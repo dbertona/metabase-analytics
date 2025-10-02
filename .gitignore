@@ -1,0 +1,27 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Metabase data
+metabase-data/
+*.h2.*
+*.log
+
+# Backups
+backups/
+*.backup
+*.sql.gz
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker volumes
+postgres-data/
+
