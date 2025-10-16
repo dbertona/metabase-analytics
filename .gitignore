@@ -5,6 +5,7 @@
 
 # Metabase data
 metabase-data/
+data/
 *.h2.*
 *.log
 

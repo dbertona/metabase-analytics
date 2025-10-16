@@ -1,6 +1,8 @@
-# Metabase Docker Setup
+# 📊 Metabase Analytics - Power Solution
 
-Configuración completa de Metabase con Docker para análisis de datos y visualizaciones.
+Configuración completa de Metabase con Docker para análisis de datos y visualizaciones del ecosistema Power Solution.
+
+**Integrado con:** Supabase (Timesheet + Expenses) + Business Central (OData)
 
 ## Estructura del Proyecto
 
@@ -67,6 +69,46 @@ Los datos se almacenan en volúmenes Docker persistentes:
 
 ⚠️ **IMPORTANTE**: Cambiar todas las contraseñas por defecto antes de usar en producción.
 
+## 🔌 Integración con Power Solution
+
+### Conexión a Supabase
+
+Metabase puede conectarse directamente a la base de datos de Supabase para analizar:
+- ⏰ Datos de Timesheet
+- 💰 Datos de Expenses
+- 👥 Usuarios y permisos
+- 📊 Métricas de uso
+
+**Configuración automática:**
+```bash
+./scripts/configure-supabase.sh
+```
+
+**Configuración manual:**
+1. En Metabase: Admin → Databases → Add Database
+2. Tipo: PostgreSQL
+3. Host: `db.qfpswxjunoepznrpsltt.supabase.co`
+4. Puerto: `5432`
+5. Database: `postgres`
+6. User/Password: (de Supabase)
+
+### Conexión a Business Central (OData)
+
+Ver `scripts/create-api-endpoint.sh` para configurar acceso a APIs de Business Central.
+
+---
+
+## 📊 Dashboards Preconfigurados
+
+_(Próximamente)_
+
+- [ ] Dashboard de Horas por Proyecto
+- [ ] Dashboard de Gastos por Departamento
+- [ ] Dashboard de Aprobaciones Pendientes
+- [ ] Dashboard de Productividad
+
+---
+
 ## Troubleshooting
 
 ### Verificar estado de servicios
@@ -83,6 +125,11 @@ docker-compose logs postgres
 ### Reiniciar servicios
 ```bash
 docker-compose restart
+```
+
+### Verificar conexión a Supabase
+```bash
+./scripts/test-supabase-connection.sh
 ```
 
 
