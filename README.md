@@ -4,6 +4,19 @@ Configuración completa de Metabase con Docker para análisis de datos y visuali
 
 **Integrado con:** Supabase (Timesheet + Expenses) + Business Central (OData)
 
+## 🚨 CRÍTICO: Gitea es el Repositorio Principal
+
+**⚠️ REGLA OBLIGATORIA: SIEMPRE hacer push a Gitea, NUNCA a GitHub directamente.**
+
+- ✅ **SIEMPRE** `git push gitea main` (Gitea es el repositorio principal)
+- ❌ **NUNCA** `git push origin main` (GitHub es solo mirror de respaldo)
+
+**Documentación completa:**
+- `docs/shared/GITEA_VS_GITHUB.md` 🚨 **CONFIGURACIÓN DE REMOTES**
+- `docs/shared/DOCUMENTATION_INDEX.md` - Índice completo de documentación
+
+**Repositorio Gitea:** `http://192.168.36.104:3000/admin/metabase-analytics`
+
 ## Estructura del Proyecto
 
 ```
