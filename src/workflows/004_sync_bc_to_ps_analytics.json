@@ -2285,13 +2285,7 @@
     },
     "Update sync_state (ConfiguracionUsuarios)": {
       "main": [
-        [
-          {
-            "node": "BC API - LoginCompany",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "BC API - LoginCompany": {
@@ -2350,13 +2344,7 @@
     },
     "Update sync_state (LoginCompany)": {
       "main": [
-        [
-          {
-            "node": "BC API - Tecnologias",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "BC API - Tecnologias": {
