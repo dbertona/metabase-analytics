@@ -1096,7 +1096,7 @@
       "parameters": {
         "jsCode": "const input=$input.all(); if(!input.length) return []; const raw=input[0]?.json??{}; const src=raw?.body??raw; const val=Array.isArray(src.value)?src.value:(Array.isArray(src)?src:[src]); const out=[]; const companyName=$items('Build sync_state map')[0]?.json?.company||''; for(const r of val){ const email=String(r.email??'').trim(); if(!email) continue; out.push({json:{ companyName:String(r.companyName??companyName).trim(), role_id:String(r.roleID??'').trim(), email:email, full_name:String(r.fullName??'').trim(), display_name:String(r.displayName??'').trim(), lastModifiedDateTime:String(r.lastModifiedDateTime??'').trim() }});} return out;"
       },
-      "id": "b2c3d4e5-f6a7-8901-bcde-f23456789012",
+      "id": "lc001-f6a7-8901-bcde-transform12345",
       "name": "Transform LoginCompany",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1113,7 +1113,7 @@
           "queryReplacement": "{{$json.companyName}}\n{{$json.role_id}}\n{{$json.email}}\n{{$json.full_name}}\n{{$json.display_name}}\n{{$json.lastModifiedDateTime}}\n"
         }
       },
-      "id": "c3d4e5f6-a7b8-9012-cdef-345678901234",
+      "id": "lc002-a7b8-9012-cdef-upsert1234567",
       "name": "Upsert LoginCompany",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
@@ -1133,7 +1133,7 @@
       "parameters": {
         "jsCode": "const err=$node['Upsert LoginCompany']?.json?.error; if(err){return [];} const companyName=$items('Build sync_state map')[0]?.json?.company||''; return [{json:{companyName, nowIso:new Date().toISOString()}}];"
       },
-      "id": "d4e5f6a7-b8c9-0123-def4-456789012345",
+      "id": "lc003-b8c9-0123-def4-compute123456",
       "name": "Compute now ISO (LoginCompany)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1170,7 +1170,7 @@
           ]
         }
       },
-      "id": "e5f6a7b8-c9d0-1234-ef56-567890123456",
+      "id": "lc004-c9d0-1234-ef56-syncstate1234",
       "name": "Update sync_state (LoginCompany)",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
@@ -1189,7 +1189,7 @@
       "parameters": {
         "jsCode": "const items=$input.all(); let failed=0; let firstErr=''; for(const it of items){ const j=it?.json||{}; const statusCode=Number(j?.statusCode??j?.response?.statusCode??0); const bodyErr=j?.body?.error?.message||(typeof j?.body==='string'?j.body:null); const msg=j?.error?.message||j?.message||j?.data?.error||j?.response?.body||j?.responseBody||bodyErr||null; if(!firstErr&&msg) firstErr=String(msg); if(msg||statusCode>=400) failed++; } const success=items.length-failed; const synced=success; const res={ key:'login_company', causeNode:'Upsert LoginCompany'}; if(failed>0){ res.status='error'; res.synced=success; res.failed=failed; res.message=firstErr||('HTTP '+(items[0]?.json?.statusCode||'error')); } else { res.status='ok'; res.synced=synced; res.success=success; } return [{json:res}];"
       },
-      "id": "f6a7b8c9-d0e1-2345-f678-678901234567",
+      "id": "lc005-d0e1-2345-f678-result12345678",
       "name": "Result LoginCompany",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
