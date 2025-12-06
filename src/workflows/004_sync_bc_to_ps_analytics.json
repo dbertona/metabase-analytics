@@ -24,7 +24,7 @@
     },
     {
       "parameters": {
-        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/Recursos?$select=no,name,arbvrneMail,globalDimension1Code,calendario,fechaDeBaja,fechaDeAlta,subcontratacion,perfil,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + $('Build sync_state map').first().json.syncStateByEntity['recursos']\n}}",
+        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/Recursos?$select=no,name,arbvrneMail,globalDimension1Code,calendario,fechaDeBaja,fechaDeAlta,subcontratacion,perfil,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + $('Build sync_state map').first().json.syncStateByEntity['resource']\n}}",
         "authentication": "genericCredentialType",
         "genericAuthType": "oAuth2Api",
         "options": {}
@@ -70,7 +70,7 @@
     },
     {
       "parameters": {
-        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/Proyectos?$select=no,description,departamento,Probability,TipoProyecto,Estado,Fechafin,DoNotConsolidate,Responsible,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + $('Build sync_state map').first().json.syncStateByEntity['proyectos']\n}}",
+        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/Proyectos?$select=no,description,departamento,Probability,TipoProyecto,Estado,Fechafin,DoNotConsolidate,Responsible,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + $('Build sync_state map').first().json.syncStateByEntity['jobs']\n}}",
         "authentication": "genericCredentialType",
         "genericAuthType": "oAuth2Api",
         "options": {}
@@ -93,7 +93,7 @@
     },
     {
       "parameters": {
-        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/EquipoProyectos?$select=ARBVRNJobNo,ARBVRNResourceNo,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + $('Build sync_state map').first().json.syncStateByEntity['equipo_proyectos']\n}}",
+        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/EquipoProyectos?$select=ARBVRNJobNo,ARBVRNResourceNo,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + $('Build sync_state map').first().json.syncStateByEntity['job_team']\n}}",
         "authentication": "genericCredentialType",
         "genericAuthType": "oAuth2Api",
         "options": {}
@@ -212,7 +212,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const nodes = [\n  { key: 'recursos', name: 'Result Recursos' },\n  { key: 'ps_year', name: 'Result PS_Years' },\n  { key: 'proyectos', name: 'Result Proyectos' },\n  { key: 'equipo_proyectos', name: 'Result Equipo Proyectos' },\n  { key: 'job_task', name: 'Result Job Task' },\n  { key: 'centros_de_responsabilidad', name: 'Result CentrosDeResponsabilidad' },\n  { key: 'configuracion_usuarios', name: 'Result ConfiguracionUsuarios' },\n  { key: 'tecnologias', name: 'Result Tecnologias' },\n  { key: 'tipologias', name: 'Result Tipologias' },\n  { key: 'departamentos', name: 'Result Departamentos' },\n  { key: 'movimientos_proyectos', name: 'Result MovimientosProyectos' },\n  { key: 'login_company', name: 'Result LoginCompany' },\n];\nconst details = {};\nlet success = 0, failed = 0;\nfor (const n of nodes) {\n  let arr = [];\n  try { arr = $items(n.name).map(i => i.json).filter(Boolean); } catch (e) { arr = []; }\n  if (arr.length > 0) {\n    const d = arr[0];\n    const entry = { status: d.status };\n    if (typeof d.synced !== 'undefined') entry.synced = d.synced;\n    if (typeof d.success !== 'undefined') entry.success = d.success;\n    if (typeof d.failed !== 'undefined') entry.failed = d.failed;\n    if (d.message) entry.message = String(d.message);\n    if (d.causeNode) entry.causeNode = d.causeNode;\n    details[n.key] = entry;\n    if (String(d.status) === 'ok') success++; else failed++;\n  }\n}\nconst overall = failed === 0 ? 'ok' : (success > 0 ? 'partial_error' : 'error');\nconst company = ($('Resolve Company').first()?.json?.companyName) || '';\nreturn [{ json: { status: overall, timestamp: new Date().toISOString(), company, summary: { total_entities: Object.keys(details).length, success, failed }, details } }];\n"
+        "jsCode": "const nodes = [\n  { key: 'resource', name: 'Result Recursos' },\n  { key: 'ps_year', name: 'Result PS_Years' },\n  { key: 'jobs', name: 'Result Proyectos' },\n  { key: 'job_team', name: 'Result Equipo Proyectos' },\n  { key: 'job_task', name: 'Result Job Task' },\n  { key: 'centers_of_responsibility', name: 'Result CentrosDeResponsabilidad' },\n  { key: 'user_configuration', name: 'Result ConfiguracionUsuarios' },\n  { key: 'technologies', name: 'Result Tecnologias' },\n  { key: 'typologies', name: 'Result Tipologias' },\n  { key: 'departments', name: 'Result Departamentos' },\n  { key: 'jobLedgerEntry', name: 'Result MovimientosProyectos' },\n  { key: 'login_company', name: 'Result LoginCompany' },\n];\nconst details = {};\nlet success = 0, failed = 0;\nfor (const n of nodes) {\n  let arr = [];\n  try { arr = $items(n.name).map(i => i.json).filter(Boolean); } catch (e) { arr = []; }\n  if (arr.length > 0) {\n    const d = arr[0];\n    const entry = { status: d.status };\n    if (typeof d.synced !== 'undefined') entry.synced = d.synced;\n    if (typeof d.success !== 'undefined') entry.success = d.success;\n    if (typeof d.failed !== 'undefined') entry.failed = d.failed;\n    if (d.message) entry.message = String(d.message);\n    if (d.causeNode) entry.causeNode = d.causeNode;\n    details[n.key] = entry;\n    if (String(d.status) === 'ok') success++; else failed++;\n  }\n}\nconst overall = failed === 0 ? 'ok' : (success > 0 ? 'partial_error' : 'error');\nconst company = ($('Resolve Company').first()?.json?.companyName) || '';\nreturn [{ json: { status: overall, timestamp: new Date().toISOString(), company, summary: { total_entities: Object.keys(details).length, success, failed }, details } }];\n"
       },
       "id": "dd2e6932-eb25-4fac-b808-348d0f08e565",
       "name": "Compute Execution Summary",
@@ -444,7 +444,7 @@
             {
               "keyName": "entity",
               "condition": "eq",
-              "keyValue": "recursos"
+              "keyValue": "resource"
             }
           ]
         },
@@ -530,7 +530,7 @@
             {
               "keyName": "entity",
               "condition": "eq",
-              "keyValue": "proyectos"
+              "keyValue": "jobs"
             }
           ]
         },
@@ -573,7 +573,7 @@
             {
               "keyName": "entity",
               "condition": "eq",
-              "keyValue": "equipo_proyectos"
+              "keyValue": "job_team"
             }
           ]
         },
@@ -671,7 +671,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const rows = $input.all().flatMap(i => Array.isArray(i.json) ? i.json : [i.json]);\nconst entities = [\n  'recursos','ps_year','proyectos','equipo_proyectos','job_task','centros_de_responsabilidad',\n  'configuracion_usuarios','tecnologias','tipologias','departamentos','movimientos_proyectos','login_company'\n];\nconst byEntity = {};\nfor (const r of rows) {\n  const e = String(r.entity || '').trim();\n  const raw = String(r.last_sync_at || '').trim();\n  if (!e || !raw) continue;\n  const iso = new Date(raw.replace(' ', 'T')).toISOString();\n  byEntity[e] = iso;\n}\nconst defaultDate = '1900-01-01T00:00:00.000Z';\nfor (const entity of entities) if (!byEntity[entity]) byEntity[entity] = defaultDate;\nconst items = [];\nconst companyName = $('Resolve Company').first().json.companyName;\nconst companyId = $('Resolve Company').first().json.companyId;\nfor (const entity of entities) items.push({ json: { syncStateByEntity: byEntity, company: companyName, companyId, entity } });\nreturn items;\n"
+        "jsCode": "const rows = $input.all().flatMap(i => Array.isArray(i.json) ? i.json : [i.json]);\nconst entities = [\n  'resource','ps_year','jobs','job_team','job_task','centers_of_responsibility',\n  'user_configuration','technologies','typologies','departments','jobLedgerEntry','login_company'\n];\nconst byEntity = {};\nfor (const r of rows) {\n  const e = String(r.entity || '').trim();\n  const raw = String(r.last_sync_at || '').trim();\n  if (!e || !raw) continue;\n  const iso = new Date(raw.replace(' ', 'T')).toISOString();\n  byEntity[e] = iso;\n}\nconst defaultDate = '1900-01-01T00:00:00.000Z';\nfor (const entity of entities) if (!byEntity[entity]) byEntity[entity] = defaultDate;\nconst items = [];\nconst companyName = $('Resolve Company').first().json.companyName;\nconst companyId = $('Resolve Company').first().json.companyId;\nfor (const entity of entities) items.push({ json: { syncStateByEntity: byEntity, company: companyName, companyId, entity } });\nreturn items;\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -813,7 +813,7 @@
     },
     {
       "parameters": {
-        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/CentrosDeResponsabilidad?$select=code,globalDimension1Code,eMail,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + $('Build sync_state map').first().json.syncStateByEntity['centros_de_responsabilidad']\n}}",
+        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/CentrosDeResponsabilidad?$select=code,globalDimension1Code,eMail,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + $('Build sync_state map').first().json.syncStateByEntity['centers_of_responsibility']\n}}",
         "authentication": "genericCredentialType",
         "genericAuthType": "oAuth2Api",
         "options": {}
@@ -899,7 +899,7 @@
             {
               "keyName": "entity",
               "condition": "eq",
-              "keyValue": "centros_de_responsabilidad"
+              "keyValue": "centers_of_responsibility"
             }
           ]
         },
@@ -942,7 +942,7 @@
     },
     {
       "parameters": {
-        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/ConfiguracionUsuarios?$select=userID,eMail,arbvrnJobresponsabilityfilter,projectteamfilter,Departamento,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + $('Build sync_state map').first().json.syncStateByEntity['configuracion_usuarios']\n}}",
+        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/ConfiguracionUsuarios?$select=userID,eMail,arbvrnJobresponsabilityfilter,projectteamfilter,Departamento,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + $('Build sync_state map').first().json.syncStateByEntity['user_configuration']\n}}",
         "authentication": "genericCredentialType",
         "genericAuthType": "oAuth2Api",
         "options": {}
@@ -1028,7 +1028,7 @@
             {
               "keyName": "entity",
               "condition": "eq",
-              "keyValue": "configuracion_usuarios"
+              "keyValue": "user_configuration"
             }
           ]
         },
@@ -1200,7 +1200,7 @@
     },
     {
       "parameters": {
-        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/Tecnologias?$select=code,name,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + $('Build sync_state map').first().json.syncStateByEntity['tecnologias']\n}}\n",
+        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/Tecnologias?$select=code,name,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + $('Build sync_state map').first().json.syncStateByEntity['technologies']\n}}\n",
         "authentication": "genericCredentialType",
         "genericAuthType": "oAuth2Api",
         "options": {}
@@ -1286,7 +1286,7 @@
             {
               "keyName": "entity",
               "condition": "eq",
-              "keyValue": "tecnologias"
+              "keyValue": "technologies"
             }
           ]
         },
@@ -1329,7 +1329,7 @@
     },
     {
       "parameters": {
-        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/Tipologias?$select=code,name,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + $('Build sync_state map').first().json.syncStateByEntity['tipologias']\n}}\n",
+        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/Tipologias?$select=code,name,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + $('Build sync_state map').first().json.syncStateByEntity['typologies']\n}}\n",
         "authentication": "genericCredentialType",
         "genericAuthType": "oAuth2Api",
         "options": {}
@@ -1415,7 +1415,7 @@
             {
               "keyName": "entity",
               "condition": "eq",
-              "keyValue": "tipologias"
+              "keyValue": "typologies"
             }
           ]
         },
@@ -1458,7 +1458,7 @@
     },
     {
       "parameters": {
-        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/Departamentos?$select=code,name,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + $('Build sync_state map').first().json.syncStateByEntity['departamentos']\n}}\n",
+        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/Departamentos?$select=code,name,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + $('Build sync_state map').first().json.syncStateByEntity['departments']\n}}\n",
         "authentication": "genericCredentialType",
         "genericAuthType": "oAuth2Api",
         "options": {}
@@ -1544,7 +1544,7 @@
             {
               "keyName": "entity",
               "condition": "eq",
-              "keyValue": "departamentos"
+              "keyValue": "departments"
             }
           ]
         },
@@ -1587,7 +1587,7 @@
     },
     {
       "parameters": {
-        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/MovimientosProyectos?$select=entryNo,entryType,documentNo,jobNo,jobTaskNo,no,description,quantity,originalUnitCost,totalCost,unitPrice,totalPrice,GlobalDimension2Code,GlobalDimension1Code,GlobalDimension5Code,GlobalDimension4Code,TimeSheetDate,DocumentDate,Origen,LinePrice,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + $('Build sync_state map').first().json.syncStateByEntity['movimientos_proyectos']\n}}",
+        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/MovimientosProyectos?$select=entryNo,entryType,documentNo,jobNo,jobTaskNo,no,description,quantity,originalUnitCost,totalCost,unitPrice,totalPrice,GlobalDimension2Code,GlobalDimension1Code,GlobalDimension5Code,GlobalDimension4Code,TimeSheetDate,DocumentDate,Origen,LinePrice,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + $('Build sync_state map').first().json.syncStateByEntity['jobLedgerEntry']\n}}",
         "authentication": "genericCredentialType",
         "genericAuthType": "oAuth2Api",
         "options": {}
@@ -1673,7 +1673,7 @@
             {
               "keyName": "entity",
               "condition": "eq",
-              "keyValue": "movimientos_proyectos"
+              "keyValue": "jobLedgerEntry"
             }
           ]
         },
