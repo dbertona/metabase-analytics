@@ -1071,7 +1071,7 @@
     },
     {
       "parameters": {
-        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/LoginCompany?$select=roleID,companyName,email,fullName,displayName,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + $('Build sync_state map').first().json.syncStateByEntity['login_company']\n}}",
+        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/LoginCompany?$select=roleID,companyName,email,fullName,displayName'\n}}",
         "authentication": "genericCredentialType",
         "genericAuthType": "oAuth2Api",
         "options": {}
@@ -1094,7 +1094,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const input=$input.all(); if(!input.length) return []; const raw=input[0]?.json??{}; const src=raw?.body??raw; const val=Array.isArray(src.value)?src.value:(Array.isArray(src)?src:[src]); const out=[]; const companyName=$items('Build sync_state map')[0]?.json?.company||''; for(const r of val){ const email=String(r.email??'').trim(); if(!email) continue; out.push({json:{ companyName:String(r.companyName??companyName).trim(), role_id:String(r.roleID??'').trim(), email:email, full_name:String(r.fullName??'').trim(), display_name:String(r.displayName??'').trim(), lastModifiedDateTime:String(r.lastModifiedDateTime??'').trim() }});} return out;"
+        "jsCode": "const input=$input.all(); if(!input.length) return []; const raw=input[0]?.json??{}; const src=raw?.body??raw; const val=Array.isArray(src.value)?src.value:(Array.isArray(src)?src:[src]); const out=[]; const companyName=$items('Build sync_state map')[0]?.json?.company||''; for(const r of val){ const email=String(r.email??'').trim(); if(!email) continue; out.push({json:{ companyName:String(r.companyName??companyName).trim(), role_id:String(r.roleID??'').trim(), email:email, full_name:String(r.fullName??'').trim(), display_name:String(r.displayName??'').trim() }});} return out;"
       },
       "id": "lc001-f6a7-8901-bcde-transform12345",
       "name": "Transform LoginCompany",
@@ -1108,9 +1108,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO public.login_company\n(company_name, role_id, email, full_name, display_name, last_modified_datetime, updated_at)\nSELECT\n  $1, $2, $3, $4, $5,\n  NULLIF($6::text,'')::timestamptz,\n  NOW()\nWHERE $3::text <> ''\nON CONFLICT (company_name, email)\nDO UPDATE SET\n  role_id = EXCLUDED.role_id,\n  full_name = EXCLUDED.full_name,\n  display_name = EXCLUDED.display_name,\n  last_modified_datetime = EXCLUDED.last_modified_datetime,\n  updated_at = NOW();\n",
+        "query": "INSERT INTO public.login_company\n(company_name, role_id, email, full_name, display_name, updated_at)\nSELECT\n  $1, $2, $3, $4, $5, NOW()\nWHERE $3::text <> ''\nON CONFLICT (company_name, email)\nDO UPDATE SET\n  role_id = EXCLUDED.role_id,\n  full_name = EXCLUDED.full_name,\n  display_name = EXCLUDED.display_name,\n  updated_at = NOW();\n",
         "options": {
-          "queryReplacement": "{{$json.companyName}}\n{{$json.role_id}}\n{{$json.email}}\n{{$json.full_name}}\n{{$json.display_name}}\n{{$json.lastModifiedDateTime}}\n"
+          "queryReplacement": "{{$json.companyName}}\n{{$json.role_id}}\n{{$json.email}}\n{{$json.full_name}}\n{{$json.display_name}}\n"
         }
       },
       "id": "lc002-a7b8-9012-cdef-upsert1234567",
