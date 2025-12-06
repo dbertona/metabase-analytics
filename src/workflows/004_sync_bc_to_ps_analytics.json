@@ -212,7 +212,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const nodes = [\n  { key: 'recursos', name: 'Result Recursos' },\n  { key: 'ps_year', name: 'Result PS_Years' },\n  { key: 'proyectos', name: 'Result Proyectos' },\n  { key: 'equipo_proyectos', name: 'Result Equipo Proyectos' },\n  { key: 'job_task', name: 'Result Job Task' },\n  { key: 'centros_de_responsabilidad', name: 'Result CentrosDeResponsabilidad' },\n  { key: 'configuracion_usuarios', name: 'Result ConfiguracionUsuarios' },\n  { key: 'tecnologias', name: 'Result Tecnologias' },\n  { key: 'tipologias', name: 'Result Tipologias' },\n  { key: 'departamentos', name: 'Result Departamentos' },\n  { key: 'movimientos_proyectos', name: 'Result MovimientosProyectos' },\n];\nconst details = {};\nlet success = 0, failed = 0;\nfor (const n of nodes) {\n  let arr = [];\n  try { arr = $items(n.name).map(i => i.json).filter(Boolean); } catch (e) { arr = []; }\n  if (arr.length > 0) {\n    const d = arr[0];\n    const entry = { status: d.status };\n    if (typeof d.synced !== 'undefined') entry.synced = d.synced;\n    if (typeof d.success !== 'undefined') entry.success = d.success;\n    if (typeof d.failed !== 'undefined') entry.failed = d.failed;\n    if (d.message) entry.message = String(d.message);\n    if (d.causeNode) entry.causeNode = d.causeNode;\n    details[n.key] = entry;\n    if (String(d.status) === 'ok') success++; else failed++;\n  }\n}\nconst overall = failed === 0 ? 'ok' : (success > 0 ? 'partial_error' : 'error');\nconst company = ($('Resolve Company').first()?.json?.companyName) || '';\nreturn [{ json: { status: overall, timestamp: new Date().toISOString(), company, summary: { total_entities: Object.keys(details).length, success, failed }, details } }];\n"
+        "jsCode": "const nodes = [\n  { key: 'recursos', name: 'Result Recursos' },\n  { key: 'ps_year', name: 'Result PS_Years' },\n  { key: 'proyectos', name: 'Result Proyectos' },\n  { key: 'equipo_proyectos', name: 'Result Equipo Proyectos' },\n  { key: 'job_task', name: 'Result Job Task' },\n  { key: 'centros_de_responsabilidad', name: 'Result CentrosDeResponsabilidad' },\n  { key: 'configuracion_usuarios', name: 'Result ConfiguracionUsuarios' },\n  { key: 'tecnologias', name: 'Result Tecnologias' },\n  { key: 'tipologias', name: 'Result Tipologias' },\n  { key: 'departamentos', name: 'Result Departamentos' },\n  { key: 'movimientos_proyectos', name: 'Result MovimientosProyectos' },\n  { key: 'login_company', name: 'Result LoginCompany' },\n];\nconst details = {};\nlet success = 0, failed = 0;\nfor (const n of nodes) {\n  let arr = [];\n  try { arr = $items(n.name).map(i => i.json).filter(Boolean); } catch (e) { arr = []; }\n  if (arr.length > 0) {\n    const d = arr[0];\n    const entry = { status: d.status };\n    if (typeof d.synced !== 'undefined') entry.synced = d.synced;\n    if (typeof d.success !== 'undefined') entry.success = d.success;\n    if (typeof d.failed !== 'undefined') entry.failed = d.failed;\n    if (d.message) entry.message = String(d.message);\n    if (d.causeNode) entry.causeNode = d.causeNode;\n    details[n.key] = entry;\n    if (String(d.status) === 'ok') success++; else failed++;\n  }\n}\nconst overall = failed === 0 ? 'ok' : (success > 0 ? 'partial_error' : 'error');\nconst company = ($('Resolve Company').first()?.json?.companyName) || '';\nreturn [{ json: { status: overall, timestamp: new Date().toISOString(), company, summary: { total_entities: Object.keys(details).length, success, failed }, details } }];\n"
       },
       "id": "dd2e6932-eb25-4fac-b808-348d0f08e565",
       "name": "Compute Execution Summary",
@@ -671,7 +671,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const rows = $input.all().flatMap(i => Array.isArray(i.json) ? i.json : [i.json]);\nconst entities = [\n  'recursos','ps_year','proyectos','equipo_proyectos','job_task','centros_de_responsabilidad',\n  'configuracion_usuarios','tecnologias','tipologias','departamentos','movimientos_proyectos'\n];\nconst byEntity = {};\nfor (const r of rows) {\n  const e = String(r.entity || '').trim();\n  const raw = String(r.last_sync_at || '').trim();\n  if (!e || !raw) continue;\n  const iso = new Date(raw.replace(' ', 'T')).toISOString();\n  byEntity[e] = iso;\n}\nconst defaultDate = '1900-01-01T00:00:00.000Z';\nfor (const entity of entities) if (!byEntity[entity]) byEntity[entity] = defaultDate;\nconst items = [];\nconst companyName = $('Resolve Company').first().json.companyName;\nconst companyId = $('Resolve Company').first().json.companyId;\nfor (const entity of entities) items.push({ json: { syncStateByEntity: byEntity, company: companyName, companyId, entity } });\nreturn items;\n"
+        "jsCode": "const rows = $input.all().flatMap(i => Array.isArray(i.json) ? i.json : [i.json]);\nconst entities = [\n  'recursos','ps_year','proyectos','equipo_proyectos','job_task','centros_de_responsabilidad',\n  'configuracion_usuarios','tecnologias','tipologias','departamentos','movimientos_proyectos','login_company'\n];\nconst byEntity = {};\nfor (const r of rows) {\n  const e = String(r.entity || '').trim();\n  const raw = String(r.last_sync_at || '').trim();\n  if (!e || !raw) continue;\n  const iso = new Date(raw.replace(' ', 'T')).toISOString();\n  byEntity[e] = iso;\n}\nconst defaultDate = '1900-01-01T00:00:00.000Z';\nfor (const entity of entities) if (!byEntity[entity]) byEntity[entity] = defaultDate;\nconst items = [];\nconst companyName = $('Resolve Company').first().json.companyName;\nconst companyId = $('Resolve Company').first().json.companyId;\nfor (const entity of entities) items.push({ json: { syncStateByEntity: byEntity, company: companyName, companyId, entity } });\nreturn items;\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1067,6 +1067,135 @@
       "position": [
         608,
         2448
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/Pruebas_PS/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/LoginCompany?$select=roleID,companyName,email,fullName,displayName,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + $('Build sync_state map').first().json.syncStateByEntity['login_company']\n}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {}
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567891",
+      "name": "BC API - LoginCompany",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        3616
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "WvL0ymQem3Y2ptqz",
+          "name": "Business Central"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const input=$input.all(); if(!input.length) return []; const raw=input[0]?.json??{}; const src=raw?.body??raw; const val=Array.isArray(src.value)?src.value:(Array.isArray(src)?src:[src]); const out=[]; const companyName=$items('Build sync_state map')[0]?.json?.company||''; for(const r of val){ const email=String(r.email??'').trim(); if(!email) continue; out.push({json:{ companyName:String(r.companyName??companyName).trim(), role_id:String(r.roleID??'').trim(), email:email, full_name:String(r.fullName??'').trim(), display_name:String(r.displayName??'').trim(), lastModifiedDateTime:String(r.lastModifiedDateTime??'').trim() }});} return out;"
+      },
+      "id": "b2c3d4e5-f6a7-8901-bcde-f23456789012",
+      "name": "Transform LoginCompany",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        3776
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO public.login_company\n(company_name, role_id, email, full_name, display_name, last_modified_datetime, updated_at)\nSELECT\n  $1, $2, $3, $4, $5,\n  NULLIF($6::text,'')::timestamptz,\n  NOW()\nWHERE $3::text <> ''\nON CONFLICT (company_name, email)\nDO UPDATE SET\n  role_id = EXCLUDED.role_id,\n  full_name = EXCLUDED.full_name,\n  display_name = EXCLUDED.display_name,\n  last_modified_datetime = EXCLUDED.last_modified_datetime,\n  updated_at = NOW();\n",
+        "options": {
+          "queryReplacement": "{{$json.companyName}}\n{{$json.role_id}}\n{{$json.email}}\n{{$json.full_name}}\n{{$json.display_name}}\n{{$json.lastModifiedDateTime}}\n"
+        }
+      },
+      "id": "c3d4e5f6-a7b8-9012-cdef-345678901234",
+      "name": "Upsert LoginCompany",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        384,
+        3776
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "aF1OnLqFL94UmPRU",
+          "name": "Postgres account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const err=$node['Upsert LoginCompany']?.json?.error; if(err){return [];} const companyName=$items('Build sync_state map')[0]?.json?.company||''; return [{json:{companyName, nowIso:new Date().toISOString()}}];"
+      },
+      "id": "d4e5f6a7-b8c9-0123-def4-456789012345",
+      "name": "Compute now ISO (LoginCompany)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        3776
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "sync_state",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "company_name",
+              "condition": "eq",
+              "keyValue": "={{ $('Build sync_state map').first().json.company }}"
+            },
+            {
+              "keyName": "entity",
+              "condition": "eq",
+              "keyValue": "login_company"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "last_sync_at",
+              "fieldValue": "={{ $json.nowIso }}"
+            }
+          ]
+        }
+      },
+      "id": "e5f6a7b8-c9d0-1234-ef56-567890123456",
+      "name": "Update sync_state (LoginCompany)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        752,
+        3776
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "0eEJakollgPP3g3u",
+          "name": "Supabase Analytics"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items=$input.all(); let failed=0; let firstErr=''; for(const it of items){ const j=it?.json||{}; const statusCode=Number(j?.statusCode??j?.response?.statusCode??0); const bodyErr=j?.body?.error?.message||(typeof j?.body==='string'?j.body:null); const msg=j?.error?.message||j?.message||j?.data?.error||j?.response?.body||j?.responseBody||bodyErr||null; if(!firstErr&&msg) firstErr=String(msg); if(msg||statusCode>=400) failed++; } const success=items.length-failed; const synced=success; const res={ key:'login_company', causeNode:'Upsert LoginCompany'}; if(failed>0){ res.status='error'; res.synced=success; res.failed=failed; res.message=firstErr||('HTTP '+(items[0]?.json?.statusCode||'error')); } else { res.status='ok'; res.synced=synced; res.success=success; } return [{json:res}];"
+      },
+      "id": "f6a7b8c9-d0e1-2345-f678-678901234567",
+      "name": "Result LoginCompany",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        3616
       ]
     },
     {
@@ -1587,7 +1716,7 @@
     },
     {
       "parameters": {
-        "numberInputs": 10
+        "numberInputs": 11
       },
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
@@ -1928,6 +2057,11 @@
             "node": "BC API - ConfiguracionUsuarios",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "BC API - LoginCompany",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -2151,7 +2285,78 @@
     },
     "Update sync_state (ConfiguracionUsuarios)": {
       "main": [
-        []
+        [
+          {
+            "node": "BC API - LoginCompany",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BC API - LoginCompany": {
+      "main": [
+        [
+          {
+            "node": "Transform LoginCompany",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Result LoginCompany",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform LoginCompany": {
+      "main": [
+        [
+          {
+            "node": "Upsert LoginCompany",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert LoginCompany": {
+      "main": [
+        [
+          {
+            "node": "Compute now ISO (LoginCompany)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Result LoginCompany",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute now ISO (LoginCompany)": {
+      "main": [
+        [
+          {
+            "node": "Update sync_state (LoginCompany)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update sync_state (LoginCompany)": {
+      "main": [
+        [
+          {
+            "node": "BC API - Tecnologias",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "BC API - Tecnologias": {
@@ -2442,6 +2647,17 @@
             "node": "Merge",
             "type": "main",
             "index": 6
+          }
+        ]
+      ]
+    },
+    "Result LoginCompany": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 10
           }
         ]
       ]
