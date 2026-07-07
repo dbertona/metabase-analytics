@@ -115,10 +115,15 @@ Ver `scripts/create-api-endpoint.sh` para configurar acceso a APIs de Business C
 
 ### Seguimiento Económico PS (réplica Power BI)
 
-Documentación y spec del informe BC → Metabase:
+**Guía maestra:** [`docs/GUIA_COMPLETA_ANALYTICS.md`](docs/GUIA_COMPLETA_ANALYTICS.md) — arquitectura, BD, sync 004, KPIs, operaciones.
 
-- [`docs/seguimiento-economico/README.md`](docs/seguimiento-economico/README.md)
-- Views SQL: `sql/views/seguimiento_economico_views.sql` (canónico en `power-solution-apps`)
+| Documento | Contenido |
+|-----------|-----------|
+| [GUIA_COMPLETA_ANALYTICS.md](docs/GUIA_COMPLETA_ANALYTICS.md) | Todo lo que tenemos y cómo funciona |
+| [seguimiento-economico/README.md](docs/seguimiento-economico/README.md) | Fases PBI, páginas del informe |
+| [ACTUALIZAR_WORKFLOW_004.md](docs/ACTUALIZAR_WORKFLOW_004.md) | Deploy n8n y sync |
+
+Views SQL canónicas: `power-solution-apps/supabase/migrations/20260702180000_*`
 
 ### Otros (pendientes)
 

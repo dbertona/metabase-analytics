@@ -2,46 +2,59 @@
 
 Informe origen: Power BI `Seguimiento Económico PS.pbix` (dataset en la nube, fuente **BC Production**).
 
+> **Documentación maestra:** [GUIA_COMPLETA_ANALYTICS.md](../GUIA_COMPLETA_ANALYTICS.md) — arquitectura, tablas, vistas, sync 004, KPIs y operaciones.
+
 ## Objetivo
 
 Replicar en **Metabase prod** (`http://192.168.36.100:3000/`) las 7 páginas del informe Power BI con paridad numérica respecto al modelo semántico PBI.
-
-**Entorno de trabajo actual:** Analytics **producción** (VM 100). DEV (102) queda para pruebas aisladas.
 
 ## Repositorios
 
 | Repo | Responsabilidad |
 |------|-----------------|
-| **metabase-analytics** (este) | Spec PBI, SQL de modelos Metabase, exports de dashboards |
-| **power-solution-apps** | Migraciones Analytics (`supabase/migrations`), workflow **004**, deploy `ops/metabase/` |
+| **metabase-analytics** (este) | Spec PBI, SQL de modelos Metabase, exports de dashboards, docs |
+| **power-solution-apps** | Migraciones Analytics, workflow **004**, scripts deploy |
 
-## Infraestructura
+## Infraestructura (prod)
 
-| Componente | Producción |
-|--------------|------------|
+| Componente | Ubicación |
+|--------------|-----------|
 | PostgreSQL Analytics | VM 100 — `192.168.36.100:5433` (`supabase-db`) |
 | Metabase | VM 100 — `http://192.168.36.100:3000/` |
-| **n8n (workflow 004)** | VM **101** — `https://apps.powersolution.es/n8n/` |
-| BC OData | **Production** (`BC_ENVIRONMENT=Production` en n8n-prod) |
+| n8n workflow 004 | VM 101 — `https://apps.powersolution.es/n8n/` |
+| BC OData | Production (`BC_ENVIRONMENT=Production`) |
 
-**Sync:**
+## Sync
 
 ```bash
-curl -X POST 'https://apps.powersolution.es/n8n/webhook/sync-bc-to-analytics?company=psi'
+curl -sS -m 900 -X POST \
+  'https://apps.powersolution.es/n8n/webhook/sync-bc-to-analytics?company=psi'
 ```
 
-Workflow UI: `https://apps.powersolution.es/n8n/workflow/d1f7647e114a486e`
+Workflow: [d1f7647e114a486e](https://apps.powersolution.es/n8n/workflow/d1f7647e114a486e)
 
-> No usar n8n en VM 100 (retirado 2026-07-07). Ver `docs/ACTUALIZAR_WORKFLOW_004.md`.
+## Paridad KPI PSI 2026 (validado 2026-07-07)
 
-## Fases
+| Métrica | Power BI | Analytics |
+|---------|----------|-----------|
+| Real (tipo R) | 2.284.579 € | 2.284.579 € ✅ |
+| Plan (tipo P) | 4.193.215 € | 4.193.215 € ✅ |
+
+```sql
+SELECT tipo, ROUND(SUM(facturado)::numeric, 0)
+FROM v_se_facturacion
+WHERE empresa = 'Power Solution Iberia SL' AND year = 2026
+GROUP BY tipo;
+```
+
+## Fases del proyecto
 
 | Fase | Estado | Entregable |
 |------|--------|------------|
-| **1** | En curso | Views SQL `v_se_*` + dimensiones + spec DAX/PQ |
-| **2** | Sync OK en prod | Workflow 004 Fase 2 (movimientos mes, expediente, objetivos, histórico) |
+| **1** | ✅ | Views `v_se_*` + spec DAX/PQ |
+| **2** | ✅ | Sync 004 Fase 2 + paridad KPI Resumen |
 | **3** | Pendiente | Dashboard Metabase «Resumen» |
-| **4** | Pendiente | Resto de páginas (Unidad, Proyectos, Facturación, Gastos, M.O.) |
+| **4** | Pendiente | Resto de páginas PBI |
 
 ## Páginas del informe PBI
 
@@ -55,69 +68,19 @@ Workflow UI: `https://apps.powersolution.es/n8n/workflow/d1f7647e114a486e`
 
 ## Filtros globales (slicers)
 
-- `Años.Año`
-- `Empresas.Display_Name` → `company_name` en Analytics
-- `Departamentos.Descripcion`
+- `Años.Año` → `v_se_dim_anos`
+- `Empresas.Display_Name` → `v_se_dim_empresas`
+- `Departamentos.Descripcion` → `v_se_dim_departamentos`
 - `Facturacion.Tipo` → `P` (planificado) / `R` (real)
-- `Proyectos.Proyecto` (opcional por página)
 
-## Views SQL (Analytics PostgreSQL)
+## Views SQL
 
-Canónico en `power-solution-apps`:
-
-```text
-supabase/migrations/20260702180000_analytics_seguimiento_economico_views.sql
-supabase/migrations/20260702200000_analytics_seguimiento_economico_phase2_views.sql
-supabase/migrations/20260706110000_analytics_se_kpi_budget_filter.sql
-```
-
-Referencia espejo en `metabase-analytics/sql/views/`.
-
-| View | Equivalente PBI | Fuente datos |
-|------|-----------------|--------------|
-| `v_se_dim_empresas` | Empresas | `companys` |
-| `v_se_dim_anos` | Años | `bc_ps_year` + años en facturación |
-| `v_se_dim_departamentos` | Departamentos | `bc_department` |
-| `v_se_lineas_planificacion` | Lineas PLanificacion | `bc_job_planning_line` |
-| `v_se_lineas_movimientos` | Lineas Proyectos | `bc_job_ledger_entry_month` |
-| `v_se_lineas_expedientes` | Lineas Expedientes | `bc_expediente_mes` |
-| `v_se_facturacion` | Facturacion | UNION planificación + movimientos + expediente + meses cerrados |
-| `v_se_kpi_cards` | KPI Resumen | Objetivos + planificación tipo P |
-| `v_se_facturacion_recursos` | FacturacionRecursos | Subconjunto Resource de facturación |
-
-## Brechas conocidas (paridad PBI)
-
-| Tema | Estado |
-|------|--------|
-| Objetivos anuales KPI | ✅ Paridad con PBI |
-| Planificación actual KPI | ❌ Gap ~2,9 M€ vs 7,74 M€ — dedup `budgetDateMonth` en upsert/views |
-| Crecimiento YoY plan | ❌ Base 2025 tipo P incompleta en views |
-
-## Despliegue migraciones SQL
-
-```bash
-cd power-solution-apps
-
-# Producción (VM 100)
-./scripts/apply-analytics-migration.sh supabase/migrations/<archivo>.sql
-
-# DEV (opcional)
-ANALYTICS_DB_HOST=192.168.36.102 ANALYTICS_DB_CONTAINER=supabase-analytics-db-dev \
-  ./scripts/apply-analytics-migration.sh supabase/migrations/<archivo>.sql
-```
-
-## Validación vs Power BI
-
-```sql
-SELECT * FROM v_se_kpi_cards
-WHERE empresa = 'Power Solution Iberia SL' AND ano = 2026;
-```
-
-Referencias PBI (PSI 2026): plan facturación **7.740.330 €**, margen **6,69 %**, beneficio **517.605 €**.
+Canónico en `power-solution-apps/supabase/migrations/20260702180000_*` y fixes julio 2026.  
+Metabase consulta **solo** vistas `v_se_*` (ver guía completa §4.2).
 
 ## Documentación relacionada
 
-- [pbix-model-spec.md](./pbix-model-spec.md) — Medidas DAX y Power Query
-- [phase-2-sync-004.md](./phase-2-sync-004.md) — Extensiones workflow 004
-- [ACTUALIZAR_WORKFLOW_004.md](../ACTUALIZAR_WORKFLOW_004.md) — n8n prod y sync
-- `power-solution-apps/docs/architecture/DATABASES_SPLIT.md`
+- [GUIA_COMPLETA_ANALYTICS.md](../GUIA_COMPLETA_ANALYTICS.md)
+- [ACTUALIZAR_WORKFLOW_004.md](../ACTUALIZAR_WORKFLOW_004.md)
+- [pbix-model-spec.md](./pbix-model-spec.md)
+- [phase-2-sync-004.md](./phase-2-sync-004.md)
