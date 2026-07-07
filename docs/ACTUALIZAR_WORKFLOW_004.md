@@ -1,134 +1,77 @@
-# Cambios en el Workflow 004
+# Workflow 004 — Sync BC → Analytics
 
-## Resumen
+## Arquitectura (2026-07)
 
-Este documento documenta los cambios realizados en el workflow `004_sync_bc_to_ps_analytics`:
-- Sincronización de la tabla `departamentos`
-- Agregado del campo `projectteamfilter` a la tabla `configuracion_usuarios`
+| Componente | Ubicación |
+|------------|-----------|
+| **Workflow 004 (canónico)** | `power-solution-apps/apps/timesheet/src/workflows/004_sync_bc_to_analytics.json` |
+| **n8n producción** | `https://apps.powersolution.es/n8n/` (VM **101**, contenedor `n8n-prod`) |
+| **ID workflow en prod** | `d1f7647e114a486e` |
+| **PostgreSQL Analytics** | VM **100** — `192.168.36.100:5433`, contenedor `supabase-db` |
+| **Metabase prod** | `http://192.168.36.100:3000/` |
 
-## ⚠️ Cómo Actualizar el Workflow
+> **Retirado (2026-07-07):** el n8n local en VM 100 (`n8n-analytics.powersolution.es`, puerto 5678) **no debe usarse**. Era redundante y provocaba syncs contra credenciales OAuth incorrectas.
 
-**Para actualizar este workflow (o cualquier otro), consulta la guía general:**
+---
 
-👉 **[Guía: Actualizar Workflows Existentes](../shared/n8n/n8n-integration-guide.md#-actualizar-workflows-existentes-método-sqlite-directo)**
+## Actualizar el workflow en n8n prod
 
-### Método Rápido (Script Automatizado)
-
-```bash
-# Desde la VM donde está el contenedor n8n
-cd /home/metabase
-./scripts/update-n8n-workflow-004.sh
-```
-
-**Nota:** El script actualiza tanto `workflow_entity` como `shared_workflow` para que la fecha se refleje correctamente en la UI.
-
-## Verificación de Cambios
-
-### Verificar en n8n UI
-
-1. Accede a: `https://n8n-analytics.powersolution.es`
-2. Abre el workflow `004_sync_bc_to_ps_analytics`
-3. Verifica que existan los siguientes nodos nuevos:
-   - ✅ `BC API - Departamentos`
-   - ✅ `Transform Departamentos`
-   - ✅ `Upsert Departamentos`
-   - ✅ `Compute now ISO (Departamentos)`
-   - ✅ `Update sync_state (Departamentos)`
-   - ✅ `Result Departamentos`
-4. Verifica cambios en `ConfiguracionUsuarios`:
-   - ✅ Abre `BC API - ConfiguracionUsuarios` y verifica que la URL incluya `projectteamfilter` en el `$select`
-   - ✅ Abre `Transform ConfiguracionUsuarios` y verifica que extraiga `projectteamfilter`
-   - ✅ Abre `Upsert ConfiguracionUsuarios` y verifica que incluya `projectteamfilter` en el INSERT/UPDATE
-   - ✅ Verifica que `Update sync_state (ConfiguracionUsuarios)` esté conectado a `BC API - Tecnologias`
-
-### Verificar desde Terminal
-
-Para verificar cambios específicos de este workflow:
+Desde el repo **power-solution-apps**:
 
 ```bash
-docker exec n8n python3 << 'PYTHON'
-import sqlite3
-import json
+cd power-solution-apps/apps/timesheet/src/workflows
 
-WORKFLOW_ID = 'l5ux7p339Nejygra'
-
-conn = sqlite3.connect('/home/node/.n8n/database.sqlite')
-cursor = conn.cursor()
-
-cursor.execute('SELECT nodes FROM workflow_entity WHERE id = ?', (WORKFLOW_ID,))
-nodes = json.loads(cursor.fetchone()[0])
-
-# Verificar nodos de Departamentos
-departamentos_nodes = [n for n in nodes if 'Departamentos' in n.get('name', '')]
-print(f'Nodos de Departamentos: {len(departamentos_nodes)}')
-for node in departamentos_nodes:
-    print(f'  - {node.get("name")}')
-
-# Verificar projectteamfilter en ConfiguracionUsuarios
-for node in nodes:
-    if 'BC API - ConfiguracionUsuarios' in node.get('name', ''):
-        url = node.get('parameters', {}).get('url', '')
-        print(f'\nprojectteamfilter en BC API: {"projectteamfilter" in url}')
-
-conn.close()
-PYTHON
+# Requiere N8N_API_KEY_PRODUCTION y acceso a apps.powersolution.es
+N8N_ENV=production ./update_workflow_n8n.sh 004_sync_bc_to_analytics.json
 ```
 
-**Para métodos de verificación generales, consulta la [guía de n8n](../shared/n8n/n8n-integration-guide.md#verificar-que-se-actualizó-correctamente).**
+Guía completa: `power-solution-apps/docs/shared/n8n/N8N_GUIDE.md`
 
-## Configuración Post-Actualización
+---
 
-Después de actualizar el workflow, debes:
+## Ejecutar sync (PSI / PSLAB)
 
-1. **Asignar credenciales a los nuevos nodos:**
-   - `BC API - Departamentos`: Asignar credencial OAuth2 de Business Central
-   - `Upsert Departamentos`: Asignar credencial de PostgreSQL
-   - `Update sync_state (Departamentos)`: Asignar credencial de Supabase
+```bash
+# Producción — único endpoint válido para Analytics
+curl -sS -m 900 -X POST \
+  'https://apps.powersolution.es/n8n/webhook/sync-bc-to-analytics?company=psi'
 
-2. **Verificar credenciales existentes:**
-   - Los nodos de `ConfiguracionUsuarios` ya deberían tener sus credenciales asignadas
+curl -sS -m 900 -X POST \
+  'https://apps.powersolution.es/n8n/webhook/sync-bc-to-analytics?company=pslab'
+```
 
-3. **Verificar conexiones:**
-   - Asegúrate de que todos los nodos estén conectados correctamente
-   - Verifica que `Result Departamentos` se conecte a `Merge Results`
-   - Verifica que `Update sync_state (ConfiguracionUsuarios)` esté conectado a `BC API - Tecnologias`
+**Entorno BC:** `BC_ENVIRONMENT=Production` en n8n-prod (VM 101).
 
-4. **Activar el workflow:**
-   - Si está inactivo, actívalo desde la UI de n8n
+---
 
-## Troubleshooting
+## Verificar en n8n UI
 
-**Para problemas generales de actualización de workflows, consulta la [guía de troubleshooting](../shared/n8n/n8n-integration-guide.md#errores-comunes-y-soluciones).**
+1. Abrir: [004 - Sync Bc To Analytics](https://apps.powersolution.es/n8n/workflow/d1f7647e114a486e)
+2. Comprobar `updatedAt` y nodos Fase 2 (PlanificacionMes, ExpedienteMes, MovimientosProyectos, etc.)
+3. Credencial Postgres Analytics → host `192.168.36.100`, puerto **5433**
 
-### Problemas Específicos de este Workflow
+---
 
-- **ID del workflow:** `l5ux7p339Nejygra`
-- **Archivo local:** `src/workflows/004_sync_bc_to_ps_analytics.json`
+## Verificar datos en Analytics DB
 
-## Cambios Realizados en el Workflow
+```bash
+sshpass -p 'PsAdmin2025' ssh ps_admin@192.168.36.100 \
+  "docker exec supabase-db psql -U postgres -d postgres -c \"
+SELECT * FROM v_se_kpi_cards
+WHERE empresa = 'Power Solution Iberia SL' AND ano = 2026;
+\""
+```
 
-### Tabla Departamentos
-- ✅ Añadido "departamentos" a la lista de entidades en `Compute Execution Summary`
-- ✅ Añadido "departamentos" a la lista de entidades en `Build sync_state map`
-- ✅ Creados 6 nodos nuevos para sincronizar Departamentos
-- ✅ Configuradas todas las conexiones entre nodos
-- ✅ Conectado `Result Departamentos` a `Merge Results` (índice 2)
+---
 
-### Tabla ConfiguracionUsuarios - Campo projectteamfilter
-- ✅ Agregado `projectteamfilter` al `$select` en `BC API - ConfiguracionUsuarios`
-- ✅ Agregado `projectteamfilter` a la extracción en `Transform ConfiguracionUsuarios`
-- ✅ Agregado `projectteamfilter` al INSERT/UPDATE en `Upsert ConfiguracionUsuarios`
-- ✅ Corregida conexión: `Update sync_state (ConfiguracionUsuarios)` → `BC API - Tecnologias`
-- ✅ Columna `projectteamfilter VARCHAR(20)` agregada al schema SQL (`scripts/ps_analytics_schema.sql`)
+## Script local de este repo
+
+`scripts/update-n8n-workflow-004.sh` está **obsoleto** (apuntaba al n8n retirado de VM 100). Usar `update_workflow_n8n.sh` en **power-solution-apps**.
+
+---
 
 ## Referencias
 
-- **[Guía completa de n8n](../shared/n8n/n8n-integration-guide.md)** - Método general para actualizar cualquier workflow
-- **Script de actualización:** `scripts/update-n8n-workflow-004.sh`
-- **Archivo del workflow:** `src/workflows/004_sync_bc_to_ps_analytics.json`
-- **Schema SQL:** `scripts/ps_analytics_schema.sql`
-
-
-
-
-
+- `power-solution-apps/apps/timesheet/src/workflows/WORKFLOW_004_ANALYSIS.md`
+- `power-solution-apps/docs/infrastructure/CONFIGURAR_BC_WORKFLOW_001.md`
+- `docs/seguimiento-economico/README.md`

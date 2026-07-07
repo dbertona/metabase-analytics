@@ -111,14 +111,19 @@ Ver `scripts/create-api-endpoint.sh` para configurar acceso a APIs de Business C
 
 ---
 
-## 📊 Dashboards Preconfigurados
+## 📊 Dashboards
 
-_(Próximamente)_
+### Seguimiento Económico PS (réplica Power BI)
+
+Documentación y spec del informe BC → Metabase:
+
+- [`docs/seguimiento-economico/README.md`](docs/seguimiento-economico/README.md)
+- Views SQL: `sql/views/seguimiento_economico_views.sql` (canónico en `power-solution-apps`)
+
+### Otros (pendientes)
 
 - [ ] Dashboard de Horas por Proyecto
 - [ ] Dashboard de Gastos por Departamento
-- [ ] Dashboard de Aprobaciones Pendientes
-- [ ] Dashboard de Productividad
 
 ---
 
