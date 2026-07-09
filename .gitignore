@@ -29,3 +29,11 @@ Thumbs.db
 # Docker volumes
 postgres-data/
 
+# Credenciales locales (no versionar)
+docs/CREDENCIALES_POSTGRES_SUPABASE.md
+docs/SUPABASE_ANON_KEY.md
+docs/OBTENER_SUPABASE_ANON_KEY.md
+
+# Workspace IDE local
+*.code-workspace
+

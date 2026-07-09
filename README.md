@@ -84,6 +84,14 @@ Los datos se almacenan en volúmenes Docker persistentes:
 
 ## 🔌 Integración con Power Solution
 
+### n8n Workflows
+
+**⚠️ IMPORTANTE**: Si usas workflows de n8n que interactúan con Supabase, configura n8n primero:
+
+- **Setup inicial**: `docs/SETUP_N8N_INICIAL.md` 🔴 **LEER PRIMERO**
+- **Troubleshooting DNS**: `docs/TROUBLESHOOTING_N8N_KONG_DNS.md`
+- **Guía de integración**: `docs/shared/n8n/n8n-integration-guide.md`
+
 ### Conexión a Supabase
 
 Metabase puede conectarse directamente a la base de datos de Supabase para analizar:
@@ -105,6 +113,10 @@ Metabase puede conectarse directamente a la base de datos de Supabase para anali
 5. Database: `postgres`
 6. User/Password: (de Supabase)
 
+**Credenciales y configuración:**
+- `docs/SUPABASE_ANON_KEY.md` - API keys de Supabase
+- `docs/CREDENCIALES_POSTGRES_SUPABASE.md` - Credenciales PostgreSQL
+
 ### Conexión a Business Central (OData)
 
 Ver `scripts/create-api-endpoint.sh` para configurar acceso a APIs de Business Central.
@@ -125,7 +137,49 @@ Ver `scripts/create-api-endpoint.sh` para configurar acceso a APIs de Business C
 
 Views SQL canónicas: `power-solution-apps/supabase/migrations/20260702180000_*`
 
-### Otros (pendientes)
+### Planificación PS Analytics ⭐
+
+Réplica del dashboard Power BI con KPIs de Objetivos Anuales y Planificación Actual.
+
+**Componentes:**
+- 8 tarjetas KPI (Facturación, Margen, Crecimiento, Beneficio × 2 secciones)
+- Tabla resumen por sección
+- Gráficos de evolución mensual (facturación y margen)
+- Filtros: Año, Empresa, Departamento, Tipo P/R
+
+**Setup Metabase (una sola vez):**
+
+```bash
+# 1. Aplicar vistas SQL en PS Analytics
+docker exec -i supabase-db psql -U postgres -d postgres \
+  < scripts/sql/mb_dashboard_planificacion_views.sql
+
+# 2. Conectar Metabase a supabase-db (si no está en la misma red Docker)
+docker network connect ps_admin_default metabase
+
+# 3. Crear dashboard en Metabase
+export MB_EMAIL="tu-email@powersolution.es"
+export MB_PASSWORD="tu-contraseña"
+python3 scripts/setup-dashboard-planificacion.py
+```
+
+**Setup Superset POC:**
+
+```bash
+./scripts/start-superset.sh
+export SUPERSET_URL=http://localhost:8088 SUPERSET_USER=admin SUPERSET_PASSWORD='...'
+python3 scripts/setup-superset-planificacion.py
+```
+
+**Vistas SQL:** `scripts/sql/mb_dashboard_planificacion_views.sql` (Metabase) · `scripts/sql/bi_dashboard_planificacion_views.sql` (Superset/BI)
+
+**Documentación de datos:**
+- Objetivos → `bc_objectives_by_department`
+- Planificación (P) → `bc_historico_planificacion_mes` (último cierre del año)
+- Real (R) → `bc_job_ledger_entry_month`
+- Crecimiento → vs facturación real del año anterior
+
+### Pendientes
 
 - [ ] Dashboard de Horas por Proyecto
 - [ ] Dashboard de Gastos por Departamento
@@ -154,6 +208,23 @@ docker-compose restart
 ```bash
 ./scripts/test-supabase-connection.sh
 ```
+
+### Problemas con n8n y Supabase
+
+Si n8n no puede conectarse a Supabase (error "getaddrinfo EAI_AGAIN kong"):
+
+```bash
+# Verificar y conectar n8n a la red de Supabase
+./scripts/ensure-n8n-network.sh
+
+# Ver documentación completa
+cat docs/TROUBLESHOOTING_N8N_KONG_DNS.md
+```
+
+**Documentación relacionada:**
+- `docs/SETUP_N8N_INICIAL.md` - Configuración inicial de n8n
+- `docs/TROUBLESHOOTING_N8N_KONG_DNS.md` - Solución al error DNS "kong"
+- `docs/shared/n8n/n8n-integration-guide.md` - Guía completa de n8n
 
 
 

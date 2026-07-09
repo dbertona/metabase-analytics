@@ -1,0 +1,15 @@
+[Unit]
+Description=Conectar n8n a la red de Supabase
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/metabase/scripts/fix-n8n-network.sh
+RemainAfterExit=yes
+
+# Ejecutar después de que n8n esté corriendo
+ExecStartPost=/bin/sleep 5
+
+[Install]
+WantedBy=multi-user.target
