@@ -1,0 +1,14 @@
+[Unit]
+Description=Timer para verificar conexión de n8n a Supabase cada 5 minutos
+After=docker.service
+
+[Timer]
+# Ejecutar 2 minutos después del arranque
+OnBootSec=2min
+# Ejecutar cada 5 minutos
+OnUnitActiveSec=5min
+# Si n8n se reinicia, ejecutar después de 30 segundos
+OnUnitInactiveSec=30s
+
+[Install]
+WantedBy=timers.target
