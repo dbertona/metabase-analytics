@@ -1,6 +1,6 @@
-# 📊 Metabase Analytics - Power Solution
+# 📊 Superset Analytics - Power Solution
 
-Configuración completa de Metabase con Docker para análisis de datos y visualizaciones del ecosistema Power Solution.
+Configuración de Superset (y legado Metabase) con Docker para análisis de datos y visualizaciones del ecosistema Power Solution.
 
 **Integrado con:** Supabase (Timesheet + Expenses) + Business Central (OData)
 
@@ -15,7 +15,9 @@ Configuración completa de Metabase con Docker para análisis de datos y visuali
 - `docs/shared/GITEA_VS_GITHUB.md` 🚨 **CONFIGURACIÓN DE REMOTES**
 - `docs/shared/DOCUMENTATION_INDEX.md` - Índice completo de documentación
 
-**Repositorio Gitea:** `http://192.168.36.104:3000/admin/metabase-analytics`
+**Repositorio Gitea:** `http://192.168.36.104:3000/admin/superset-analytics`
+
+**Mirror GitHub (solo lectura/respaldo):** `https://github.com/dbertona/metabase-analytics`
 
 ## Estructura del Proyecto
 
