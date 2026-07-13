@@ -94,3 +94,15 @@ Views canónicas BC: `sql/views/seguimiento_economico_views.sql` y migraciones e
 ## Seguridad
 
 ⚠️ Cambiar `SUPERSET_SECRET_KEY` y `SUPERSET_ADMIN_PASSWORD` en producción.
+
+## Migración desde Metabase (2026-07)
+
+- **Metabase retirado** — no hay contenedores ni puerto 3000.
+- **Directorio en VM:** renombrar `/home/metabase` → `/home/superset-analytics` (opcional, recomendado).
+- **Datos legacy:** eliminar `data/postgres` (BD interna Metabase) si quedó en disco:
+
+```bash
+sudo rm -rf data/postgres
+```
+
+- **Servicio systemd:** actualizar ruta en `scripts/n8n-network.service` tras renombrar directorio.

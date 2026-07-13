@@ -1,7 +1,7 @@
 -- ============================================================================
 -- ANALYTICS DB ONLY (VM 100 prod / VM 102 dev / VM 103 testing)
--- Views Seguimiento Económico PS — réplica Metabase del informe Power BI
--- Spec: metabase-analytics/docs/seguimiento-economico/
+-- Views Seguimiento Económico PS — réplica Superset del informe Power BI
+-- Spec: superset-analytics/docs/seguimiento-economico/
 -- ============================================================================
 
 -- Helpers: probabilidad BC (0 = firmado → 100%)
@@ -303,4 +303,4 @@ GROUP BY
   codigo_unico_departamento, tipo;
 
 COMMENT ON VIEW public.v_se_resumen_mensual IS
-  'Agregación mensual — base para KPIs Margen%, cards y pivots Metabase.';
+  'Agregación mensual — base para KPIs Margen%, cards y pivots Superset.';

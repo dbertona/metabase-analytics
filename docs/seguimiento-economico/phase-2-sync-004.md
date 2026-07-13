@@ -29,7 +29,7 @@ Query BC: `Business-Central/src/Queries/PSMovimientosProyectosMes.Query.al`
 
 ## Prioridad 3 — Recursos enriquecidos
 
-PBI `RecursosHoras` usa campos de perfil desde API recursos. Verificar que `bc_resource` incluye columnas equivalentes a `perfil` si Metabase lo necesita.
+PBI `RecursosHoras` usa campos de perfil desde API recursos. Verificar que `bc_resource` incluye columnas equivalentes a `perfil` si Superset lo necesita.
 
 ## Checklist despliegue
 

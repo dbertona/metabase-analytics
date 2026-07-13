@@ -1,5 +1,5 @@
 -- =============================================================================
--- Capa semántica BI: Dashboard Planificación (Power BI / Metabase / Superset)
+-- Capa semántica BI: Dashboard Planificación (Power BI / Superset)
 -- Fuente única de verdad para KPIs, evolución mensual y probabilidad.
 -- =============================================================================
 
