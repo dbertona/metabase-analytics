@@ -3,8 +3,7 @@
 .env.local
 .env.*.local
 
-# Metabase data
-metabase-data/
+# Apache Superset - PS Analytics
 data/
 *.h2.*
 *.log

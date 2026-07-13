@@ -1,15 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Script para parar Metabase con Docker Compose
-# Uso: ./scripts/stop.sh
-
-set -e
-
-echo "🛑 Parando Metabase..."
-
-# Parar servicios
+echo "🛑 Parando Superset..."
 docker compose down
-
-echo "✅ Metabase parado correctamente!"
-echo "📊 Para ver el estado: docker compose ps"
-echo "🚀 Para iniciar de nuevo: ./scripts/start.sh"
+echo "✅ Superset parado."

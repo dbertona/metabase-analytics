@@ -1,4 +1,4 @@
-# Guía completa — Analytics BC + Metabase (Seguimiento Económico)
+# Guía completa — Analytics BC + Superset (Seguimiento Económico)
 
 **Última actualización:** 2026-07-07  
 **Estado:** Producción operativa con paridad KPI PSI 2026 vs Power BI
@@ -11,10 +11,10 @@ Documento de referencia único: qué tenemos, dónde vive cada cosa y cómo func
 
 | Pregunta | Respuesta |
 |----------|-----------|
-| ¿Para qué sirve? | Réplica de datos BC para **Metabase** (informe *Seguimiento Económico*, paridad con Power BI) |
+| ¿Para qué sirve? | Réplica de datos BC para **Superset** (informe *Seguimiento Económico*, paridad con Power BI) |
 | ¿La app Timesheet/Gastos la usa? | **No** — BD Analytics es solo reporting |
 | ¿De dónde salen los datos? | **Business Central Production** vía workflow n8n **004** |
-| ¿Dónde está Metabase? | VM **100** — `http://192.168.36.100:3000/` |
+| ¿Dónde está Superset? | VM **100** — `http://192.168.36.100:8088/` |
 | ¿Dónde está PostgreSQL Analytics? | VM **100** — `192.168.36.100:5433` (contenedor `supabase-db`) |
 | ¿Dónde corre el sync? | VM **101** — `https://apps.powersolution.es/n8n/` (contenedor `n8n-prod`) |
 

@@ -1,4 +1,4 @@
-# Seguimiento Económico PS — Réplica Metabase
+# Seguimiento Económico PS — Réplica Superset
 
 Informe origen: Power BI `Seguimiento Económico PS.pbix` (dataset en la nube, fuente **BC Production**).
 
@@ -6,7 +6,7 @@ Informe origen: Power BI `Seguimiento Económico PS.pbix` (dataset en la nube, f
 
 ## Objetivo
 
-Replicar en **Metabase prod** (`http://192.168.36.100:3000/`) las 7 páginas del informe Power BI con paridad numérica respecto al modelo semántico PBI.
+Replicar en **Superset** (`http://192.168.36.100:8088/`) las páginas del informe Power BI con paridad numérica respecto al modelo semántico PBI.
 
 ## Repositorios
 

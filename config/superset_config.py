@@ -1,4 +1,4 @@
-"""Configuración Superset POC - PS Analytics."""
+"""Configuración Apache Superset - PS Analytics."""
 
 import os
 

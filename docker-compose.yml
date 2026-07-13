@@ -1,63 +1,31 @@
-version: '3.8'
+# Apache Superset - PS Analytics (stack principal)
 
 services:
-  metabase:
-    image: metabase/metabase:latest
-    container_name: metabase
+  superset:
+    build:
+      context: ./docker/superset
+    image: ps-superset:4.1.2-poc
+    container_name: superset
     restart: unless-stopped
     ports:
-      - "${MB_JETTY_PORT:-3000}:3000"
+      - "${SUPERSET_PORT:-8088}:8088"
     environment:
-      - MB_DB_TYPE=${MB_DB_TYPE:-postgres}
-      - MB_DB_DBNAME=${MB_DB_DBNAME:-metabase}
-      - MB_DB_PORT=${MB_DB_PORT:-5432}
-      - MB_DB_USER=${MB_DB_USER:-metabase}
-      - MB_DB_PASS=${MB_DB_PASS:-metabase_password}
-      - MB_DB_HOST=${MB_DB_HOST:-postgres}
-      - MB_JETTY_HOST=${MB_JETTY_HOST:-0.0.0.0}
-      - MB_JETTY_PORT=${MB_JETTY_PORT:-3000}
-      - MB_ENCRYPTION_SECRET_KEY=${MB_ENCRYPTION_SECRET_KEY}
-    depends_on:
-      postgres:
-        condition: service_healthy
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-PsSupersetSecretKey2026ChangeMe}
+      SUPERSET_LOAD_EXAMPLES: "no"
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-PsSuperset#2026xK9!}
     volumes:
-      - ./data/metabase:/metabase-data
+      - ./config/superset_config.py:/app/pythonpath/superset_config.py:ro
+      - ./data/superset-home:/app/superset_home
+    command: >
+      /bin/sh -c "
+      superset db upgrade &&
+      superset fab create-admin --username admin --firstname Admin --lastname PowerSolution --email admin@powersolution.es --password \"$$SUPERSET_ADMIN_PASSWORD\" || true &&
+      superset init &&
+      /usr/bin/run-server.sh
+      "
     networks:
-      - metabase-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    extra_hosts:
-      - "db.qfpswxjunoepznrpsltt.supabase.co:104.18.38.10"
-
-  postgres:
-    image: postgres:15
-    container_name: metabase-postgres
-    restart: unless-stopped
-    environment:
-      - POSTGRES_DB=${POSTGRES_DB:-metabase}
-      - POSTGRES_USER=${POSTGRES_USER:-metabase}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-metabase_password}
-    volumes:
-      - ./data/postgres:/var/lib/postgresql/data
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-metabase} -d ${POSTGRES_DB:-metabase}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - metabase-network
-
-volumes:
-  metabase-data:
-    driver: local
-  postgres-data:
-    driver: local
+      - ps_admin_default
 
 networks:
-  metabase-network:
-    driver: bridge
+  ps_admin_default:
+    external: true
