@@ -4,14 +4,14 @@ Plataforma de Business Intelligence con **Apache Superset** para visualizaciones
 
 **Integrado con:** PostgreSQL PS Analytics (Supabase) + sync n8n desde Business Central
 
-> **Nota:** El repositorio en Gitea sigue llamándose `metabase-analytics` por historial; el stack activo es **solo Superset** (Metabase retirado).
+> **Repositorio Gitea:** `superset-analytics` — stack BI con Apache Superset.
 
 ## 🚨 Gitea es el repositorio principal
 
 - ✅ `git push gitea main`
 - ❌ No push directo a GitHub (solo mirror)
 
-**Gitea:** `http://192.168.36.104:3000/admin/metabase-analytics`
+**Gitea:** `http://192.168.36.104:3000/admin/superset-analytics`
 
 ## Inicio rápido
 

@@ -12,7 +12,7 @@ Replicar en **Superset** (`http://192.168.36.100:8088/`) las páginas del inform
 
 | Repo | Responsabilidad |
 |------|-----------------|
-| **metabase-analytics** (este) | Spec PBI, SQL de modelos Metabase, exports de dashboards, docs |
+| **superset-analytics** (este) | Spec PBI, SQL de modelos Superset, exports de dashboards, docs |
 | **power-solution-apps** | Migraciones Analytics, workflow **004**, scripts deploy |
 
 ## Infraestructura (prod)

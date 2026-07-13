@@ -52,7 +52,7 @@ flowchart LR
 | Repo | Contenido |
 |------|-----------|
 | **power-solution-apps** | Workflow `004_sync_bc_to_analytics.json`, migraciones `ANALYTICS DB ONLY`, scripts `apply-analytics-migration.sh` |
-| **metabase-analytics** (este) | Spec PBI, exports Metabase, documentación de dashboards |
+| **superset-analytics** (este) | Spec PBI, exports Superset, documentación de dashboards |
 | **power-solution-docs** | Docs compartidas (submódulo) |
 
 ---

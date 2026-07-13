@@ -1,6 +1,6 @@
 # Workflow 004 — Sync BC → Analytics
 
-> **Guía completa:** [metabase-analytics/docs/GUIA_COMPLETA_ANALYTICS.md](../../../metabase-analytics/docs/GUIA_COMPLETA_ANALYTICS.md)
+> **Guía completa:** [superset-analytics/docs/GUIA_COMPLETA_ANALYTICS.md](../../../superset-analytics/docs/GUIA_COMPLETA_ANALYTICS.md)
 
 ## Arquitectura (2026-07)
 
