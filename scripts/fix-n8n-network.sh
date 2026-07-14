@@ -15,14 +15,14 @@ echo "🔧 Verificando conexión de n8n a la red de Supabase..."
 
 # Verificar que el contenedor n8n existe y está corriendo
 if ! docker ps --format '{{.Names}}' | grep -q "^${N8N_CONTAINER}$"; then
-    echo "❌ Error: El contenedor '${N8N_CONTAINER}' no está corriendo"
-    exit 1
+    echo "ℹ️  El contenedor '${N8N_CONTAINER}' no está corriendo en este host — omitiendo (normal en VM Analytics sin n8n local)"
+    exit 0
 fi
 
 # Verificar que la red existe
 if ! docker network ls --format '{{.Name}}' | grep -q "^${SUPABASE_NETWORK}$"; then
-    echo "❌ Error: La red '${SUPABASE_NETWORK}' no existe"
-    exit 1
+    echo "ℹ️  La red '${SUPABASE_NETWORK}' no existe en este host — omitiendo"
+    exit 0
 fi
 
 # Verificar si ya está conectado

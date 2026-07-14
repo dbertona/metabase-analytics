@@ -29,7 +29,8 @@ docker network connect ps_admin_default n8n
 
 #### Configuración Permanente con Systemd
 
-Los servicios systemd mantienen la conexión automáticamente:
+Solo necesario en hosts donde corre el contenedor Docker **`n8n`** (p. ej. VM con n8n local).
+En **VM 100 (Analytics/Superset)** el sync n8n está en **VM 101** — el servicio se omite sin error si no hay `n8n`.
 
 ```bash
 # Verificar que los servicios estén activos
