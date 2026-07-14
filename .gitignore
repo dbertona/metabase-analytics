@@ -33,6 +33,7 @@ docs/CREDENCIALES_POSTGRES_SUPABASE.md
 docs/SUPABASE_ANON_KEY.md
 docs/OBTENER_SUPABASE_ANON_KEY.md
 
-# Workspace IDE local
+# Workspace IDE local (excepto el workspace del repo)
 *.code-workspace
+!superset-analytics.code-workspace
 
