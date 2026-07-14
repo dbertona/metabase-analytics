@@ -127,7 +127,8 @@ services:
 Agregar a crontab para ejecutar cada 5 minutos:
 
 ```bash
-*/5 * * * * /home/metabase/scripts/ensure-n8n-network.sh >/dev/null 2>&1
+# Cron opcional (ajustar ruta al directorio del repo en el servidor):
+# */5 * * * * /home/<usuario>/superset-analytics/scripts/ensure-n8n-network.sh >/dev/null 2>&1
 ```
 
 ## Notas

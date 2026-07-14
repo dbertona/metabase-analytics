@@ -1,6 +1,6 @@
 # Workflow 004 — Sync BC → Analytics
 
-> **Guía completa:** [metabase-analytics/docs/GUIA_COMPLETA_ANALYTICS.md](../../../metabase-analytics/docs/GUIA_COMPLETA_ANALYTICS.md)
+> **Guía completa:** [superset-analytics/docs/GUIA_COMPLETA_ANALYTICS.md](../../../superset-analytics/docs/GUIA_COMPLETA_ANALYTICS.md)
 
 ## Arquitectura (2026-07)
 
@@ -11,7 +11,7 @@
 | **ID workflow prod** | `d1f7647e114a486e` |
 | **n8n DEV** | VM 102 — workflow ID `d57165bf41a34b8eb215` |
 | **PostgreSQL Analytics** | VM **100** — `192.168.36.100:5433` (`supabase-db`) |
-| **Metabase** | VM **100** — `http://192.168.36.100:3000/` |
+| **Superset** | VM **100** — `http://192.168.36.100:8088/` |
 
 > **Retirado:** n8n en VM 100 (puerto 5678). No usar.
 

@@ -4,7 +4,8 @@
 
 N8N_URL="https://n8n-analytics.powersolution.es"
 WORKFLOW_ID="l5ux7p339Nejygra"
-OUTPUT_FILE="/home/metabase/src/workflows/004_sync_bc_to_ps_analytics.json"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+OUTPUT_FILE="${ROOT_DIR}/src/workflows/004_sync_bc_to_ps_analytics.json"
 
 echo "Descargando workflow 004 desde n8n..."
 echo "URL: ${N8N_URL}"

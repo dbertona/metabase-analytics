@@ -1,4 +1,4 @@
-# Seguimiento Económico PS — Réplica Metabase
+# Seguimiento Económico PS — Réplica Superset
 
 Informe origen: Power BI `Seguimiento Económico PS.pbix` (dataset en la nube, fuente **BC Production**).
 
@@ -6,13 +6,13 @@ Informe origen: Power BI `Seguimiento Económico PS.pbix` (dataset en la nube, f
 
 ## Objetivo
 
-Replicar en **Metabase prod** (`http://192.168.36.100:3000/`) las 7 páginas del informe Power BI con paridad numérica respecto al modelo semántico PBI.
+Replicar en **Superset** (`http://192.168.36.100:8088/`) las páginas del informe Power BI con paridad numérica respecto al modelo semántico PBI.
 
 ## Repositorios
 
 | Repo | Responsabilidad |
 |------|-----------------|
-| **metabase-analytics** (este) | Spec PBI, SQL de modelos Metabase, exports de dashboards, docs |
+| **superset-analytics** (este) | Spec PBI, SQL de modelos Superset, exports de dashboards, docs |
 | **power-solution-apps** | Migraciones Analytics, workflow **004**, scripts deploy |
 
 ## Infraestructura (prod)
@@ -20,7 +20,7 @@ Replicar en **Metabase prod** (`http://192.168.36.100:3000/`) las 7 páginas del
 | Componente | Ubicación |
 |--------------|-----------|
 | PostgreSQL Analytics | VM 100 — `192.168.36.100:5433` (`supabase-db`) |
-| Metabase | VM 100 — `http://192.168.36.100:3000/` |
+| Superset | VM 100 — `http://192.168.36.100:8088/` |
 | n8n workflow 004 | VM 101 — `https://apps.powersolution.es/n8n/` |
 | BC OData | Production (`BC_ENVIRONMENT=Production`) |
 
@@ -53,7 +53,7 @@ GROUP BY tipo;
 |------|--------|------------|
 | **1** | ✅ | Views `v_se_*` + spec DAX/PQ |
 | **2** | ✅ | Sync 004 Fase 2 + paridad KPI Resumen |
-| **3** | Pendiente | Dashboard Metabase «Resumen» |
+| **3** | Pendiente | Dashboard Superset «Resumen» |
 | **4** | Pendiente | Resto de páginas PBI |
 
 ## Páginas del informe PBI
@@ -76,7 +76,7 @@ GROUP BY tipo;
 ## Views SQL
 
 Canónico en `power-solution-apps/supabase/migrations/20260702180000_*` y fixes julio 2026.  
-Metabase consulta **solo** vistas `v_se_*` (ver guía completa §4.2).
+Superset consulta **solo** vistas `v_se_*` y `bi_v_*` (ver guía completa §4.2).
 
 ## Documentación relacionada
 

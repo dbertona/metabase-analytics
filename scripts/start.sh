@@ -1,45 +1,48 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Script para iniciar Metabase con Docker Compose
-# Uso: ./scripts/start.sh
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
 
-set -e
+echo "==> Aplicando capa BI (vistas SQL)..."
+bash "${ROOT_DIR}/scripts/apply-bi-views.sh"
 
-echo "🚀 Iniciando Metabase..."
-
-# Verificar que existe el archivo .env
-if [ ! -f .env ]; then
-    echo "⚠️  Archivo .env no encontrado. Copiando desde env.example..."
-    cp env.example .env
-    echo "📝 Por favor, edita el archivo .env con tus configuraciones antes de continuar."
-    echo "   Especialmente importante: MB_ENCRYPTION_SECRET_KEY"
-    exit 1
-fi
-
-# Crear directorios de datos si no existen
-mkdir -p data/metabase data/postgres
-
-# Verificar que Docker está corriendo
-if ! docker info > /dev/null 2>&1; then
-    echo "❌ Docker no está corriendo. Por favor, inicia Docker primero."
-    exit 1
-fi
-
-# Iniciar servicios
-echo "🐳 Iniciando contenedores..."
+echo "==> Levantando Apache Superset..."
+docker compose build
 docker compose up -d
 
-# Esperar a que los servicios estén listos
-echo "⏳ Esperando a que los servicios estén listos..."
-sleep 10
+echo "==> Esperando a que Superset responda en :8088..."
+for i in $(seq 1 60); do
+  if curl -fsS "http://localhost:${SUPERSET_PORT:-8088}/health" >/dev/null 2>&1; then
+    echo "    Superset listo (${i}s)"
+    break
+  fi
+  sleep 2
+  if [[ "$i" -eq 60 ]]; then
+    echo "ERROR: Superset no respondió a tiempo. Revisa: docker compose logs -f superset"
+    exit 1
+  fi
+done
 
-# Verificar estado
-echo "📊 Estado de los servicios:"
-docker compose ps
+echo "==> Configurando conexión PS Analytics y dashboard de planificación..."
+export SUPERSET_URL="${SUPERSET_URL:-http://localhost:8088}"
+export SUPERSET_USER="${SUPERSET_USER:-admin}"
+export SUPERSET_PASSWORD="${SUPERSET_PASSWORD:-PsSuperset#2026xK9!}"
+python3 scripts/setup-superset-planificacion.py
 
-echo ""
-echo "✅ Metabase iniciado correctamente!"
-echo "🌐 Accede a: http://localhost:3000"
-echo "📊 Estado: docker compose ps"
-echo "📝 Logs: docker compose logs -f"
-echo "🛑 Parar: ./scripts/stop.sh"
+cat <<'EOF'
+
+══════════════════════════════════════════════════════════════
+✅ Superset listo
+══════════════════════════════════════════════════════════════
+URL:       http://192.168.36.100:8088
+Dashboard: http://192.168.36.100:8088/superset/dashboard/planificacion-ps-analytics/
+Usuario:   admin
+
+Fuente de datos:
+  scripts/sql/bi_dashboard_planificacion_views.sql
+
+Regenerar dashboard:
+  python3 scripts/setup-superset-planificacion.py
+══════════════════════════════════════════════════════════════
+EOF

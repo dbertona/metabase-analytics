@@ -1,4 +1,4 @@
-# Guía completa — Analytics BC + Metabase (Seguimiento Económico)
+# Guía completa — Analytics BC + Superset (Seguimiento Económico)
 
 **Última actualización:** 2026-07-07  
 **Estado:** Producción operativa con paridad KPI PSI 2026 vs Power BI
@@ -11,10 +11,10 @@ Documento de referencia único: qué tenemos, dónde vive cada cosa y cómo func
 
 | Pregunta | Respuesta |
 |----------|-----------|
-| ¿Para qué sirve? | Réplica de datos BC para **Metabase** (informe *Seguimiento Económico*, paridad con Power BI) |
+| ¿Para qué sirve? | Réplica de datos BC para **Superset** (informe *Seguimiento Económico*, paridad con Power BI) |
 | ¿La app Timesheet/Gastos la usa? | **No** — BD Analytics es solo reporting |
 | ¿De dónde salen los datos? | **Business Central Production** vía workflow n8n **004** |
-| ¿Dónde está Metabase? | VM **100** — `http://192.168.36.100:3000/` |
+| ¿Dónde está Superset? | VM **100** — `http://192.168.36.100:8088/` |
 | ¿Dónde está PostgreSQL Analytics? | VM **100** — `192.168.36.100:5433` (contenedor `supabase-db`) |
 | ¿Dónde corre el sync? | VM **101** — `https://apps.powersolution.es/n8n/` (contenedor `n8n-prod`) |
 
@@ -34,13 +34,13 @@ flowchart LR
   BC[Business Central Production]
   N8N[n8n prod VM 101<br/>Workflow 004]
   PG[(PostgreSQL Analytics<br/>VM 100 supabase-db)]
-  MB[Metabase VM 100]
+  SS[Superset VM 100]
   PBI[Power BI referencia]
 
   BC -->|OData PS_API| N8N
   N8N -->|Upsert bc_*| PG
-  PG -->|v_se_* views| MB
-  PBI -.->|paridad numérica| MB
+  PG -->|v_se_* / bi_v_* views| SS
+  PBI -.->|paridad numérica| SS
 ```
 
 **Regla de oro:** el JSON canónico del workflow está en **power-solution-apps**; n8n prod es la instancia de ejecución. **No usar** n8n en VM 100 (retirado 2026-07-07).
@@ -52,7 +52,7 @@ flowchart LR
 | Repo | Contenido |
 |------|-----------|
 | **power-solution-apps** | Workflow `004_sync_bc_to_analytics.json`, migraciones `ANALYTICS DB ONLY`, scripts `apply-analytics-migration.sh` |
-| **metabase-analytics** (este) | Spec PBI, exports Metabase, documentación de dashboards |
+| **superset-analytics** (este) | Spec PBI, exports Superset, documentación de dashboards |
 | **power-solution-docs** | Docs compartidas (submódulo) |
 
 ---
@@ -91,10 +91,10 @@ Todas prefijadas con `bc_` desde migración `20260627120001_rename_bc_tables_ana
 | `sync_state` | Puntero incremental por `(company_name, entity)` |
 | `sync_executions` | Log de ejecuciones del webhook 004 |
 
-**Eliminado 2026-07-07 (legacy Imixs, no usado por Metabase):**  
+**Eliminado 2026-07-07 (legacy Imixs, no usado por Superset):**  
 `workflow_*`, `login_company`, `companys`, `role_type_permissions`, `v_user_roles_summary`.
 
-### 4.2 Vistas Metabase (`v_se_*`) — 13 vistas
+### 4.2 Vistas semánticas (`v_se_*`) — 13 vistas
 
 Capa semántica equivalente al modelo Power BI. Definidas en migraciones `20260702180000_*`, `20260702200000_*` y fixes julio 2026.
 
@@ -114,7 +114,7 @@ Capa semántica equivalente al modelo Power BI. Definidas en migraciones `202607
 | `v_se_resumen_mensual` | Acumulados mensuales | Agregación sobre facturación |
 | `v_se_facturacion_recursos` | Mano de obra | Subconjunto recursos |
 
-**Metabase debe consultar solo `v_se_*`**, no `bc_*` directamente (salvo debugging).
+**Superset debe consultar solo `v_se_*` y `bi_v_*`**, no `bc_*` directamente (salvo debugging).
 
 ---
 
@@ -314,7 +314,7 @@ Luego sync PSI + PSLAB vía webhook. Validar KPIs con SQL §6.3.
 | KPI plan ~7 M€ en lugar de ~4,2 M€ | Vista KPI antigua (híbrido meses cerrados) | Aplicar `20260707190000_analytics_planificado_kpi_tipo_p.sql` |
 | KPI plan bajo (~3,4 M€) | Paginación rota en PlanificacionMes | Verificar paginación anidada en JSON 004; resync full |
 | Incremental no trae datos | `sync_state` reciente sin filas nuevas en BC | Reset `last_sync_at` a 1900-01-01 + sync |
-| Metabase sin empresas en slicer | `v_se_dim_empresas` caída | Aplicar `20260707195000_analytics_recreate_v_se_dim_empresas.sql` |
+| Superset sin empresas en slicer | `v_se_dim_empresas` caída | Aplicar `20260707195000_analytics_recreate_v_se_dim_empresas.sql` |
 | Sync OAuth error | n8n incorrecto (VM 100) | Usar solo apps.powersolution.es/n8n (VM 101) |
 
 ---

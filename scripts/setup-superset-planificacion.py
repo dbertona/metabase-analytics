@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Configura Superset con capa BI mantenible (mismos datos que PBI/Metabase).
+"""Configura Superset con capa BI mantenible (mismos datos que Power BI).
 
 Flujo:
   1. Aplica vistas SQL bi_v_* en PostgreSQL
