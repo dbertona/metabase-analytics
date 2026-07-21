@@ -14,11 +14,23 @@ GROUP BY year, company_name;
 
 -- -----------------------------------------------------------------------------
 -- KPI detalle por empresa / año / departamento
--- Planificación: facturación P+R (alineado con Power BI)
+-- Planificación Actual (PBI):
+--   mes cerrado (proyecto-mes en bc_meses_cerrados) → tipo R
+--   mes abierto → tipo P
 -- Objetivos: v_se_objectives
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE VIEW bi_v_planificacion_kpi AS
-WITH plan_pr AS (
+WITH closed_job_months AS (
+    SELECT DISTINCT
+        company_name AS empresa,
+        job_no AS job,
+        year,
+        month
+    FROM bc_meses_cerrados
+    WHERE job_no IS NOT NULL
+      AND btrim(job_no::text) <> ''
+),
+plan_hybrid AS (
     SELECT
         f.empresa,
         f.year,
@@ -27,7 +39,16 @@ WITH plan_pr AS (
         SUM(f.coste) AS plan_coste,
         SUM(f.facturado - f.coste) AS plan_beneficio
     FROM v_se_facturacion f
-    WHERE f.tipo IN ('P', 'R')
+    LEFT JOIN closed_job_months c
+        ON c.empresa = f.empresa
+       AND c.job = f.job
+       AND c.year = f.year
+       AND c.month = f.month
+    WHERE (
+            c.empresa IS NOT NULL AND f.tipo = 'R'
+        ) OR (
+            c.empresa IS NULL AND f.tipo = 'P'
+        )
     GROUP BY f.empresa, f.year, f.departamento
 ),
 obj AS (
@@ -41,9 +62,9 @@ obj AS (
     FROM v_se_objectives o
 )
 SELECT
-    COALESCE(obj.empresa, plan_pr.empresa) AS empresa,
-    COALESCE(obj.year, plan_pr.year) AS year,
-    COALESCE(obj.department_code, plan_pr.department_code) AS department_code,
+    COALESCE(obj.empresa, plan_hybrid.empresa) AS empresa,
+    COALESCE(obj.year, plan_hybrid.year) AS year,
+    COALESCE(obj.department_code, plan_hybrid.department_code) AS department_code,
     d.department_name,
     obj.obj_facturacion,
     obj.obj_coste,
@@ -52,21 +73,21 @@ SELECT
         WHEN obj.obj_facturacion > 0
             THEN (obj.obj_facturacion - obj.obj_coste) / obj.obj_facturacion * 100
     END AS obj_margen_pct,
-    COALESCE(plan_pr.plan_facturacion, 0) AS plan_facturacion,
-    COALESCE(plan_pr.plan_coste, 0) AS plan_coste,
-    COALESCE(plan_pr.plan_beneficio, 0) AS plan_beneficio,
+    COALESCE(plan_hybrid.plan_facturacion, 0) AS plan_facturacion,
+    COALESCE(plan_hybrid.plan_coste, 0) AS plan_coste,
+    COALESCE(plan_hybrid.plan_beneficio, 0) AS plan_beneficio,
     CASE
-        WHEN COALESCE(plan_pr.plan_facturacion, 0) > 0
-            THEN plan_pr.plan_beneficio / plan_pr.plan_facturacion * 100
+        WHEN COALESCE(plan_hybrid.plan_facturacion, 0) > 0
+            THEN plan_hybrid.plan_beneficio / plan_hybrid.plan_facturacion * 100
     END AS plan_margen_pct
 FROM obj
-FULL OUTER JOIN plan_pr
-    ON obj.empresa = plan_pr.empresa
-   AND obj.year = plan_pr.year
-   AND obj.department_code = plan_pr.department_code
+FULL OUTER JOIN plan_hybrid
+    ON obj.empresa = plan_hybrid.empresa
+   AND obj.year = plan_hybrid.year
+   AND obj.department_code = plan_hybrid.department_code
 LEFT JOIN mb_v_dim_departamento d
-    ON d.company_name = COALESCE(obj.empresa, plan_pr.empresa)
-   AND d.department_code = COALESCE(obj.department_code, plan_pr.department_code);
+    ON d.company_name = COALESCE(obj.empresa, plan_hybrid.empresa)
+   AND d.department_code = COALESCE(obj.department_code, plan_hybrid.department_code);
 
 -- Evolución mensual (tablas y gráficos)
 CREATE OR REPLACE VIEW bi_v_evolucion_mensual AS
@@ -110,7 +131,7 @@ GROUP BY
     COALESCE(f.probability, 0);
 
 COMMENT ON VIEW bi_v_planificacion_kpi IS
-  'KPIs Objetivos y Planificación (P+R). Usar con filtros año/empresa/departamento.';
+  'KPIs Objetivos y Planificación Actual: mes cerrado (bc_meses_cerrados) = R, mes abierto = P.';
 COMMENT ON VIEW bi_v_evolucion_mensual IS
   'Evolución mensual facturación/coste/margen por tipo P o R.';
 COMMENT ON VIEW bi_v_facturacion_probabilidad IS
