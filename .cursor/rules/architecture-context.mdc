@@ -1,0 +1,106 @@
+---
+description: Contexto de arquitectura de superset-analytics — leer PRIMERO en cada chat
+alwaysApply: true
+---
+
+# Arquitectura — superset-analytics
+
+## 🎯 ¿Para qué sirve este repo?
+
+Réplica de datos BC en **Apache Superset** para reporting financiero (Seguimiento Económico, Facturación P/R).
+No contiene workflows n8n ni código de la app Timesheet/Gastos.
+
+**Doc maestra:** `docs/GUIA_COMPLETA_ANALYTICS.md`  
+**Troubleshooting P/R:** `docs/shared/analytics/ANALYTICS_FACTURACION_PBI_ALIGNMENT.md`  
+**Workflow 004 (sync):** `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md`
+
+---
+
+## 📍 Infraestructura
+
+| Componente | Ubicación | Acceso |
+|------------|-----------|--------|
+| **Superset** | VM 100 — `http://192.168.36.100:8088/` | admin / ver `.env` |
+| **PostgreSQL Analytics** | VM 100 — `192.168.36.100:5433` | postgres / `SuperSecurePassword2025` |
+| **n8n prod (sync 004)** | VM 101 — `https://apps.powersolution.es/n8n/` | No usar n8n VM 100 (retirado) |
+
+```bash
+# Conectar a analytics DB desde terminal
+docker run --rm --network host postgres:15 \
+  psql "postgresql://postgres:SuperSecurePassword2025@192.168.36.100:5433/postgres"
+```
+
+---
+
+## 📦 Responsabilidades por repo
+
+| Repo | Qué contiene | ¿Tocar desde aquí? |
+|------|-------------|-------------------|
+| **superset-analytics** (este) | Spec PBI, exports Superset, docs dashboards, SQL vistas | ✅ Sí |
+| **power-solution-apps** | Workflow 004, migraciones `ANALYTICS DB ONLY`, scripts apply | ❌ No (otro workspace) |
+| **power-solution-docs** | Docs compartidas (`docs/shared/`) | Solo via submódulo |
+
+---
+
+## 🗄️ Tablas principales (Analytics DB)
+
+Prefijo `bc_` — origen: workflow n8n 004 desde BC Production.
+
+| Tabla | Descripción |
+|-------|-------------|
+| `bc_job_ledger_entry_month` | Movimientos reales agregados por mes (**Tipo R**) |
+| `bc_job_planning_line` / `bc_planificacion_mes` | Planificación por mes (**Tipo P**) |
+| `bc_expediente_mes` | Expedientes planificados (**Tipo P**) |
+| `bc_meses_cerrados` | Meses bloqueados (cambia R↔P) |
+| `bc_job` | Proyectos |
+| `bc_resource` | Recursos humanos |
+| `bc_department` | Departamentos |
+
+## 📊 Vistas principales
+
+| Vista | Descripción |
+|-------|-------------|
+| `v_se_facturacion` | UNION ALL P+R — fuente principal de Superset |
+| `v_se_lineas_planificacion` | Tipo P (plan) con lógica vigente + Distinct PBI |
+| `v_se_lineas_expedientes` | Tipo P (expedientes) |
+| `v_se_lineas_movimientos` | Tipo R (movimientos reales) |
+| `bi_v_*` | Vistas BI específicas para dashboards Superset |
+
+---
+
+## 🎯 KPIs de referencia (PSI 2026, jul 2026)
+
+| KPI | Valor | Fuente |
+|-----|-------|--------|
+| Tipo P (Plan+Expedientes) | 3.712.450 € | `v_se_facturacion WHERE tipo='P'` |
+| Tipo R (Real) | 2.604.816 € | `v_se_facturacion WHERE tipo='R'` |
+
+---
+
+## 🔴 REGLAS CRÍTICAS
+
+- **Migraciones SQL** → crearlas en `power-solution-apps/supabase/migrations/` con prefijo `ANALYTICS DB ONLY`, NO aquí
+- **Workflow 004** → vive en `power-solution-apps/apps/timesheet/src/workflows/`; este repo solo documenta
+- **Commits**: siempre rama `feat/` o `fix/` — nunca en `main` directamente
+- **Push**: siempre `gitea`, nunca `origin` (GitHub es solo mirror)
+- **Submodulo `docs/shared`**: actualizar con `git pull origin main` desde `docs/shared/` y commitear el puntero en el padre
+
+---
+
+## 📂 Estructura del repo
+
+```text
+superset-analytics/
+  docs/
+    GUIA_COMPLETA_ANALYTICS.md       ← referencia principal
+    ACTUALIZAR_WORKFLOW_004.md        ← cómo actualizar el sync
+    seguimiento-economico/README.md   ← especificación de dashboards
+    shared/                           ← submódulo power-solution-docs
+      analytics/
+        004_SYNC_BC_ANALYTICS.md      ← arquitectura workflow 004
+        ANALYTICS_FACTURACION_PBI_ALIGNMENT.md ← troubleshooting P/R
+  sql/
+    views/                            ← DDL de vistas SQL
+  scripts/                            ← scripts operativos
+  docker/                             ← config Superset Docker
+```

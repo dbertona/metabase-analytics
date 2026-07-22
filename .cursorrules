@@ -1,0 +1,55 @@
+# Reglas superset-analytics — resumen de triggers
+# Detalle completo en .cursor/rules/ (alwaysApply: true, cargados automáticamente)
+
+---
+
+## 🔴 TRIGGERS CRÍTICOS
+
+| Situación | Acción inmediata |
+| --------- | ---------------- |
+| Verbos de acción ("corrige", "añade", "modifica", "crea", "haz"...) | Verificar rama → crear `feat/` o `fix/` si en `main` → `git-workflow-automatic.mdc` FASE 1 |
+| "migración", "CREATE TABLE", "ALTER TABLE" | ❌ Las migraciones van en **power-solution-apps** — este repo es solo docs/spec/SQL vistas |
+| "workflow 004", "n8n", "sync" | Leer `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md` — workflow JSON en power-solution-apps |
+| "power-solution-apps", "timesheet", ".json workflow" | ❌ NO modificar desde este repo → `00-REPO-WORKSPACE-BOUNDARY.mdc` |
+| "BC", "Business Central", ".al" | ❌ NUNCA tocar BC desde aquí |
+| "prod" / "producción" / VM 101 | ❌ NUNCA sin aprobación explícita en ese mismo chat |
+| "error" / "no coincide" / "discrepancia P/R" | Leer `docs/shared/analytics/ANALYTICS_FACTURACION_PBI_ALIGNMENT.md` |
+| "commit" / "push" | `git-workflow-automatic.mdc` FASE 2 — push a `gitea` siempre |
+| "merge" / "cierra la rama" | `merge-command-workflow.mdc` — documentar → `merge-safe.sh` |
+| "--no-verify" / "ignore" / "skip" | ❌ DETENER → `never-ignore-without-approval.mdc` |
+
+---
+
+## 📚 Fuentes de verdad
+
+| Área | Documento |
+|------|-----------|
+| Arquitectura general | `.cursor/rules/architecture-context.mdc` |
+| Workflow 004 (sync BC→Analytics) | `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md` |
+| Troubleshooting Tipo P/R vs PBI | `docs/shared/analytics/ANALYTICS_FACTURACION_PBI_ALIGNMENT.md` |
+| Guía dashboards Superset | `docs/GUIA_COMPLETA_ANALYTICS.md` |
+| Índice de docs | `.cursor/DOCUMENTATION_INDEX.md` |
+| Git / commits / ramas | `git-workflow-automatic.mdc` |
+
+---
+
+## 🗄️ Conexión Analytics DB (referencia rápida)
+
+```bash
+# Desde terminal local o VM 101
+docker run --rm --network host postgres:15 \
+  psql "postgresql://postgres:SuperSecurePassword2025@192.168.36.100:5433/postgres"
+
+# KPI rápido PSI 2026
+# SELECT tipo, ROUND(SUM(facturado::numeric),2) FROM v_se_facturacion
+# WHERE empresa ILIKE '%Iberia%' AND year=2026 GROUP BY tipo;
+```
+
+---
+
+## ⚠️ LO QUE NO HACE ESTE REPO
+
+- ❌ No contiene migraciones SQL (van en power-solution-apps)
+- ❌ No contiene el workflow n8n 004 (va en power-solution-apps)
+- ❌ No conecta con Timesheet ni Gastos
+- ✅ Contiene: spec PBI, exports Superset, SQL vistas BI, docs dashboards

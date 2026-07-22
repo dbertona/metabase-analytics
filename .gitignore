@@ -23,7 +23,6 @@ ehthumbs.db
 Thumbs.db
 
 # Cursor (symlink al root)
-.cursor
 
 # Docker volumes
 postgres-data/
