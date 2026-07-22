@@ -33,12 +33,12 @@ curl -sS -m 900 -X POST \
 
 Workflow: [d1f7647e114a486e](https://apps.powersolution.es/n8n/workflow/d1f7647e114a486e)
 
-## Paridad KPI PSI 2026 (validado 2026-07-07)
+## Paridad KPI PSI 2026 (validado 2026-07-22)
 
 | Métrica | Power BI | Analytics |
 |---------|----------|-----------|
-| Real (tipo R) | 2.284.579 € | 2.284.579 € ✅ |
-| Plan (tipo P) | 4.193.215 € | 4.193.215 € ✅ |
+| Real (tipo R) | 2.604.816 € | 2.604.816 € ✅ |
+| Plan (tipo P) | 3.712.417 € | 3.712.450 € ✅ |
 
 ```sql
 SELECT tipo, ROUND(SUM(facturado)::numeric, 0)

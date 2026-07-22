@@ -66,7 +66,9 @@ SELECT * FROM v_se_kpi_cards WHERE empresa = 'Power Solution Iberia SL' AND ano 
 \""
 ```
 
-Esperado plan PSI 2026: **4.193.215 €**.
+Esperado plan PSI 2026: **4.193.215 €** (`v_se_kpi_cards`, incluye tipo P + objetivos).
+
+> Desglose solo tipo P en `v_se_facturacion`: **3.712.450 €** — ver `docs/GUIA_COMPLETA_ANALYTICS.md` §6.2.
 
 ---
 

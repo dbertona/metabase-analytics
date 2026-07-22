@@ -1,6 +1,6 @@
 # Guía completa — Analytics BC + Superset (Seguimiento Económico)
 
-**Última actualización:** 2026-07-07  
+**Última actualización:** 2026-07-22  
 **Estado:** Producción operativa con paridad KPI PSI 2026 vs Power BI
 
 Documento de referencia único: qué tenemos, dónde vive cada cosa y cómo funciona el flujo de datos.
@@ -196,14 +196,17 @@ El 004 **no elimina** filas huérfanas. Borrados maestros BC → workflow **017*
 
 Migración clave: `20260707190000_analytics_planificado_kpi_tipo_p.sql`
 
-### 6.2 Referencia PSI 2026 (validado 2026-07-07)
+### 6.2 Referencia PSI 2026 (validado 2026-07-22)
 
 | Métrica | Power BI | Analytics | Estado |
 |---------|----------|-----------|--------|
-| Real facturación | 2.284.579 € | 2.284.579 € | ✅ |
-| Plan facturación | 4.193.215 € | 4.193.215 € | ✅ |
+| Real facturación (tipo R) | 2.604.816 € | 2.604.816 € | ✅ |
+| Plan facturación (tipo P) | 3.712.417 € | 3.712.450 € | ✅ (+33 € redondeo) |
 | Filas plan 2026 | ~24.199 | 24.199 | ✅ |
 | Meses cerrados PSI | ~11.004 | 11.004 | ✅ |
+
+> **Nota:** `v_se_kpi_cards.plan_facturacion` agrega tipo P + objetivos y puede mostrar ~4,19 M€.
+> El desglose `tipo='P'` en `v_se_facturacion` da 3.712.450 €, que es el equivalente al informe PBI.
 
 ### 6.3 SQL de validación
 
