@@ -69,7 +69,8 @@ Réplica del informe Power BI — Objetivos Anuales y Planificación Actual.
 - Filtros: Año, Empresas, Departamentos, Tipo P/R
 - Gráficos de evolución mensual y facturación por probabilidad
 
-**Filtros nativos (diseño canónico):** [`docs/FILTROS_DASHBOARD_PLANIFICACION.md`](docs/FILTROS_DASHBOARD_PLANIFICACION.md)
+**Filtros nativos (diseño canónico):** [`docs/FILTROS_DASHBOARD_PLANIFICACION.md`](docs/FILTROS_DASHBOARD_PLANIFICACION.md)  
+**Changelog:** [`CHANGELOG.md`](CHANGELOG.md) — Apply filters es **manual** (sin auto-apply en 6.1).
 
 **Datos:**
 - Objetivos → `bc_objectives_by_department`
