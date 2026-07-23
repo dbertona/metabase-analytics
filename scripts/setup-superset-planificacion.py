@@ -5,7 +5,9 @@ Flujo:
   1. Aplica vistas SQL bi_v_* en PostgreSQL
   2. Crea datasets físicos (sin SQL embebido en Python)
   3. Crea tarjetas KPI + tablas + gráficos
-  4. Persiste filtros (año actual por defecto) vía ORM
+  4. Persiste filtros nativos (valores desde bi_v_evolucion_mensual)
+
+Ver: docs/FILTROS_DASHBOARD_PLANIFICACION.md
 """
 
 from __future__ import annotations
@@ -188,12 +190,35 @@ def metric_sql(sql: str, label: str) -> dict[str, Any]:
     return {"expressionType": "SQL", "sqlExpression": sql, "label": label}
 
 
+def dim_adhoc_filters() -> list[dict[str, Any]]:
+    """Fuerza a Superset 6.x a exponer year/empresa/department_code en
+    /dashboard/.../datasets para charts big_number (si no, Apply queda disabled).
+    """
+    out: list[dict[str, Any]] = []
+    for col in ("year", "empresa", "department_code"):
+        out.append(
+            {
+                "expressionType": "SIMPLE",
+                "subject": col,
+                "operator": "IS NOT NULL",
+                "operatorId": "IS_NOT_NULL",
+                "clause": "WHERE",
+                "sqlExpression": None,
+                "isExtra": False,
+                "isNew": False,
+                "datasourceWarning": False,
+                "filterOptionName": f"filter_{col}_not_null",
+            }
+        )
+    return out
+
+
 def big_number_params(metric: dict[str, Any], fmt: str, *, currency: bool = False) -> dict[str, Any]:
     # header_font_size es factor × 16px; 1.25 ≈ 20px (Segoe UI solicitado)
     # subheader = etiqueta bajo el valor (Facturación, Margen, etc.) como en Power BI
     label = metric.get("label", "")
     params: dict[str, Any] = {
-        "adhoc_filters": [],
+        "adhoc_filters": dim_adhoc_filters(),
         "metric": metric,
         "header_font_size": 0.9,
         "subheader": label,
@@ -228,9 +253,14 @@ def get_chart_uuids() -> dict[int, str]:
 
 
 def persist_dashboard_config(dash_id: int, dataset_ids: dict[str, int], chart_ids: list[int]) -> None:
-    kpi_ds = dataset_ids["bi_v_kpi_anual_empresa"]
+    # KPI cards (bi_v_planificacion_kpi) exponen year/empresa/department_code vía
+    # adhoc_filters IS NOT NULL (ver dim_adhoc_filters). Valores de filtro Tipo
+    # siguen en bi_v_evolucion_mensual.
     detail_ds = dataset_ids["bi_v_planificacion_kpi"]
     evo_ds = dataset_ids["bi_v_evolucion_mensual"]
+    kpi_chart_ids = chart_ids[:8]  # 8 tarjetas Obj/Plan
+    evo_chart_ids = [cid for cid in chart_ids[8:11]]  # Resumen, Evolución, Margen
+    filter_scope_all = kpi_chart_ids + evo_chart_ids  # sin Probabilidad (ds distinto)
 
     dashboard_css = (
         "/* Power BI look: Segoe UI 20px en valor KPI */\n"
@@ -294,52 +324,72 @@ with app.app_context():
 
     dash = db.session.query(Dashboard).get({dash_id})
     jm = json.loads(dash.json_metadata or '{{}}')
+    jm['cross_filters_enabled'] = False
+    jm['chart_configuration'] = {{}}
+    jm['default_filters'] = '{{}}'
+    # Superset 6.1: IDs DEBEN empezar por NATIVE_FILTER- (isFilterId en FiltersConfigModal).
+    # Prefijos FILTER-* se interpretan mal → modal "[untitled customization]" y panel vacío.
     jm['native_filter_configuration'] = [
         {{
-            'id': 'FILTER-YEAR',
+            'id': 'NATIVE_FILTER-YEAR',
             'name': 'Año',
             'filterType': 'filter_select',
             'type': 'NATIVE_FILTER',
-            'targets': [{{'datasetId': {kpi_ds}, 'column': {{'name': 'year'}}}}],
+            'targets': [{{'datasetId': {detail_ds}, 'column': {{'name': 'year'}}}}],
             'defaultDataMask': {{
                 'filterState': {{'value': [{CURRENT_YEAR}]}},
                 'extraFormData': {{'filters': [{{'col': 'year', 'op': 'IN', 'val': [{CURRENT_YEAR}]}}]}},
             }},
             'controlValues': {{'multiSelect': False, 'enableEmptyFilter': False}},
+            'cascadeParentIds': [],
             'scope': {{'rootPath': ['ROOT_ID'], 'excluded': []}},
+            'chartsInScope': {filter_scope_all!r},
+            'tabsInScope': [],
         }},
         {{
-            'id': 'FILTER-EMPRESA',
+            'id': 'NATIVE_FILTER-EMPRESA',
             'name': 'Empresas',
             'filterType': 'filter_select',
             'type': 'NATIVE_FILTER',
-            'targets': [{{'datasetId': {kpi_ds}, 'column': {{'name': 'empresa'}}}}],
+            'targets': [{{'datasetId': {detail_ds}, 'column': {{'name': 'empresa'}}}}],
+            'defaultDataMask': {{'filterState': {{'value': None}}}},
             'controlValues': {{'multiSelect': True, 'enableEmptyFilter': False, 'sortAscending': True}},
+            'cascadeParentIds': [],
             'scope': {{'rootPath': ['ROOT_ID'], 'excluded': []}},
+            'chartsInScope': {filter_scope_all!r},
+            'tabsInScope': [],
         }},
         {{
-            'id': 'FILTER-DEPT',
+            'id': 'NATIVE_FILTER-DEPT',
             'name': 'Departamentos',
             'filterType': 'filter_select',
             'type': 'NATIVE_FILTER',
             'targets': [{{'datasetId': {detail_ds}, 'column': {{'name': 'department_code'}}}}],
+            'defaultDataMask': {{'filterState': {{'value': None}}}},
             'controlValues': {{'multiSelect': True, 'enableEmptyFilter': False, 'sortAscending': True}},
+            'cascadeParentIds': [],
             'scope': {{'rootPath': ['ROOT_ID'], 'excluded': []}},
+            'chartsInScope': {filter_scope_all!r},
+            'tabsInScope': [],
         }},
         {{
-            'id': 'FILTER-TIPO',
+            'id': 'NATIVE_FILTER-TIPO',
             'name': 'Tipo P/R',
             'filterType': 'filter_select',
             'type': 'NATIVE_FILTER',
             'targets': [{{'datasetId': {evo_ds}, 'column': {{'name': 'tipo'}}}}],
+            'defaultDataMask': {{'filterState': {{'value': None}}}},
             'controlValues': {{'multiSelect': False, 'enableEmptyFilter': False}},
+            'cascadeParentIds': [],
             'scope': {{'rootPath': ['ROOT_ID'], 'excluded': []}},
+            'chartsInScope': {evo_chart_ids!r},
+            'tabsInScope': [],
         }},
     ]
     dash.json_metadata = json.dumps(jm)
     dash.css = {dashboard_css!r}
     db.session.commit()
-    print('Dashboard config persistida')
+    print('Dashboard config persistida (filtros evo_ds + KPI detail_ds={detail_ds})')
 """
     subprocess.run(["docker", "exec", "superset", "python", "-c", code], check=True)
 
@@ -440,7 +490,8 @@ def main() -> int:
     print("==> 2/4 Creando datasets...")
     db_id = client.ensure_database()
     dataset_ids = {name: client.ensure_dataset(db_id, name) for name in DATASETS}
-    kpi_ds = dataset_ids["bi_v_kpi_anual_empresa"]
+    # Tarjetas KPI: bi_v_planificacion_kpi (tiene department_code + real_anterior)
+    kpi_ds = dataset_ids["bi_v_planificacion_kpi"]
     evo_ds = dataset_ids["bi_v_evolucion_mensual"]
     prob_ds = dataset_ids["bi_v_facturacion_probabilidad"]
 
@@ -485,8 +536,12 @@ def main() -> int:
              ".2f")),
         ("Plan · Beneficio", "plan", kpi_ds, "big_number_total",
          big_number_params(metric_sum("plan_beneficio", "Beneficio"), ",.0f", currency=True)),
+        # Incluir dims para que /dashboard/.../datasets exponga columnas de filtro (Superset 6.x)
         ("Resumen mensual", "table", evo_ds, "table",
-         {"all_columns": ["ano_mes", "facturacion", "coste", "beneficio", "margen_pct"],
+         {"all_columns": [
+             "empresa", "year", "ano_mes", "department_code", "department_name", "tipo",
+             "facturacion", "coste", "beneficio", "margen_pct",
+         ],
           "order_by_cols": ['["ano_mes", true]']}),
         ("Evolución mensual", "chart", evo_ds, "echarts_timeseries_line",
          {"x_axis": "ano_mes", "metrics": [metric_sum("facturacion", "Facturación")],
