@@ -12,12 +12,23 @@
 | Resumen / Evolución / Margen | `bi_v_evolucion_mensual` | Fuente de **valores** de filtros (Año, Empresa, Dept, Tipo) |
 | Facturación por Probabilidad | `bi_v_facturacion_probabilidad` | Fuera del scope de filtros Año/Empresa/Dept (evita invalidar Apply) |
 
-### Por qué los filtros apuntan a `bi_v_evolucion_mensual`
+### Por qué Apply se quedaba deshabilitado (Superset 6.x)
 
-En Superset 6.x, `GET /api/v1/dashboard/.../datasets` solo expone columnas **usadas por charts**.  
-Si los filtros apuntan a un dataset cuyas columnas de dimensión no aparecen ahí, el botón **Apply filters** queda deshabilitado.
+`GET /api/v1/dashboard/.../datasets` solo expone columnas **referenciadas por charts**.
+Las tarjetas `big_number` solo usaban métricas → no aparecían `year` / `empresa` /
+`department_code` → el filtro se marcaba inválido (`not_in_datasource`) y **Apply**
+permanecía gris.
 
-Por eso `Resumen mensual` incluye en `all_columns`: `empresa`, `year`, `department_code`, `tipo`, etc.
+**Fix canónico:** en cada KPI, `adhoc_filters` con `IS NOT NULL` sobre esas 3 columnas
+(`dim_adhoc_filters()` en `setup-superset-planificacion.py`). No cambia los totales;
+solo registra las columnas en el contexto del dashboard.
+
+### Por qué los filtros apuntan a `bi_v_planificacion_kpi` (Año/Empresa/Dept)
+
+Tras el fix de columnas, el dataset de las tarjetas KPI ya expone las dimensiones.
+`Tipo P/R` sigue en `bi_v_evolucion_mensual` (solo existe ahí).
+
+`Resumen mensual` también incluye dims en `all_columns` por robustez.
 
 ### Scopes
 

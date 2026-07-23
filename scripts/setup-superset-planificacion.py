@@ -190,12 +190,35 @@ def metric_sql(sql: str, label: str) -> dict[str, Any]:
     return {"expressionType": "SQL", "sqlExpression": sql, "label": label}
 
 
+def dim_adhoc_filters() -> list[dict[str, Any]]:
+    """Fuerza a Superset 6.x a exponer year/empresa/department_code en
+    /dashboard/.../datasets para charts big_number (si no, Apply queda disabled).
+    """
+    out: list[dict[str, Any]] = []
+    for col in ("year", "empresa", "department_code"):
+        out.append(
+            {
+                "expressionType": "SIMPLE",
+                "subject": col,
+                "operator": "IS NOT NULL",
+                "operatorId": "IS_NOT_NULL",
+                "clause": "WHERE",
+                "sqlExpression": None,
+                "isExtra": False,
+                "isNew": False,
+                "datasourceWarning": False,
+                "filterOptionName": f"filter_{col}_not_null",
+            }
+        )
+    return out
+
+
 def big_number_params(metric: dict[str, Any], fmt: str, *, currency: bool = False) -> dict[str, Any]:
     # header_font_size es factor × 16px; 1.25 ≈ 20px (Segoe UI solicitado)
     # subheader = etiqueta bajo el valor (Facturación, Margen, etc.) como en Power BI
     label = metric.get("label", "")
     params: dict[str, Any] = {
-        "adhoc_filters": [],
+        "adhoc_filters": dim_adhoc_filters(),
         "metric": metric,
         "header_font_size": 0.9,
         "subheader": label,
@@ -230,9 +253,9 @@ def get_chart_uuids() -> dict[int, str]:
 
 
 def persist_dashboard_config(dash_id: int, dataset_ids: dict[str, int], chart_ids: list[int]) -> None:
-    # Valores de filtro: bi_v_evolucion_mensual (Superset 6.x solo expone columnas
-    # usadas por charts; "Resumen mensual" incluye year/empresa/dept/tipo).
-    # Scope KPI: todas las tarjetas + evo; Tipo P/R solo charts de evolución.
+    # KPI cards (bi_v_planificacion_kpi) exponen year/empresa/department_code vía
+    # adhoc_filters IS NOT NULL (ver dim_adhoc_filters). Valores de filtro Tipo
+    # siguen en bi_v_evolucion_mensual.
     detail_ds = dataset_ids["bi_v_planificacion_kpi"]
     evo_ds = dataset_ids["bi_v_evolucion_mensual"]
     kpi_chart_ids = chart_ids[:8]  # 8 tarjetas Obj/Plan
@@ -310,7 +333,7 @@ with app.app_context():
             'name': 'Año',
             'filterType': 'filter_select',
             'type': 'NATIVE_FILTER',
-            'targets': [{{'datasetId': {evo_ds}, 'column': {{'name': 'year'}}}}],
+            'targets': [{{'datasetId': {detail_ds}, 'column': {{'name': 'year'}}}}],
             'defaultDataMask': {{
                 'filterState': {{'value': [{CURRENT_YEAR}]}},
                 'extraFormData': {{'filters': [{{'col': 'year', 'op': 'IN', 'val': [{CURRENT_YEAR}]}}]}},
@@ -326,7 +349,7 @@ with app.app_context():
             'name': 'Empresas',
             'filterType': 'filter_select',
             'type': 'NATIVE_FILTER',
-            'targets': [{{'datasetId': {evo_ds}, 'column': {{'name': 'empresa'}}}}],
+            'targets': [{{'datasetId': {detail_ds}, 'column': {{'name': 'empresa'}}}}],
             'controlValues': {{'multiSelect': True, 'enableEmptyFilter': True, 'sortAscending': True}},
             'cascadeParentIds': [],
             'scope': {{'rootPath': ['ROOT_ID'], 'excluded': []}},
@@ -338,7 +361,7 @@ with app.app_context():
             'name': 'Departamentos',
             'filterType': 'filter_select',
             'type': 'NATIVE_FILTER',
-            'targets': [{{'datasetId': {evo_ds}, 'column': {{'name': 'department_code'}}}}],
+            'targets': [{{'datasetId': {detail_ds}, 'column': {{'name': 'department_code'}}}}],
             'controlValues': {{'multiSelect': True, 'enableEmptyFilter': True, 'sortAscending': True}},
             'cascadeParentIds': ['FILTER-EMPRESA'],
             'scope': {{'rootPath': ['ROOT_ID'], 'excluded': []}},
