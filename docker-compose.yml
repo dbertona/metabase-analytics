@@ -4,7 +4,7 @@ services:
   superset:
     build:
       context: ./docker/superset
-    image: ps-superset:4.1.2-poc
+    image: ps-superset:6.1.0
     container_name: superset
     restart: unless-stopped
     ports:

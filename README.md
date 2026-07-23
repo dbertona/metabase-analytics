@@ -1,6 +1,6 @@
 # 📊 PS Analytics — Apache Superset
 
-Plataforma de Business Intelligence con **Apache Superset** para visualizaciones del ecosistema Power Solution.
+Plataforma de Business Intelligence con **Apache Superset 6.1.0** para visualizaciones del ecosistema Power Solution.
 
 **Integrado con:** PostgreSQL PS Analytics (Supabase) + sync n8n desde Business Central
 
