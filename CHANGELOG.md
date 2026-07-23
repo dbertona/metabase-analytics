@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [2026-07-23] — Espejo SQL seguimiento económico
+
+### Changed
+
+- `sql/views/seguimiento_economico_views.sql` regenerado desde BD live (VM 100):
+  `v_se_lineas_movimientos` usa `bc_job_ledger_entry_month`; planificación excluye
+  meses con Ingresos reales; incluye vistas fase 2 (expedientes, meses cerrados, KPIs).
+- README del espejo: fuente de verdad = migraciones en `power-solution-apps`.
+
 ## [2026-07-23] — Filtros KPI / Departamentos (Superset 6.1)
 
 ### Added
