@@ -49,9 +49,17 @@ cd /home/superset-analytics   # o clone local
 python3 scripts/setup-superset-planificacion.py
 ```
 
+### Prefijo obligatorio de IDs (Superset 6.1)
+
+Los IDs de filtro nativo **deben** empezar por `NATIVE_FILTER-` (p. ej.
+`NATIVE_FILTER-EMPRESA`). El modal `FiltersConfigModal` usa `isFilterId()` con ese
+prefijo. IDs legacy tipo `FILTER-EMPRESA` se muestran como
+`[untitled customization]`, panel derecho vacío y Save deshabilitado.
+
 ## Historial relevante (2026-07-23)
 
 1. KPI cards pasaron de `bi_v_kpi_anual_empresa` → `bi_v_planificacion_kpi`.
 2. Vista KPI ampliada con `real_anterior_dept` y plan híbrido (meses cerrados = R).
 3. Upgrade servidor: Apache Superset **4.1.2 → 6.1.0**.
 4. Hotfixes en SQLite de VM 100 consolidados en este script (fuente de verdad).
+5. Fix IDs `FILTER-*` → `NATIVE_FILTER-*` (modal de edición roto en 6.1).

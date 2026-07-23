@@ -327,9 +327,11 @@ with app.app_context():
     jm['cross_filters_enabled'] = False
     jm['chart_configuration'] = {{}}
     jm['default_filters'] = '{{}}'
+    # Superset 6.1: IDs DEBEN empezar por NATIVE_FILTER- (isFilterId en FiltersConfigModal).
+    # Prefijos FILTER-* se interpretan mal → modal "[untitled customization]" y panel vacío.
     jm['native_filter_configuration'] = [
         {{
-            'id': 'FILTER-YEAR',
+            'id': 'NATIVE_FILTER-YEAR',
             'name': 'Año',
             'filterType': 'filter_select',
             'type': 'NATIVE_FILTER',
@@ -345,11 +347,12 @@ with app.app_context():
             'tabsInScope': [],
         }},
         {{
-            'id': 'FILTER-EMPRESA',
+            'id': 'NATIVE_FILTER-EMPRESA',
             'name': 'Empresas',
             'filterType': 'filter_select',
             'type': 'NATIVE_FILTER',
             'targets': [{{'datasetId': {detail_ds}, 'column': {{'name': 'empresa'}}}}],
+            'defaultDataMask': {{'filterState': {{'value': None}}}},
             'controlValues': {{'multiSelect': True, 'enableEmptyFilter': False, 'sortAscending': True}},
             'cascadeParentIds': [],
             'scope': {{'rootPath': ['ROOT_ID'], 'excluded': []}},
@@ -357,11 +360,12 @@ with app.app_context():
             'tabsInScope': [],
         }},
         {{
-            'id': 'FILTER-DEPT',
+            'id': 'NATIVE_FILTER-DEPT',
             'name': 'Departamentos',
             'filterType': 'filter_select',
             'type': 'NATIVE_FILTER',
             'targets': [{{'datasetId': {detail_ds}, 'column': {{'name': 'department_code'}}}}],
+            'defaultDataMask': {{'filterState': {{'value': None}}}},
             'controlValues': {{'multiSelect': True, 'enableEmptyFilter': False, 'sortAscending': True}},
             'cascadeParentIds': [],
             'scope': {{'rootPath': ['ROOT_ID'], 'excluded': []}},
@@ -369,11 +373,12 @@ with app.app_context():
             'tabsInScope': [],
         }},
         {{
-            'id': 'FILTER-TIPO',
+            'id': 'NATIVE_FILTER-TIPO',
             'name': 'Tipo P/R',
             'filterType': 'filter_select',
             'type': 'NATIVE_FILTER',
             'targets': [{{'datasetId': {evo_ds}, 'column': {{'name': 'tipo'}}}}],
+            'defaultDataMask': {{'filterState': {{'value': None}}}},
             'controlValues': {{'multiSelect': False, 'enableEmptyFilter': False}},
             'cascadeParentIds': [],
             'scope': {{'rootPath': ['ROOT_ID'], 'excluded': []}},
