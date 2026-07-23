@@ -34,7 +34,11 @@ Tras el fix de columnas, el dataset de las tarjetas KPI ya expone las dimensione
 
 - Año / Empresas / Departamentos → tarjetas KPI + charts de evolución (no Probabilidad).
 - Tipo P/R → solo Resumen / Evolución / Margen acumulado.
-- `enableEmptyFilter: true` (no bloquear Apply por filtro vacío).
+- `enableEmptyFilter: false` — en el código de Superset esta flag equivale al
+  checkbox **«Filter value is required»** cuando está en `true`. Con `true` en
+  filtros vacíos, **Apply queda deshabilitado** hasta rellenar todos.
+  Usamos `false` (vacío permitido).
+- Sin `cascadeParentIds` (cascada Empresa→Dept puede dejar validateStatus=error).
 - `cross_filters_enabled: false` (evitar conflicto con filtros nativos).
 
 ## Regenerar sin perder el diseño
