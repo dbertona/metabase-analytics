@@ -69,9 +69,11 @@ Réplica del informe Power BI — Objetivos Anuales y Planificación Actual.
 - Filtros: Año, Empresas, Departamentos, Tipo P/R
 - Gráficos de evolución mensual y facturación por probabilidad
 
+**Filtros nativos (diseño canónico):** [`docs/FILTROS_DASHBOARD_PLANIFICACION.md`](docs/FILTROS_DASHBOARD_PLANIFICACION.md)
+
 **Datos:**
 - Objetivos → `bc_objectives_by_department`
-- Planificación (P) → `bc_historico_planificacion_mes`
+- Planificación (P/R híbrido) → vistas `v_se_*` / `bi_v_planificacion_kpi`
 - Real (R) → `bc_job_ledger_entry_month`
 
 ## Seguimiento Económico (PBI)

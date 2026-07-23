@@ -5,7 +5,9 @@ Flujo:
   1. Aplica vistas SQL bi_v_* en PostgreSQL
   2. Crea datasets físicos (sin SQL embebido en Python)
   3. Crea tarjetas KPI + tablas + gráficos
-  4. Persiste filtros (año actual por defecto) vía ORM
+  4. Persiste filtros nativos (valores desde bi_v_evolucion_mensual)
+
+Ver: docs/FILTROS_DASHBOARD_PLANIFICACION.md
 """
 
 from __future__ import annotations
@@ -228,9 +230,14 @@ def get_chart_uuids() -> dict[int, str]:
 
 
 def persist_dashboard_config(dash_id: int, dataset_ids: dict[str, int], chart_ids: list[int]) -> None:
-    kpi_ds = dataset_ids["bi_v_kpi_anual_empresa"]
+    # Valores de filtro: bi_v_evolucion_mensual (Superset 6.x solo expone columnas
+    # usadas por charts; "Resumen mensual" incluye year/empresa/dept/tipo).
+    # Scope KPI: todas las tarjetas + evo; Tipo P/R solo charts de evolución.
     detail_ds = dataset_ids["bi_v_planificacion_kpi"]
     evo_ds = dataset_ids["bi_v_evolucion_mensual"]
+    kpi_chart_ids = chart_ids[:8]  # 8 tarjetas Obj/Plan
+    evo_chart_ids = [cid for cid in chart_ids[8:11]]  # Resumen, Evolución, Margen
+    filter_scope_all = kpi_chart_ids + evo_chart_ids  # sin Probabilidad (ds distinto)
 
     dashboard_css = (
         "/* Power BI look: Segoe UI 20px en valor KPI */\n"
@@ -294,37 +301,49 @@ with app.app_context():
 
     dash = db.session.query(Dashboard).get({dash_id})
     jm = json.loads(dash.json_metadata or '{{}}')
+    jm['cross_filters_enabled'] = False
+    jm['chart_configuration'] = {{}}
+    jm['default_filters'] = '{{}}'
     jm['native_filter_configuration'] = [
         {{
             'id': 'FILTER-YEAR',
             'name': 'Año',
             'filterType': 'filter_select',
             'type': 'NATIVE_FILTER',
-            'targets': [{{'datasetId': {kpi_ds}, 'column': {{'name': 'year'}}}}],
+            'targets': [{{'datasetId': {evo_ds}, 'column': {{'name': 'year'}}}}],
             'defaultDataMask': {{
                 'filterState': {{'value': [{CURRENT_YEAR}]}},
                 'extraFormData': {{'filters': [{{'col': 'year', 'op': 'IN', 'val': [{CURRENT_YEAR}]}}]}},
             }},
-            'controlValues': {{'multiSelect': False, 'enableEmptyFilter': False}},
+            'controlValues': {{'multiSelect': False, 'enableEmptyFilter': True}},
+            'cascadeParentIds': [],
             'scope': {{'rootPath': ['ROOT_ID'], 'excluded': []}},
+            'chartsInScope': {filter_scope_all!r},
+            'tabsInScope': [],
         }},
         {{
             'id': 'FILTER-EMPRESA',
             'name': 'Empresas',
             'filterType': 'filter_select',
             'type': 'NATIVE_FILTER',
-            'targets': [{{'datasetId': {kpi_ds}, 'column': {{'name': 'empresa'}}}}],
-            'controlValues': {{'multiSelect': True, 'enableEmptyFilter': False, 'sortAscending': True}},
+            'targets': [{{'datasetId': {evo_ds}, 'column': {{'name': 'empresa'}}}}],
+            'controlValues': {{'multiSelect': True, 'enableEmptyFilter': True, 'sortAscending': True}},
+            'cascadeParentIds': [],
             'scope': {{'rootPath': ['ROOT_ID'], 'excluded': []}},
+            'chartsInScope': {filter_scope_all!r},
+            'tabsInScope': [],
         }},
         {{
             'id': 'FILTER-DEPT',
             'name': 'Departamentos',
             'filterType': 'filter_select',
             'type': 'NATIVE_FILTER',
-            'targets': [{{'datasetId': {detail_ds}, 'column': {{'name': 'department_code'}}}}],
-            'controlValues': {{'multiSelect': True, 'enableEmptyFilter': False, 'sortAscending': True}},
+            'targets': [{{'datasetId': {evo_ds}, 'column': {{'name': 'department_code'}}}}],
+            'controlValues': {{'multiSelect': True, 'enableEmptyFilter': True, 'sortAscending': True}},
+            'cascadeParentIds': ['FILTER-EMPRESA'],
             'scope': {{'rootPath': ['ROOT_ID'], 'excluded': []}},
+            'chartsInScope': {filter_scope_all!r},
+            'tabsInScope': [],
         }},
         {{
             'id': 'FILTER-TIPO',
@@ -332,14 +351,17 @@ with app.app_context():
             'filterType': 'filter_select',
             'type': 'NATIVE_FILTER',
             'targets': [{{'datasetId': {evo_ds}, 'column': {{'name': 'tipo'}}}}],
-            'controlValues': {{'multiSelect': False, 'enableEmptyFilter': False}},
+            'controlValues': {{'multiSelect': False, 'enableEmptyFilter': True}},
+            'cascadeParentIds': [],
             'scope': {{'rootPath': ['ROOT_ID'], 'excluded': []}},
+            'chartsInScope': {evo_chart_ids!r},
+            'tabsInScope': [],
         }},
     ]
     dash.json_metadata = json.dumps(jm)
     dash.css = {dashboard_css!r}
     db.session.commit()
-    print('Dashboard config persistida')
+    print('Dashboard config persistida (filtros evo_ds + KPI detail_ds={detail_ds})')
 """
     subprocess.run(["docker", "exec", "superset", "python", "-c", code], check=True)
 
@@ -440,7 +462,8 @@ def main() -> int:
     print("==> 2/4 Creando datasets...")
     db_id = client.ensure_database()
     dataset_ids = {name: client.ensure_dataset(db_id, name) for name in DATASETS}
-    kpi_ds = dataset_ids["bi_v_kpi_anual_empresa"]
+    # Tarjetas KPI: bi_v_planificacion_kpi (tiene department_code + real_anterior)
+    kpi_ds = dataset_ids["bi_v_planificacion_kpi"]
     evo_ds = dataset_ids["bi_v_evolucion_mensual"]
     prob_ds = dataset_ids["bi_v_facturacion_probabilidad"]
 
@@ -485,8 +508,12 @@ def main() -> int:
              ".2f")),
         ("Plan · Beneficio", "plan", kpi_ds, "big_number_total",
          big_number_params(metric_sum("plan_beneficio", "Beneficio"), ",.0f", currency=True)),
+        # Incluir dims para que /dashboard/.../datasets exponga columnas de filtro (Superset 6.x)
         ("Resumen mensual", "table", evo_ds, "table",
-         {"all_columns": ["ano_mes", "facturacion", "coste", "beneficio", "margen_pct"],
+         {"all_columns": [
+             "empresa", "year", "ano_mes", "department_code", "department_name", "tipo",
+             "facturacion", "coste", "beneficio", "margen_pct",
+         ],
           "order_by_cols": ['["ano_mes", true]']}),
         ("Evolución mensual", "chart", evo_ds, "echarts_timeseries_line",
          {"x_axis": "ano_mes", "metrics": [metric_sum("facturacion", "Facturación")],

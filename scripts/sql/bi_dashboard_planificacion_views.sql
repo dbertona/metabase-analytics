@@ -1,9 +1,10 @@
 -- =============================================================================
 -- Capa semántica BI: Dashboard Planificación (Power BI / Superset)
 -- Fuente única de verdad para KPIs, evolución mensual y probabilidad.
+-- Repo: superset-analytics — aplicar con scripts/apply-bi-views.sh
 -- =============================================================================
 
--- Real del año anterior a nivel empresa (base de crecimiento %)
+-- Real del año anterior a nivel empresa (base de crecimiento % en vista anual)
 CREATE OR REPLACE VIEW bi_v_real_anterior_empresa AS
 SELECT
     year + 1 AS year,
@@ -14,11 +15,21 @@ GROUP BY year, company_name;
 
 -- -----------------------------------------------------------------------------
 -- KPI detalle por empresa / año / departamento
--- Planificación: facturación P+R (alineado con Power BI)
--- Objetivos: v_se_objectives
+-- Plan híbrido: R en meses cerrados, P en meses abiertos (alineado PBI)
+-- + real año anterior por departamento (filtro Departamento en Crecimiento)
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE VIEW bi_v_planificacion_kpi AS
-WITH plan_pr AS (
+WITH closed_job_months AS (
+    SELECT DISTINCT
+        company_name AS empresa,
+        job_no AS job,
+        year,
+        month
+    FROM bc_meses_cerrados
+    WHERE job_no IS NOT NULL
+      AND btrim(job_no::text) <> ''
+),
+plan_hybrid AS (
     SELECT
         f.empresa,
         f.year,
@@ -27,7 +38,13 @@ WITH plan_pr AS (
         SUM(f.coste) AS plan_coste,
         SUM(f.facturado - f.coste) AS plan_beneficio
     FROM v_se_facturacion f
-    WHERE f.tipo IN ('P', 'R')
+    LEFT JOIN closed_job_months c
+        ON c.empresa = f.empresa
+       AND c.job::text = f.job::text
+       AND c.year = f.year
+       AND c.month = f.month
+    WHERE (c.empresa IS NOT NULL AND f.tipo = 'R')
+       OR (c.empresa IS NULL AND f.tipo = 'P')
     GROUP BY f.empresa, f.year, f.departamento
 ),
 obj AS (
@@ -39,11 +56,20 @@ obj AS (
         o.cost_target AS obj_coste,
         o.beneficio_eur AS obj_beneficio
     FROM v_se_objectives o
+),
+real_anterior_dept AS (
+    SELECT
+        company_name AS empresa,
+        year + 1 AS year,
+        departamento AS department_code,
+        SUM(invoice) AS facturacion_real_anterior
+    FROM bc_job_ledger_entry_month
+    GROUP BY company_name, year + 1, departamento
 )
 SELECT
-    COALESCE(obj.empresa, plan_pr.empresa) AS empresa,
-    COALESCE(obj.year, plan_pr.year) AS year,
-    COALESCE(obj.department_code, plan_pr.department_code) AS department_code,
+    COALESCE(obj.empresa, plan_hybrid.empresa) AS empresa,
+    COALESCE(obj.year, plan_hybrid.year) AS year,
+    COALESCE(obj.department_code, plan_hybrid.department_code) AS department_code,
     d.department_name,
     obj.obj_facturacion,
     obj.obj_coste,
@@ -52,23 +78,38 @@ SELECT
         WHEN obj.obj_facturacion > 0
             THEN (obj.obj_facturacion - obj.obj_coste) / obj.obj_facturacion * 100
     END AS obj_margen_pct,
-    COALESCE(plan_pr.plan_facturacion, 0) AS plan_facturacion,
-    COALESCE(plan_pr.plan_coste, 0) AS plan_coste,
-    COALESCE(plan_pr.plan_beneficio, 0) AS plan_beneficio,
+    COALESCE(plan_hybrid.plan_facturacion, 0) AS plan_facturacion,
+    COALESCE(plan_hybrid.plan_coste, 0) AS plan_coste,
+    COALESCE(plan_hybrid.plan_beneficio, 0) AS plan_beneficio,
     CASE
-        WHEN COALESCE(plan_pr.plan_facturacion, 0) > 0
-            THEN plan_pr.plan_beneficio / plan_pr.plan_facturacion * 100
-    END AS plan_margen_pct
+        WHEN COALESCE(plan_hybrid.plan_facturacion, 0) > 0
+            THEN plan_hybrid.plan_beneficio / plan_hybrid.plan_facturacion * 100
+    END AS plan_margen_pct,
+    ra.facturacion_real_anterior,
+    CASE
+        WHEN ra.facturacion_real_anterior > 0
+            THEN (obj.obj_facturacion - ra.facturacion_real_anterior)
+                 / ra.facturacion_real_anterior * 100
+    END AS obj_crecimiento_pct,
+    CASE
+        WHEN ra.facturacion_real_anterior > 0
+            THEN (COALESCE(plan_hybrid.plan_facturacion, 0) - ra.facturacion_real_anterior)
+                 / ra.facturacion_real_anterior * 100
+    END AS plan_crecimiento_pct
 FROM obj
-FULL OUTER JOIN plan_pr
-    ON obj.empresa = plan_pr.empresa
-   AND obj.year = plan_pr.year
-   AND obj.department_code = plan_pr.department_code
+FULL OUTER JOIN plan_hybrid
+    ON obj.empresa = plan_hybrid.empresa
+   AND obj.year = plan_hybrid.year
+   AND obj.department_code = plan_hybrid.department_code
 LEFT JOIN mb_v_dim_departamento d
-    ON d.company_name = COALESCE(obj.empresa, plan_pr.empresa)
-   AND d.department_code = COALESCE(obj.department_code, plan_pr.department_code);
+    ON d.company_name = COALESCE(obj.empresa, plan_hybrid.empresa)
+   AND d.department_code = COALESCE(obj.department_code, plan_hybrid.department_code)
+LEFT JOIN real_anterior_dept ra
+    ON ra.empresa = COALESCE(obj.empresa, plan_hybrid.empresa)
+   AND ra.year = COALESCE(obj.year, plan_hybrid.year)
+   AND ra.department_code = COALESCE(obj.department_code, plan_hybrid.department_code);
 
--- Evolución mensual (tablas y gráficos)
+-- Evolución mensual (tablas y gráficos + fuente de valores de filtros nativos)
 CREATE OR REPLACE VIEW bi_v_evolucion_mensual AS
 SELECT
     r.empresa,
@@ -110,13 +151,13 @@ GROUP BY
     COALESCE(f.probability, 0);
 
 COMMENT ON VIEW bi_v_planificacion_kpi IS
-  'KPIs Objetivos y Planificación (P+R). Usar con filtros año/empresa/departamento.';
+  'KPIs Objetivos/Plan por dept (híbrido P/R + crecimiento vs real anterior). Filtro Departamento OK.';
 COMMENT ON VIEW bi_v_evolucion_mensual IS
-  'Evolución mensual facturación/coste/margen por tipo P o R.';
+  'Evolución mensual facturación/coste/margen por tipo P o R. Fuente de filtros Año/Empresa/Dept/Tipo.';
 COMMENT ON VIEW bi_v_facturacion_probabilidad IS
   'Facturación planificada agrupada por probabilidad de cierre.';
 
--- KPI agregados por empresa/año (tarjetas del dashboard)
+-- KPI agregados por empresa/año (referencia / legacy; tarjetas usan bi_v_planificacion_kpi)
 CREATE OR REPLACE VIEW bi_v_kpi_anual_empresa AS
 WITH agg AS (
     SELECT
