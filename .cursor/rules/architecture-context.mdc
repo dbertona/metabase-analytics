@@ -60,7 +60,8 @@ Prefijo `bc_` — origen: workflow n8n 004 desde BC Production.
 
 | Vista | Descripción |
 |-------|-------------|
-| `v_se_facturacion` | UNION ALL P+R — fuente principal de Superset |
+| `v_se_facturacion` | UNION ALL P+R — fuente principal de Superset (**facturación canónica**) |
+| `v_se_coste` | Capa Coste P/R (`SUM(coste)`); independiente de facturación |
 | `v_se_lineas_planificacion` | Tipo P (plan) con lógica vigente + Distinct PBI |
 | `v_se_lineas_expedientes` | Tipo P (expedientes) |
 | `v_se_lineas_movimientos` | Tipo R (movimientos reales) |
@@ -73,9 +74,12 @@ Prefijo `bc_` — origen: workflow n8n 004 desde BC Production.
 | KPI | Valor Analytics | PBI | Estado |
 |-----|----------------|-----|--------|
 | Facturación P (Plan+Expedientes) | 3.695.962 € | ~3.696k € | ✅ alineado |
-| Facturación R (Real) | 2.688.861 € | 2.688.861 € | ✅ alineado exacto |
-| Coste R (Real) | 2.513.515 € | ~2.381k € (lag refresh PBI) | ✅ = BC Production |
-| Coste P (Plan+Expedientes) | 3.870.490 € | — | en revisión |
+| Facturación R (Real) | 2.688.861 € | 2.688.861 € | ✅ paridad exacta |
+| Coste R (Real) | 2.513.515 € | 2.381.218 € | ⚠️ diferencia por diseño (ver nota) |
+
+> **Nota Coste R:** gap ~132k causado por `PSI-AR-26-1200` y `PSI-CO-26-7000` sin `departamento`
+> en BC. PBI excluye entradas sin departamento; Analytics las incluye. Solución: asignar
+> departamento en BC. Documentado en `ANALYTICS_FACTURACION_PBI_ALIGNMENT.md` §8.
 
 ---
 

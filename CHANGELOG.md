@@ -26,8 +26,43 @@
 | Métrica | Analytics | PBI | Estado |
 |---------|-----------|-----|--------|
 | Facturación R | 2.688.861 € | 2.688.861 € | ✅ paridad exacta |
-| Coste R | 2.513.515 € | ~2.381k € (lag refresh PBI) | ✅ = BC Production |
+| Coste R | 2.513.515 € | 2.381.218 € | ⚠️ diferencia por diseño (ver abajo) |
 | Facturación P | 3.695.962 € | ~3.696k € | ✅ alineado |
+
+### Investigación Coste R Analytics vs PBI (jul 2026)
+
+**Síntoma:** Analytics muestra 2.513.515 €, PBI muestra 2.381.218 € → gap de ~132.297 €.
+
+**Causa raíz confirmada:** PBI filtra implícitamente los registros de `movimientosProyectosMes`
+que **no tienen `departamento` asignado**. Analytics incluye todos los registros sin distinción.
+
+**Proyectos afectados:**
+
+| Proyecto | Descripción | tipo_proyecto | type_line | Coste 2026 |
+|----------|-------------|--------------|-----------|------------|
+| `PSI-AR-26-1200` | PS Argentina 2026 | Structure | G/L Account | 131.700 € |
+| `PSI-CO-26-7000` | (Structure) | Structure | G/L Account | 14,99 € (mes 3) |
+| **Total** | | | | **~131.715 €** |
+
+Residual no explicado (~582 €) es irrelevante (lag de réplica BC).
+
+**Desglose mes a mes de PSI-AR-26-1200:**
+
+| Mes | Coste BC/Analytics | PBI excluye |
+|-----|--------------------|-------------|
+| 1 | 20.000 € | ✅ (sin dpto) |
+| 2 | 20.000 € | ✅ (sin dpto) |
+| 3 | 20.000 € | ✅ (sin dpto) |
+| 4 | 20.000 € | ✅ (sin dpto) |
+| 5 | 20.000 € | ✅ (sin dpto) |
+| 6 | 31.700 € (2 reg.) | ✅ (sin dpto) |
+
+**Acción requerida (en BC):** Asignar un código de departamento a los proyectos `PSI-AR-26-1200`
+y `PSI-CO-26-7000` en la ficha de proyecto de Business Central. Tras el cambio y el siguiente
+refresco de PBI, el coste pasará a ~2.513k (paridad con Analytics y BC Production).
+
+Mientras tanto: la diferencia de 132k es **por diseño** — PBI excluye costes sin departamento,
+Analytics los incluye. Ambas cifras son correctas según su scope.
 
 ## [2026-07-23] — Filtros KPI / Departamentos (Superset 6.1)
 
