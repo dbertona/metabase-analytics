@@ -8,7 +8,8 @@ alwaysApply: true
 ## 🎯 ¿Para qué sirve este repo?
 
 Réplica de datos BC en **Apache Superset** para reporting financiero (Seguimiento Económico, Facturación P/R).
-No contiene workflows n8n ni código de la app Timesheet/Gastos.
+Contiene el **workflow n8n 004** (sync BC → Analytics) en `src/workflows/`.
+NO contiene código de la app Timesheet/Gastos (eso está en `power-solution-apps`).
 
 **Doc maestra:** `docs/GUIA_COMPLETA_ANALYTICS.md`  
 **Troubleshooting P/R:** `docs/shared/analytics/ANALYTICS_FACTURACION_PBI_ALIGNMENT.md`  
@@ -36,7 +37,7 @@ docker run --rm --network host postgres:15 \
 
 | Repo | Qué contiene | ¿Tocar desde aquí? |
 |------|-------------|-------------------|
-| **superset-analytics** (este) | Spec PBI, exports Superset, docs dashboards, SQL vistas (canónico) | ✅ Sí |
+| **superset-analytics** (este) | Workflow 004, SQL vistas, scripts deploy, docs dashboards, spec PBI | ✅ Sí |
 | **power-solution-apps** | App Timesheet/Gastos (fuera de alcance en este workspace) | ❌ No (otro workspace) |
 | **power-solution-docs** | Docs compartidas (`docs/shared/`) | Solo via submódulo |
 
@@ -85,11 +86,12 @@ Prefijo `bc_` — origen: workflow n8n 004 desde BC Production.
 
 ## 🔴 REGLAS CRÍTICAS
 
-- **SQL Analytics (`v_se_*`, `bi_v_*`, helpers)** → fuente de verdad en este repo (`sql/views/`, `scripts/sql/`)
-- **Workflow 004** → se opera contra n8n VM 101; la documentación funcional vive en este repo
+- **Workflow 004** → el JSON canónico está en `src/workflows/004_sync_bc_to_ps_analytics.json` **en este repo**; se despliega con `scripts/update-n8n-workflow-004.sh` contra n8n VM 101
+- **SQL Analytics (`v_se_*`, `bi_v_*`, helpers)** → fuente de verdad en `sql/views/seguimiento_economico_views.sql`; aplicar en DB con `scripts/apply-bi-views.sh`
+- **Migraciones SQL** → crearlas en `power-solution-apps/supabase/migrations/` con prefijo `ANALYTICS DB ONLY`, NO aquí
 - **Commits**: siempre rama `feat/` o `fix/` — nunca en `main` directamente
 - **Push**: siempre `gitea`, nunca `origin` (GitHub es solo mirror)
-- **Submodulo `docs/shared`**: actualizar con `git pull origin main` desde `docs/shared/` y commitear el puntero en el padre
+- **Submodulo `docs/shared`**: actualizar con `git pull gitea main` desde `docs/shared/` y commitear el puntero en el padre
 
 ---
 
@@ -97,16 +99,23 @@ Prefijo `bc_` — origen: workflow n8n 004 desde BC Production.
 
 ```text
 superset-analytics/
-  docs/
-    GUIA_COMPLETA_ANALYTICS.md       ← referencia principal
-    ACTUALIZAR_WORKFLOW_004.md        ← cómo actualizar el sync
-    seguimiento-economico/README.md   ← especificación de dashboards
-    shared/                           ← submódulo power-solution-docs
-      analytics/
-        004_SYNC_BC_ANALYTICS.md      ← arquitectura workflow 004
-        ANALYTICS_FACTURACION_PBI_ALIGNMENT.md ← troubleshooting P/R
+  src/
+    workflows/
+      004_sync_bc_to_ps_analytics.json  ← workflow n8n 004 (CANÓNICO AQUÍ)
   sql/
-    views/                            ← DDL de vistas SQL
-  scripts/                            ← scripts operativos
-  docker/                             ← config Superset Docker
+    views/                              ← DDL de vistas SQL (seguimiento_economico_views.sql)
+  scripts/
+    update-n8n-workflow-004.sh          ← aplica workflow en n8n prod (VM 101)
+    update-n8n-workflow-004-api.sh      ← aplica vía API n8n
+    download-workflow-004.sh            ← descarga estado actual de prod
+    apply-bi-views.sh                   ← aplica vistas SQL en analytics DB
+  docker/                               ← config Superset Docker
+  docs/
+    GUIA_COMPLETA_ANALYTICS.md          ← referencia principal
+    ACTUALIZAR_WORKFLOW_004.md          ← cómo actualizar el sync
+    seguimiento-economico/README.md     ← especificación de dashboards
+    shared/                             ← submódulo power-solution-docs
+      analytics/
+        004_SYNC_BC_ANALYTICS.md        ← arquitectura workflow 004
+        ANALYTICS_FACTURACION_PBI_ALIGNMENT.md ← troubleshooting P/R
 ```

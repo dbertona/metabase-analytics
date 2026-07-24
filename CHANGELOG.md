@@ -2,6 +2,84 @@
 
 ## [Unreleased]
 
+## [2026-07-24b] — Alineación completa Factura P / Coste P con PBI (PSI 2026)
+
+### Fixed
+
+- **`v_se_lineas_expedientes`**: eliminados CTEs `vigente` y JOIN asociado. La vista
+  ahora filtra `bc_expediente_mes` con `budget_date_month = month AND budget_date_year = year`,
+  replicando exactamente la lógica de PBI (cada mes usa su propia versión de presupuesto).
+  Elimina el gap de ~60k € en Factura P de junio causado por el filtro de presupuesto vigente.
+
+- **`v_se_lineas_planificacion`**: lógica híbrida para meses pasados mejorada.
+  En lugar de `budget_date_month = month` (estricto), ahora usa
+  `MAX(budget_date_month) <= month` como subconsulta correlacionada, permitiendo incluir
+  proyectos Structure que tienen presupuesto en un mes anterior al planificado
+  (e.g., `budget_date_month=5` en `month=6`). Cierra gap de ~54k € en Coste P (mayo/junio).
+  - La rama de meses actuales/futuros no cambia: acepta todas las versiones y deduplication
+    vía DISTINCT elimina repeticiones.
+  - Se mantiene `NOT EXISTS (bc_meses_cerrados)` y `NOT EXISTS (Ingresos reales)`.
+
+- **Datos huérfanos en `bc_expediente_mes`**: el sync incremental (UPSERT por PK) no borra
+  registros cuando BC cambia `budgetDateMonth` (e.g., de 6 → 7). Se acumulaban filas
+  huérfanas que inflaban Factura P ~60k €. Solución: DELETE + reset watermark + full resync.
+  Proyectos afectados: `PSI-OT-23-2002`, `PSI-OT-23-2008`, `PSI-OT-24-2016`,
+  `PSI-OT-24-2034`, `PSI-OT-25-2052` (eliminados correctamente tras resync).
+
+- **Datos huérfanos en `bc_job_planning_line`**: misma causa raíz. Proyectos
+  `PSI-OT-24-2032` (19.735 €) y `PSI-OT-26-2022` (4.675 €) permanecían con
+  `budget_date_month=6` en junio cuando BC los había actualizado a budget=7.
+  DELETE + reset watermark + resync corrige el gap de ~24k € en Factura P junio.
+
+- **`Transform ExpedienteMes` (n8n 004)**: bug de doble-conteo por deduplicación
+  incompleta. BC OData devuelve filas duplicadas (mismo invoice, distinto `lastModifiedDateTime`)
+  cuando se consulta por ventanas de timestamp. La clave exacta (`exactKey`) incluye todos
+  los campos incluyendo `invoice`, de forma que duplicados exactos se descartan antes de sumar.
+  El `key` sin invoice agrega líneas genuinamente distintas del mismo expediente/mes.
+
+### Changed
+
+- **Resync completo `bc_expediente_mes` PSI**: DELETE de 3.156 filas + watermark
+  `1900-01-01` + sync 004 → 2.947 filas reinsertadas desde BC. Elimina todos los huérfanos.
+
+- **Resync completo `bc_job_planning_line` PSI**: DELETE de 34.134 filas + watermark
+  `1900-01-01` + sync 004 → 1.966 filas reinsertadas desde BC. Elimina todos los huérfanos.
+
+### KPIs PSI 2026 — Estado final (2026-07-24)
+
+| Métrica | Analytics | PBI | Gap | Estado |
+|---------|-----------|-----|-----|--------|
+| Factura P total | 3.685.687 € | 3.685.687 € | 0 € | ✅ paridad exacta |
+| Factura R total | 2.688.861 € | 2.688.861 € | 0 € | ✅ paridad exacta |
+| Coste P total | 3.838.008 € | 3.838.008 € | 0 € | ✅ paridad exacta |
+| Coste R | 2.513.515 € | 2.381.218 € | +132k € | ⚠️ por diseño (sin departamento) |
+
+Coste R: diferencia documentada — PBI excluye proyectos sin `departamento` en BC
+(`PSI-AR-26-1200`, `PSI-CO-26-7000`). Analytics los incluye. Resolución: asignar
+departamento en BC (acción de negocio, no técnica).
+
+### Investigación técnica — Hallazgos de alineación P vs PBI
+
+**Lógica PBI para `ExpedienteMes`:**
+- Filtra por `budgetDateMonth = month` (cada mes usa su versión propia de presupuesto).
+- Incluye filas negativas (correcciones/cancelaciones); el neto es el importe correcto.
+- Agrupa por `(job, year, month, budgetDateMonth)` y suma neto incluyendo negativos.
+
+**Lógica PBI para `PlanificacionMes` (meses pasados):**
+- Incluye la última versión de presupuesto con `budgetDateMonth ≤ month`.
+- Esto es relevante para proyectos Structure cuyo presupuesto no se actualiza cada mes.
+- Incluye filas con `lineType = ''` (Both Budget & Billable) y `Billable`.
+- Excluye meses con movimientos reales de tipo Ingresos (no muestra P si ya hay R).
+
+**Causa raíz de huérfanos (patrón UPSERT):**
+El sync 004 hace UPSERT por PK `(company, job, year, month, budget_date_year, budget_date_month)`.
+Cuando BC actualiza `budgetDateMonth` de una línea (ej. 6→7), el registro antiguo
+`(job, month=6, budget=6)` queda huérfano en analytics porque el UPSERT solo inserta/actualiza,
+no borra. La única solución operativa es el resync completo periódico.
+
+**Recomendación operativa:** Programar un resync completo mensual de `bc_expediente_mes`
+y `bc_job_planning_line` (DELETE + reset watermark + sync) para evitar acumulación de huérfanos.
+
 ## [2026-07-24] — Fix watermark n8n 004 + resync completo PSI
 
 ### Fixed

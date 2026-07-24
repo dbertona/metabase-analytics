@@ -119,9 +119,34 @@ CREATE OR REPLACE VIEW public.v_se_lineas_planificacion AS
             p.concepto_analitico_descripcion AS descripcion_ca
            FROM bc_job_planning_line p
              LEFT JOIN bc_job j ON j.company_name = p.company_name AND j.no::text = p.job_no::text
-          WHERE p.job_no IS NOT NULL AND btrim(p.job_no::text) <> ''::text AND p.job_no::text !~~ 'PP%'::text AND p.job_no::text !~~ 'PY%'::text AND (p.status::text = ANY (ARRAY['Open'::text, 'Planning'::text])) AND NOT (EXISTS ( SELECT 1
-                   FROM bc_job_ledger_entry_month m
-                  WHERE m.company_name = p.company_name AND m.job_no::text = p.job_no::text AND m.year = p.year AND m.month = p.month AND m.concepto_analitico_descripcion::text = 'Ingresos'::text AND m.invoice <> 0::numeric))
+          WHERE p.job_no IS NOT NULL AND btrim(p.job_no::text) <> ''::text AND p.job_no::text !~~ 'PP%'::text AND p.job_no::text !~~ 'PY%'::text AND (p.status::text = ANY (ARRAY['Open'::text, 'Planning'::text]))
+            AND (
+              -- Meses pasados: última versión de presupuesto con budget_date_month <= month
+              -- (PBI incluye Structure con presupuesto anterior si no hay versión del mes)
+              (make_date(p.year, p.month, 1) < date_trunc('month', CURRENT_DATE)
+               AND p.budget_date_year = p.year
+               AND p.budget_date_month <= p.month
+               AND p.budget_date_month = (
+                 SELECT MAX(p2.budget_date_month)
+                   FROM bc_job_planning_line p2
+                  WHERE p2.company_name = p.company_name
+                    AND p2.job_no::text = p.job_no::text
+                    AND p2.year = p.year
+                    AND p2.month = p.month
+                    AND p2.budget_date_year = p.year
+                    AND p2.budget_date_month <= p.month
+                    AND (p2.status::text = ANY (ARRAY['Open'::text, 'Planning'::text]))
+               ))
+              OR
+              -- Mes actual y futuros: sin filtro budget_date_month (toma todas las versiones; dedup elimina duplicados)
+              make_date(p.year, p.month, 1) >= date_trunc('month', CURRENT_DATE)
+            )
+            AND NOT EXISTS (SELECT 1 FROM bc_meses_cerrados c
+                  WHERE c.company_name = p.company_name AND c.job_no::text = p.job_no::text AND c.year = p.year AND c.month = p.month)
+            AND NOT EXISTS (SELECT 1 FROM bc_job_ledger_entry_month m
+                  WHERE m.company_name = p.company_name AND m.job_no::text = p.job_no::text
+                  AND m.year = p.year AND m.month = p.month
+                  AND m.concepto_analitico_descripcion = 'Ingresos')
         ), dedup AS (
          SELECT DISTINCT ON (s.job, s.year, s.month, s.invoice, s.cost, s.nr, s.descripcion_ca) s.empresa,
             s.job,
@@ -175,7 +200,7 @@ CREATE OR REPLACE VIEW public.v_se_lineas_planificacion AS
     (d.empresa || ':'::text) || d.year::text AS empresa_ano,
     (d.empresa || ':'::text) || COALESCE(d.nr, ''::character varying)::text AS empresa_recurso
    FROM dedup d;
-COMMENT ON VIEW public.v_se_lineas_planificacion IS 'PBI Lineas Planificacion: filtro budget (year=budgetYear, month>=budgetMonth), Distinct(job,year,month,invoice,cost,nr,descripcionCA), Open/Planning.';
+COMMENT ON VIEW public.v_se_lineas_planificacion IS 'PBI Lineas Planificacion: híbrido — pasados: MAX(budget_date_month)<=month (fallback Structure); futuros: todas las versiones + dedup. Excluye bc_meses_cerrados y meses con Ingresos reales. Distinct, Open/Planning.';
 
 -- ---------------------------------------------------------------------------
 -- View: v_se_lineas_movimientos
@@ -252,33 +277,9 @@ COMMENT ON VIEW public.v_se_lineas_movimientos IS 'Replica M de Power BI para mo
 -- View: v_se_lineas_expedientes
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE VIEW public.v_se_lineas_expedientes AS
- WITH version_stats AS (
-         SELECT p.company_name,
-            p.budget_date_year AS byear,
-            p.budget_date_month AS bmonth,
-            count(*) AS n
-           FROM bc_job_planning_line p
-          WHERE (p.status::text = ANY (ARRAY['Open'::character varying, 'Planning'::character varying]::text[])) AND COALESCE(p.budget_date_year, 0) > 0 AND COALESCE(p.budget_date_month, 0) > 0
-          GROUP BY p.company_name, p.budget_date_year, p.budget_date_month
-        ), max_n AS (
-         SELECT version_stats.company_name,
-            max(version_stats.n) AS mx
-           FROM version_stats
-          GROUP BY version_stats.company_name
-        ), plateau AS (
-         SELECT v.company_name,
-            v.byear,
-            v.bmonth,
-            v.n
-           FROM version_stats v
-             JOIN max_n m ON m.company_name = v.company_name AND v.n::numeric >= (m.mx::numeric * 0.85)
-        ), vigente AS (
-         SELECT DISTINCT ON (p.company_name) p.company_name,
-            p.byear AS budget_date_year,
-            p.bmonth AS budget_date_month
-           FROM plateau p
-          ORDER BY p.company_name, (abs(p.bmonth - EXTRACT(month FROM CURRENT_DATE)::integer) + abs(p.byear - EXTRACT(year FROM CURRENT_DATE)::integer) * 12), p.byear DESC, p.bmonth DESC
-        ), src AS (
+ -- Lógica PBI: cada mes usa su propia versión de presupuesto (budget_date_month = month).
+ -- No se usa vigente global; se muestra el expediente planificado para ese mes específico.
+ WITH src AS (
          SELECT e.company_name AS empresa,
             e.job_no AS job,
             e.year,
@@ -293,9 +294,11 @@ CREATE OR REPLACE VIEW public.v_se_lineas_expedientes AS
             e.budget_date_month,
             e.month_closing_status AS status1
            FROM bc_expediente_mes e
-             JOIN vigente v ON v.company_name = e.company_name AND v.budget_date_year = e.budget_date_year AND v.budget_date_month = e.budget_date_month
              LEFT JOIN bc_job j ON j.company_name = e.company_name AND j.no::text = e.job_no::text
-          WHERE e.job_no IS NOT NULL AND btrim(e.job_no::text) <> ''::text AND e.job_no::text !~~ 'PP%'::text AND e.job_no::text !~~ 'PY%'::text AND (COALESCE(e.budget_date_year, 0) = 0 OR e.year = e.budget_date_year AND e.month >= COALESCE(NULLIF(e.budget_date_month, 0), 1)) AND (COALESCE(e.month_closing_status, ''::character varying)::text <> ALL (ARRAY['Completed'::character varying, 'Lost'::character varying]::text[]))
+          WHERE e.job_no IS NOT NULL AND btrim(e.job_no::text) <> ''::text
+            AND e.job_no::text !~~ 'PP%'::text AND e.job_no::text !~~ 'PY%'::text
+            AND e.budget_date_month = e.month AND e.budget_date_year = e.year
+            AND (COALESCE(e.month_closing_status, ''::character varying)::text <> ALL (ARRAY['Completed'::character varying, 'Lost'::character varying]::text[]))
         ), dedup AS (
          SELECT DISTINCT ON (s.empresa, s.job, s.year, s.month, s.invoice) s.empresa,
             s.job,
@@ -342,7 +345,7 @@ CREATE OR REPLACE VIEW public.v_se_lineas_expedientes AS
     (d.empresa || ':'::text) || d.year::text AS empresa_ano,
     d.empresa || ':'::text AS empresa_recurso
    FROM dedup d;
-COMMENT ON VIEW public.v_se_lineas_expedientes IS 'PBI Lineas Expedientes: filtro budget M, Distinct(job,year,month,invoice), excluye Completed/Lost.';
+COMMENT ON VIEW public.v_se_lineas_expedientes IS 'PBI Lineas Expedientes: budget_date_month=month (lógica PBI — cada mes usa su propio presupuesto), Distinct(job,year,month,invoice), excluye Completed/Lost.';
 
 -- ---------------------------------------------------------------------------
 -- View: v_se_lineas_meses_cerrados
