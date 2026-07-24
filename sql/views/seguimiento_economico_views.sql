@@ -121,9 +121,22 @@ CREATE OR REPLACE VIEW public.v_se_lineas_planificacion AS
              LEFT JOIN bc_job j ON j.company_name = p.company_name AND j.no::text = p.job_no::text
           WHERE p.job_no IS NOT NULL AND btrim(p.job_no::text) <> ''::text AND p.job_no::text !~~ 'PP%'::text AND p.job_no::text !~~ 'PY%'::text AND (p.status::text = ANY (ARRAY['Open'::text, 'Planning'::text]))
             AND (
-              -- Meses pasados: lógica PBI — cada mes usa su propia versión de presupuesto
+              -- Meses pasados: última versión de presupuesto con budget_date_month <= month
+              -- (PBI incluye Structure con presupuesto anterior si no hay versión del mes)
               (make_date(p.year, p.month, 1) < date_trunc('month', CURRENT_DATE)
-               AND p.budget_date_month = p.month AND p.budget_date_year = p.year)
+               AND p.budget_date_year = p.year
+               AND p.budget_date_month <= p.month
+               AND p.budget_date_month = (
+                 SELECT MAX(p2.budget_date_month)
+                   FROM bc_job_planning_line p2
+                  WHERE p2.company_name = p.company_name
+                    AND p2.job_no::text = p.job_no::text
+                    AND p2.year = p.year
+                    AND p2.month = p.month
+                    AND p2.budget_date_year = p.year
+                    AND p2.budget_date_month <= p.month
+                    AND (p2.status::text = ANY (ARRAY['Open'::text, 'Planning'::text]))
+               ))
               OR
               -- Mes actual y futuros: sin filtro budget_date_month (toma todas las versiones; dedup elimina duplicados)
               make_date(p.year, p.month, 1) >= date_trunc('month', CURRENT_DATE)
@@ -187,7 +200,7 @@ CREATE OR REPLACE VIEW public.v_se_lineas_planificacion AS
     (d.empresa || ':'::text) || d.year::text AS empresa_ano,
     (d.empresa || ':'::text) || COALESCE(d.nr, ''::character varying)::text AS empresa_recurso
    FROM dedup d;
-COMMENT ON VIEW public.v_se_lineas_planificacion IS 'PBI Lineas Planificacion: híbrido — pasados: budget_date_month=month (lógica PBI); futuros: todas las versiones + dedup. NOT IN bc_meses_cerrados, Distinct(job,year,month,invoice,cost,nr,descripcionCA), Open/Planning.';
+COMMENT ON VIEW public.v_se_lineas_planificacion IS 'PBI Lineas Planificacion: híbrido — pasados: MAX(budget_date_month)<=month (fallback Structure); futuros: todas las versiones + dedup. Excluye bc_meses_cerrados y meses con Ingresos reales. Distinct, Open/Planning.';
 
 -- ---------------------------------------------------------------------------
 -- View: v_se_lineas_movimientos
