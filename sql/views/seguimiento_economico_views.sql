@@ -120,8 +120,8 @@ CREATE OR REPLACE VIEW public.v_se_lineas_planificacion AS
            FROM bc_job_planning_line p
              LEFT JOIN bc_job j ON j.company_name = p.company_name AND j.no::text = p.job_no::text
           WHERE p.job_no IS NOT NULL AND btrim(p.job_no::text) <> ''::text AND p.job_no::text !~~ 'PP%'::text AND p.job_no::text !~~ 'PY%'::text AND (p.status::text = ANY (ARRAY['Open'::text, 'Planning'::text])) AND NOT (EXISTS ( SELECT 1
-                   FROM bc_job_ledger_entry_month m
-                  WHERE m.company_name = p.company_name AND m.job_no::text = p.job_no::text AND m.year = p.year AND m.month = p.month AND m.concepto_analitico_descripcion::text = 'Ingresos'::text AND m.invoice <> 0::numeric))
+                   FROM bc_meses_cerrados c
+                  WHERE c.company_name = p.company_name AND c.job_no::text = p.job_no::text AND c.year = p.year AND c.month = p.month))
         ), dedup AS (
          SELECT DISTINCT ON (s.job, s.year, s.month, s.invoice, s.cost, s.nr, s.descripcion_ca) s.empresa,
             s.job,
