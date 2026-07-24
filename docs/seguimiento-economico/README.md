@@ -33,18 +33,35 @@ curl -sS -m 900 -X POST \
 
 Workflow: [d1f7647e114a486e](https://apps.powersolution.es/n8n/workflow/d1f7647e114a486e)
 
-## Paridad KPI PSI 2026 (validado 2026-07-22)
+## Paridad KPI PSI 2026
+
+### Facturación (validado 2026-07-22) — fuente `v_se_facturacion`
 
 | Métrica | Power BI | Analytics |
 |---------|----------|-----------|
 | Real (tipo R) | 2.604.816 € | 2.604.816 € ✅ |
 | Plan (tipo P) | 3.712.417 € | 3.712.450 € ✅ |
 
+### Coste — fuente `v_se_coste` (capa dedicada; no tocar facturado)
+
+| Métrica | Power BI | Analytics (baseline) |
+|---------|----------|----------------------|
+| Coste P | 3.788.848 € | 3.953.354 € (gap ~+164k) |
+| Coste R | 2.271.735 € | 1.497.530 € (gap ~−774k) |
+
 ```sql
+-- Facturación canónica
 SELECT tipo, ROUND(SUM(facturado)::numeric, 0)
 FROM v_se_facturacion
 WHERE empresa = 'Power Solution Iberia SL' AND year = 2026
 GROUP BY tipo;
+
+-- Coste (capa separada)
+SELECT tipo, fuente, ROUND(SUM(coste)::numeric, 2)
+FROM v_se_coste
+WHERE empresa ILIKE '%Iberia%' AND year = 2026
+GROUP BY tipo, fuente
+ORDER BY tipo, fuente;
 ```
 
 ## Fases del proyecto

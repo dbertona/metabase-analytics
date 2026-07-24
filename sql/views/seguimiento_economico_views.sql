@@ -655,3 +655,150 @@ CREATE OR REPLACE VIEW public.v_se_kpi_cards AS
      LEFT JOIN fact_p fp ON fp.empresa = o.empresa AND fp.ano = (o.ano - 1);
 COMMENT ON VIEW public.v_se_kpi_cards IS 'PBI Resumen — 8 KPI cards (Objetivos Anuales + Planificación Actual) por empresa y año.';
 
+-- ---------------------------------------------------------------------------
+-- View: v_se_coste
+-- Capa dedicada a Coste P/R (PBI TotalGasto / Coste).
+-- NO sustituye a v_se_facturacion: la facturación canónica sigue allí.
+-- Objetivo: iterar alineación de coste vs PBI sin riesgo sobre facturado.
+-- Fórmula Coste PBI: probability=0 → cost ; else cost * probability / 100
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE VIEW public.v_se_coste AS
+SELECT
+  s.empresa,
+  s.job,
+  s.year,
+  s.month,
+  s.cost AS coste_raw,
+  public.se_weight_amount(s.probability, s.cost) AS coste,
+  s.nr,
+  s.type_line,
+  s.quantity AS cantidad_raw,
+  public.se_weight_amount(s.probability, s.quantity) AS cantidad,
+  s.line_type,
+  s.departamento,
+  s.descripcion,
+  s.estado,
+  s.tipo_proyecto,
+  s.probability,
+  public.se_prob_pct(s.probability) AS pct,
+  s.descripcion_ca,
+  s.tipo,
+  s.fuente,
+  s.codigo_unico_departamento,
+  s.fecha_calculada,
+  s.empresa_ano,
+  s.empresa_recurso,
+  LPAD(s.month::text, 2, '0') AS mes_tex,
+  LPAD(s.month::text, 2, '0') || '/' || s.year::text AS ano_mes
+FROM (
+  SELECT
+    p.empresa,
+    p.job,
+    p.year,
+    p.month,
+    p.cost,
+    p.nr,
+    p.type_line,
+    p.quantity,
+    p.line_type,
+    p.departamento,
+    p.descripcion,
+    p.estado,
+    p.tipo_proyecto,
+    p.probability,
+    p.descripcion_ca,
+    p.tipo,
+    'planificacion'::text AS fuente,
+    p.codigo_unico_departamento,
+    p.fecha_calculada,
+    p.empresa_ano,
+    p.empresa_recurso
+  FROM public.v_se_lineas_planificacion p
+  WHERE p.year IS NOT NULL AND p.month IS NOT NULL
+
+  UNION ALL
+
+  SELECT
+    m.empresa,
+    m.job,
+    m.year,
+    m.month,
+    m.cost,
+    m.nr,
+    m.type_line,
+    m.quantity,
+    m.line_type,
+    m.departamento,
+    m.descripcion,
+    m.estado,
+    m.tipo_proyecto,
+    m.probability,
+    m.descripcion_ca,
+    m.tipo,
+    'movimientos'::text AS fuente,
+    m.codigo_unico_departamento,
+    m.fecha_calculada,
+    m.empresa_ano,
+    m.empresa_recurso
+  FROM public.v_se_lineas_movimientos m
+  WHERE m.year IS NOT NULL AND m.month IS NOT NULL
+
+  UNION ALL
+
+  SELECT
+    e.empresa,
+    e.job,
+    e.year,
+    e.month,
+    e.cost,
+    e.nr,
+    e.type_line,
+    e.quantity,
+    e.line_type,
+    e.departamento,
+    e.descripcion,
+    e.estado,
+    e.tipo_proyecto,
+    e.probability,
+    e.descripcion_ca,
+    e.tipo,
+    'expedientes'::text AS fuente,
+    e.codigo_unico_departamento,
+    e.fecha_calculada,
+    e.empresa_ano,
+    e.empresa_recurso
+  FROM public.v_se_lineas_expedientes e
+  WHERE e.year IS NOT NULL AND e.month IS NOT NULL
+
+  UNION ALL
+
+  SELECT
+    c.empresa,
+    c.job,
+    c.year,
+    c.month,
+    c.cost,
+    c.nr,
+    c.type_line,
+    c.quantity,
+    c.line_type,
+    c.departamento,
+    c.descripcion,
+    c.estado,
+    c.tipo_proyecto,
+    c.probability,
+    c.descripcion_ca,
+    c.tipo,
+    'meses_cerrados'::text AS fuente,
+    c.codigo_unico_departamento,
+    c.fecha_calculada,
+    c.empresa_ano,
+    c.empresa_recurso
+  FROM public.v_se_lineas_meses_cerrados c
+  WHERE c.year IS NOT NULL AND c.month IS NOT NULL
+) s;
+
+COMMENT ON VIEW public.v_se_coste IS
+  'Capa Coste P/R (PBI TotalGasto). Independiente de v_se_facturacion. '
+  'Usar SUM(coste) filtrado por tipo/empresa/año. Facturación canónica = v_se_facturacion.';
+

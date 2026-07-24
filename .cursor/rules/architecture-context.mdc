@@ -60,7 +60,8 @@ Prefijo `bc_` — origen: workflow n8n 004 desde BC Production.
 
 | Vista | Descripción |
 |-------|-------------|
-| `v_se_facturacion` | UNION ALL P+R — fuente principal de Superset |
+| `v_se_facturacion` | UNION ALL P+R — fuente principal de Superset (**facturación canónica**) |
+| `v_se_coste` | Capa Coste P/R (`SUM(coste)`); independiente; no sustituye facturación |
 | `v_se_lineas_planificacion` | Tipo P (plan) con lógica vigente + Distinct PBI |
 | `v_se_lineas_expedientes` | Tipo P (expedientes) |
 | `v_se_lineas_movimientos` | Tipo R (movimientos reales) |
@@ -72,8 +73,10 @@ Prefijo `bc_` — origen: workflow n8n 004 desde BC Production.
 
 | KPI | Valor | Fuente |
 |-----|-------|--------|
-| Tipo P (Plan+Expedientes) | 3.712.450 € | `v_se_facturacion WHERE tipo='P'` |
-| Tipo R (Real) | 2.604.816 € | `v_se_facturacion WHERE tipo='R'` |
+| Tipo P facturado | 3.712.450 € | `v_se_facturacion WHERE tipo='P'` |
+| Tipo R facturado | 2.604.816 € | `v_se_facturacion WHERE tipo='R'` |
+| Tipo P coste (objetivo PBI) | 3.788.848 € | `v_se_coste WHERE tipo='P'` (alineación en curso) |
+| Tipo R coste (objetivo PBI) | 2.271.735 € | `v_se_coste WHERE tipo='R'` (alineación en curso) |
 
 ---
 

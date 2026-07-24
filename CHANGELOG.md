@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- Vista `v_se_coste`: capa Coste P/R independiente de `v_se_facturacion` (misma fórmula
+  `se_weight_amount`, con `fuente` y `coste_raw` para alinear vs PBI sin tocar facturado).
+
 ## [2026-07-23] — Espejo SQL seguimiento económico
 
 ### Changed
