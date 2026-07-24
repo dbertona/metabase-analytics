@@ -43,7 +43,7 @@ flowchart LR
   PBI -.->|paridad numérica| SS
 ```
 
-**Regla de oro:** el JSON canónico del workflow está en **power-solution-apps**; n8n prod es la instancia de ejecución. **No usar** n8n en VM 100 (retirado 2026-07-07).
+**Regla de oro:** las definiciones SQL canónicas de Analytics (`v_se_*`, `bi_v_*`, helpers) viven en **superset-analytics**. n8n prod es la instancia de ejecución del sync 004. **No usar** n8n en VM 100 (retirado 2026-07-07).
 
 ---
 
@@ -51,8 +51,8 @@ flowchart LR
 
 | Repo | Contenido |
 |------|-----------|
-| **power-solution-apps** | Workflow `004_sync_bc_to_analytics.json`, migraciones `ANALYTICS DB ONLY`, scripts `apply-analytics-migration.sh` |
-| **superset-analytics** (este) | Spec PBI, exports Superset, documentación de dashboards |
+| **superset-analytics** (este) | Spec PBI, SQL canónico de Analytics (`v_se_*`, `bi_v_*`), exports Superset, documentación de dashboards |
+| **power-solution-apps** | Referencias históricas de app/workflows (fuera del alcance operativo de este repo para SQL Analytics) |
 | **power-solution-docs** | Docs compartidas (submódulo) |
 
 ---
@@ -96,7 +96,7 @@ Todas prefijadas con `bc_` desde migración `20260627120001_rename_bc_tables_ana
 
 ### 4.2 Vistas semánticas (`v_se_*`) — 13 vistas
 
-Capa semántica equivalente al modelo Power BI. Definidas en migraciones `20260702180000_*`, `20260702200000_*` y fixes julio 2026.
+Capa semántica equivalente al modelo Power BI. Definida y mantenida en este repo (`sql/views/seguimiento_economico_views.sql`) y en la capa BI (`scripts/sql/bi_dashboard_planificacion_views.sql`).
 
 | Vista | Rol PBI | Fuente principal |
 |-------|---------|------------------|
@@ -120,7 +120,7 @@ Capa semántica equivalente al modelo Power BI. Definidas en migraciones `202607
 
 ## 5. Workflow 004 — cómo sincroniza
 
-**Archivo:** `power-solution-apps/apps/timesheet/src/workflows/004_sync_bc_to_analytics.json`  
+**Archivo:** `src/workflows/004_sync_bc_to_ps_analytics.json`  
 **ID n8n prod:** `d1f7647e114a486e`  
 **Webhook:**
 
@@ -243,34 +243,30 @@ Duración típica: **PSI ~4–5 min**, **PSLAB ~1–2 min**.
 
 ### 7.2 Actualizar workflow en n8n prod
 
-Desde `power-solution-apps`:
+Desde este repo (`superset-analytics`):
 
 ```bash
-# Opción A: API (requiere N8N_API_KEY_PRODUCTION)
-N8N_ENV=production ./apps/timesheet/src/workflows/update_workflow_n8n.sh \
-  apps/timesheet/src/workflows/004_sync_bc_to_analytics.json
+# Opción A: API
+./scripts/update-n8n-workflow-004-api.sh
 
 # Opción B: SQLite hotfix (ver N8N_GUIDE.md PASO 2.5 remapeo credenciales)
-./scripts/apply-analytics-migration.sh  # solo SQL; para n8n ver docs/ACTUALIZAR_WORKFLOW_004.md
+./scripts/update-n8n-workflow-004.sh  # script informativo con instrucciones de fallback SQLite
 ```
 
 **Prod:** workflow ID `d1f7647e114a486e`, DB `/var/lib/docker/volumes/n8n_n8n_data_clean/_data/database.sqlite`
 
-### 7.3 Aplicar migraciones SQL Analytics
+### 7.3 Aplicar SQL Analytics canónico
 
 ```bash
-cd power-solution-apps
-
 # Producción VM 100
-./scripts/apply-analytics-migration.sh supabase/migrations/<archivo>.sql
+psql "postgresql://postgres:SuperSecurePassword2025@192.168.36.100:5433/postgres" \
+  -f sql/views/seguimiento_economico_views.sql
 
-# DEV VM 102
-ANALYTICS_DB_HOST=192.168.36.102 \
-ANALYTICS_DB_CONTAINER=supabase-analytics-db-dev \
-  ./scripts/apply-analytics-migration.sh supabase/migrations/<archivo>.sql
+# Capa BI Superset
+./scripts/apply-bi-views.sh
 ```
 
-⚠️ Migraciones con cabecera **`ANALYTICS DB ONLY`** — **no** usar `run-migrations.sh` de Timesheet.
+⚠️ Aplicar cambios SQL solo tras validar impacto en KPI (`v_se_facturacion`, `v_se_kpi_cards`) contra Power BI.
 
 ### 7.4 Resync completo (prueba o recuperación)
 
@@ -328,10 +324,10 @@ Luego sync PSI + PSLAB vía webhook. Validar KPIs con SQL §6.3.
 |-----------|-----------|
 | Actualizar workflow 004 | [ACTUALIZAR_WORKFLOW_004.md](./ACTUALIZAR_WORKFLOW_004.md) |
 | Seguimiento Económico (fases PBI) | [seguimiento-economico/README.md](./seguimiento-economico/README.md) |
-| Análisis técnico workflow 004 | `power-solution-apps/.../WORKFLOW_004_ANALYSIS.md` |
-| Reparto BD principal vs Analytics | `power-solution-apps/docs/architecture/DATABASES_SPLIT.md` |
-| Guía n8n | `power-solution-apps/docs/shared/n8n/N8N_GUIDE.md` |
+| Vistas SQL canónicas | `sql/views/seguimiento_economico_views.sql` |
+| Capa BI Superset (`bi_v_*`) | `scripts/sql/bi_dashboard_planificacion_views.sql` |
+| Guía n8n | `docs/shared/n8n/N8N_GUIDE.md` |
 
 ---
 
-**Mantenimiento:** tras cada cambio en views SQL o workflow 004 → migración en git → aplicar en prod → sync → validar §6.3 → actualizar esta guía si cambia el comportamiento.
+**Mantenimiento:** tras cada cambio en SQL (`v_se_*`/`bi_v_*`) o en operación del workflow 004 → commit en este repo → aplicar en entorno → validar §6.3 → actualizar esta guía si cambia el comportamiento.

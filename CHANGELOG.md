@@ -64,6 +64,20 @@ refresco de PBI, el coste pasará a ~2.513k (paridad con Analytics y BC Producti
 Mientras tanto: la diferencia de 132k es **por diseño** — PBI excluye costes sin departamento,
 Analytics los incluye. Ambas cifras son correctas según su scope.
 
+## [2026-07-23] — Espejo SQL + vista `v_se_coste`
+
+### Added
+
+- Vista `v_se_coste`: capa Coste P/R independiente de `v_se_facturacion` (misma fórmula
+  `se_weight_amount`, con `fuente` y `coste_raw` para alinear vs PBI sin tocar facturado).
+
+### Changed
+
+- `sql/views/seguimiento_economico_views.sql` regenerado desde BD live (VM 100):
+  `v_se_lineas_movimientos` usa `bc_job_ledger_entry_month`; planificación excluye
+  meses con Ingresos reales; incluye vistas fase 2 (expedientes, meses cerrados, KPIs).
+- README y reglas: fuente de verdad SQL Analytics = `superset-analytics`.
+
 ## [2026-07-23] — Filtros KPI / Departamentos (Superset 6.1)
 
 ### Added

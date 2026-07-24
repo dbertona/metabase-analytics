@@ -81,7 +81,9 @@ Réplica del informe Power BI — Objetivos Anuales y Planificación Actual.
 
 Guía maestra: [`docs/GUIA_COMPLETA_ANALYTICS.md`](docs/GUIA_COMPLETA_ANALYTICS.md)
 
-Views canónicas BC: `sql/views/seguimiento_economico_views.sql` y migraciones en `power-solution-apps`.
+Views canónicas BC (`v_se_*`): fuente de verdad en `sql/views/seguimiento_economico_views.sql`
+(cambios SQL de Analytics se mantienen y versionan en este repo).
+Ver `sql/views/README.md`.
 
 ## n8n y sync BC
 

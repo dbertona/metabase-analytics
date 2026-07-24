@@ -12,8 +12,8 @@ Replicar en **Superset** (`http://192.168.36.100:8088/`) las páginas del inform
 
 | Repo | Responsabilidad |
 |------|-----------------|
-| **superset-analytics** (este) | Spec PBI, SQL de modelos Superset, exports de dashboards, docs |
-| **power-solution-apps** | Migraciones Analytics, workflow **004**, scripts deploy |
+| **superset-analytics** (este) | Spec PBI, SQL canónico de Analytics (`v_se_*`, `bi_v_*`), exports de dashboards y docs |
+| **power-solution-apps** | Fuera de alcance para cambios de Analytics en este workspace |
 
 ## Infraestructura (prod)
 
@@ -33,18 +33,35 @@ curl -sS -m 900 -X POST \
 
 Workflow: [d1f7647e114a486e](https://apps.powersolution.es/n8n/workflow/d1f7647e114a486e)
 
-## Paridad KPI PSI 2026 (validado 2026-07-22)
+## Paridad KPI PSI 2026
+
+### Facturación (validado 2026-07-22) — fuente `v_se_facturacion`
 
 | Métrica | Power BI | Analytics |
 |---------|----------|-----------|
 | Real (tipo R) | 2.604.816 € | 2.604.816 € ✅ |
 | Plan (tipo P) | 3.712.417 € | 3.712.450 € ✅ |
 
+### Coste — fuente `v_se_coste` (capa dedicada; no tocar facturado)
+
+| Métrica | Power BI | Analytics (baseline) |
+|---------|----------|----------------------|
+| Coste P | 3.788.848 € | 3.953.354 € (gap ~+164k) |
+| Coste R | 2.271.735 € | 1.497.530 € (gap ~−774k) |
+
 ```sql
+-- Facturación canónica
 SELECT tipo, ROUND(SUM(facturado)::numeric, 0)
 FROM v_se_facturacion
 WHERE empresa = 'Power Solution Iberia SL' AND year = 2026
 GROUP BY tipo;
+
+-- Coste (capa separada)
+SELECT tipo, fuente, ROUND(SUM(coste)::numeric, 2)
+FROM v_se_coste
+WHERE empresa ILIKE '%Iberia%' AND year = 2026
+GROUP BY tipo, fuente
+ORDER BY tipo, fuente;
 ```
 
 ## Fases del proyecto
@@ -75,7 +92,7 @@ GROUP BY tipo;
 
 ## Views SQL
 
-Canónico en `power-solution-apps/supabase/migrations/20260702180000_*` y fixes julio 2026.  
+Canónico en este repo: `sql/views/seguimiento_economico_views.sql` + `scripts/sql/bi_dashboard_planificacion_views.sql`.  
 Superset consulta **solo** vistas `v_se_*` y `bi_v_*` (ver guía completa §4.2).
 
 ## Documentación relacionada
