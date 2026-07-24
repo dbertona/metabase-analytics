@@ -119,9 +119,21 @@ CREATE OR REPLACE VIEW public.v_se_lineas_planificacion AS
             p.concepto_analitico_descripcion AS descripcion_ca
            FROM bc_job_planning_line p
              LEFT JOIN bc_job j ON j.company_name = p.company_name AND j.no::text = p.job_no::text
-          WHERE p.job_no IS NOT NULL AND btrim(p.job_no::text) <> ''::text AND p.job_no::text !~~ 'PP%'::text AND p.job_no::text !~~ 'PY%'::text AND (p.status::text = ANY (ARRAY['Open'::text, 'Planning'::text])) AND NOT (EXISTS ( SELECT 1
-                   FROM bc_meses_cerrados c
-                  WHERE c.company_name = p.company_name AND c.job_no::text = p.job_no::text AND c.year = p.year AND c.month = p.month))
+          WHERE p.job_no IS NOT NULL AND btrim(p.job_no::text) <> ''::text AND p.job_no::text !~~ 'PP%'::text AND p.job_no::text !~~ 'PY%'::text AND (p.status::text = ANY (ARRAY['Open'::text, 'Planning'::text]))
+            AND (
+              -- Meses pasados: lógica PBI — cada mes usa su propia versión de presupuesto
+              (make_date(p.year, p.month, 1) < date_trunc('month', CURRENT_DATE)
+               AND p.budget_date_month = p.month AND p.budget_date_year = p.year)
+              OR
+              -- Mes actual y futuros: sin filtro budget_date_month (toma todas las versiones; dedup elimina duplicados)
+              make_date(p.year, p.month, 1) >= date_trunc('month', CURRENT_DATE)
+            )
+            AND NOT EXISTS (SELECT 1 FROM bc_meses_cerrados c
+                  WHERE c.company_name = p.company_name AND c.job_no::text = p.job_no::text AND c.year = p.year AND c.month = p.month)
+            AND NOT EXISTS (SELECT 1 FROM bc_job_ledger_entry_month m
+                  WHERE m.company_name = p.company_name AND m.job_no::text = p.job_no::text
+                  AND m.year = p.year AND m.month = p.month
+                  AND m.concepto_analitico_descripcion = 'Ingresos')
         ), dedup AS (
          SELECT DISTINCT ON (s.job, s.year, s.month, s.invoice, s.cost, s.nr, s.descripcion_ca) s.empresa,
             s.job,
@@ -175,7 +187,7 @@ CREATE OR REPLACE VIEW public.v_se_lineas_planificacion AS
     (d.empresa || ':'::text) || d.year::text AS empresa_ano,
     (d.empresa || ':'::text) || COALESCE(d.nr, ''::character varying)::text AS empresa_recurso
    FROM dedup d;
-COMMENT ON VIEW public.v_se_lineas_planificacion IS 'PBI Lineas Planificacion: filtro vigente (budget_date_month=month para meses pasados pendiente — ver TODO), NOT IN bc_meses_cerrados, Distinct(job,year,month,invoice,cost,nr,descripcionCA), Open/Planning.';
+COMMENT ON VIEW public.v_se_lineas_planificacion IS 'PBI Lineas Planificacion: híbrido — pasados: budget_date_month=month (lógica PBI); futuros: todas las versiones + dedup. NOT IN bc_meses_cerrados, Distinct(job,year,month,invoice,cost,nr,descripcionCA), Open/Planning.';
 
 -- ---------------------------------------------------------------------------
 -- View: v_se_lineas_movimientos
