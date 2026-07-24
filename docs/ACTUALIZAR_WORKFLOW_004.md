@@ -33,26 +33,35 @@ curl -sS -m 900 -X POST \
 
 ## Actualizar workflow en n8n prod
 
-### Opción A — API
+> **Jul 2026:** n8n prod usa **PostgreSQL** (no SQLite). Método correcto: `update_n8n_workflow_postgres.py`.
+> ⛔ SQLite obsoleto — solo backups `.bak-pre-postgres-*`. Ver `docs/shared/n8n/N8N_GUIDE.md`.
+
+### Método correcto — PostgreSQL (agente / hotfix)
+
+```bash
+# 1) Copiar script y JSON al servidor 101
+sshpass -p 'PsAdmin2025' scp \
+  /ruta/power-solution-apps/scripts/update_n8n_workflow_postgres.py \
+  src/workflows/004_sync_bc_to_ps_analytics.json \
+  ps_admin@192.168.36.101:/tmp/
+
+# 2) Ejecutar en el servidor
+sshpass -p 'PsAdmin2025' ssh ps_admin@192.168.36.101 bash << 'REMOTE'
+export N8N_DB_PASSWORD="c7DxE3KNX72LlRzYPf5KGDskeM84jWvn"
+python3 /tmp/update_n8n_workflow_postgres.py update \
+  d1f7647e114a486e \
+  /tmp/004_sync_bc_to_ps_analytics.json
+REMOTE
+```
+
+### Método alternativo — API REST (CI/CD)
 
 ```bash
 cd superset-analytics
 ./scripts/update-n8n-workflow-004-api.sh
 ```
 
-### Opción B — SQLite (hotfix con remapeo credenciales)
-
-Ver `docs/shared/n8n/N8N_GUIDE.md` PASO 2.5 y 3:
-
-```bash
-# 1) Copiar JSON + scripts al servidor 101
-# 2) docker stop n8n-prod
-# 3) remap_n8n_credentials.py --source sqlite --db-path ... --workflow-name "004 - Sync Bc To Analytics"
-# 4) update_n8n_workflow_sqlite.py d1f7647e114a486e ...
-# 5) docker start n8n-prod
-```
-
-DB prod: `/var/lib/docker/volumes/n8n_n8n_data_clean/_data/database.sqlite`
+Requiere `N8N_API_KEY` exportada. API key en tabla `user_api_keys` del Postgres n8n (`n8n` DB en `supabase-db` VM 101).
 
 ---
 
