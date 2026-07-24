@@ -293,15 +293,7 @@ CREATE OR REPLACE VIEW public.v_se_lineas_expedientes AS
             e.budget_date_month,
             e.month_closing_status AS status1
            FROM bc_expediente_mes e
-             -- JOIN amplío: versión vigente (meses >= vigente) O versión mensual propia
-             -- (budget_date_month = mes del registro) para meses abiertos anteriores al vigente.
-             -- Esto evita excluir datos de junio cuando el vigente es julio.
-             JOIN vigente v ON v.company_name = e.company_name
-               AND v.budget_date_year = e.budget_date_year
-               AND (
-                 v.budget_date_month = e.budget_date_month
-                 OR (e.budget_date_month = e.month AND e.month < v.budget_date_month)
-               )
+             JOIN vigente v ON v.company_name = e.company_name AND v.budget_date_year = e.budget_date_year AND v.budget_date_month = e.budget_date_month
              LEFT JOIN bc_job j ON j.company_name = e.company_name AND j.no::text = e.job_no::text
           WHERE e.job_no IS NOT NULL AND btrim(e.job_no::text) <> ''::text AND e.job_no::text !~~ 'PP%'::text AND e.job_no::text !~~ 'PY%'::text AND (COALESCE(e.budget_date_year, 0) = 0 OR e.year = e.budget_date_year AND e.month >= COALESCE(NULLIF(e.budget_date_month, 0), 1)) AND (COALESCE(e.month_closing_status, ''::character varying)::text <> ALL (ARRAY['Completed'::character varying, 'Lost'::character varying]::text[]))
         ), dedup AS (
