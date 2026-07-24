@@ -12,8 +12,8 @@ Replicar en **Superset** (`http://192.168.36.100:8088/`) las páginas del inform
 
 | Repo | Responsabilidad |
 |------|-----------------|
-| **superset-analytics** (este) | Spec PBI, SQL de modelos Superset, exports de dashboards, docs |
-| **power-solution-apps** | Migraciones Analytics, workflow **004**, scripts deploy |
+| **superset-analytics** (este) | Spec PBI, SQL canónico de Analytics (`v_se_*`, `bi_v_*`), exports de dashboards y docs |
+| **power-solution-apps** | Fuera de alcance para cambios de Analytics en este workspace |
 
 ## Infraestructura (prod)
 
@@ -75,7 +75,7 @@ GROUP BY tipo;
 
 ## Views SQL
 
-Canónico en `power-solution-apps/supabase/migrations/20260702180000_*` y fixes julio 2026.  
+Canónico en este repo: `sql/views/seguimiento_economico_views.sql` + `scripts/sql/bi_dashboard_planificacion_views.sql`.  
 Superset consulta **solo** vistas `v_se_*` y `bi_v_*` (ver guía completa §4.2).
 
 ## Documentación relacionada

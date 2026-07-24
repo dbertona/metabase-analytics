@@ -2,8 +2,8 @@
 # Script para descargar el workflow 004 desde n8n
 # Basado en: docs/shared/n8n/n8n-integration-guide.md
 
-N8N_URL="https://n8n-analytics.powersolution.es"
-WORKFLOW_ID="l5ux7p339Nejygra"
+N8N_URL="https://apps.powersolution.es/n8n"
+WORKFLOW_ID="d1f7647e114a486e"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUTPUT_FILE="${ROOT_DIR}/src/workflows/004_sync_bc_to_ps_analytics.json"
 

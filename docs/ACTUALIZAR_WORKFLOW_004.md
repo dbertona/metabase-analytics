@@ -6,7 +6,7 @@
 
 | Componente | Ubicación |
 |------------|-----------|
-| **Workflow 004 (canónico)** | `apps/timesheet/src/workflows/004_sync_bc_to_analytics.json` |
+| **Workflow 004 (canónico en este repo)** | `src/workflows/004_sync_bc_to_ps_analytics.json` |
 | **n8n producción** | `https://apps.powersolution.es/n8n/` (VM **101**, `n8n-prod`) |
 | **ID workflow prod** | `d1f7647e114a486e` |
 | **n8n DEV** | VM 102 — workflow ID `d57165bf41a34b8eb215` |
@@ -36,9 +36,8 @@ curl -sS -m 900 -X POST \
 ### Opción A — API
 
 ```bash
-cd power-solution-apps
-N8N_ENV=production ./apps/timesheet/src/workflows/update_workflow_n8n.sh \
-  apps/timesheet/src/workflows/004_sync_bc_to_analytics.json
+cd superset-analytics
+./scripts/update-n8n-workflow-004-api.sh
 ```
 
 ### Opción B — SQLite (hotfix con remapeo credenciales)
@@ -74,6 +73,6 @@ Esperado plan PSI 2026: **4.193.215 €** (`v_se_kpi_cards`, incluye tipo P + ob
 
 ## Referencias
 
-- `apps/timesheet/src/workflows/WORKFLOW_004_ANALYSIS.md` — detalle técnico entidades
-- `docs/architecture/DATABASES_SPLIT.md` — BD Analytics vs Timesheet
+- `src/workflows/004_sync_bc_to_ps_analytics.json` — definición del workflow en este repo
+- `docs/GUIA_COMPLETA_ANALYTICS.md` — arquitectura y operación Analytics/Superset
 - `docs/shared/n8n/N8N_GUIDE.md`

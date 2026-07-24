@@ -7,32 +7,30 @@ Snapshot de las vistas `v_se_*` y helpers `se_*` alineado con la **BD analytics 
 
 | Qué | Dónde |
 |-----|--------|
-| **Canónico (aplicar cambios)** | `power-solution-apps/supabase/migrations/*analytics_*.sql` |
-| **Espejo (referencia)** | Este directorio: `seguimiento_economico_views.sql` |
+| **Canónico (aplicar cambios)** | Este directorio: `sql/views/seguimiento_economico_views.sql` |
 | **Capa dashboard Superset `bi_v_*`** | `scripts/sql/bi_dashboard_planificacion_views.sql` |
+| **Documentación funcional** | `docs/GUIA_COMPLETA_ANALYTICS.md` |
 
-**No uses este archivo como único deploy** sobre un entorno ya migrado: podrías
-pisar o divergir de la cadena de migraciones de `power-solution-apps`.
+**No apliques cambios SQL sin validación previa en entorno** (DEV/PROD): las vistas
+`v_se_*` alimentan KPIs y dashboards críticos.
 
 ## Aplicar cambios reales
 
-Siempre desde `power-solution-apps` (nueva migración + script apply):
+Desde este repo, aplicando SQL directamente sobre la BD Analytics:
 
 ```bash
-cd ../power-solution-apps   # o ruta al monorepo apps
-# Ejemplo DEV:
-ANALYTICS_DB_HOST=192.168.36.102 ANALYTICS_DB_CONTAINER=supabase-analytics-db-dev \
-  ./scripts/apply-analytics-migration.sh supabase/migrations/<nueva_migracion>.sql
+psql "postgresql://postgres:SuperSecurePassword2025@192.168.36.100:5433/postgres" \
+  -f sql/views/seguimiento_economico_views.sql
 ```
 
-## Regenerar este espejo
+## Actualizar fuente canónica
 
-Cuando la BD live cambie y quieras actualizar la referencia en este repo:
+Cuando cambie la lógica de negocio PBI/Superset:
 
-1. Exportar desde VM 100 (`pg_get_viewdef` / `pg_get_functiondef`) las
-   funciones `se_*` y vistas `v_se_*` listadas en el header del `.sql`.
-2. Sustituir `sql/views/seguimiento_economico_views.sql`.
-3. Actualizar la fecha del header y una línea en `CHANGELOG.md`.
+1. Editar `sql/views/seguimiento_economico_views.sql`.
+2. Probar en DB Analytics (`psql ... -f`).
+3. Validar KPIs (`v_se_facturacion`, `v_se_kpi_cards`) contra Power BI.
+4. Actualizar `CHANGELOG.md` y documentación relacionada.
 
 ## Contenido vigente (resumen)
 

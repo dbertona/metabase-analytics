@@ -4,9 +4,8 @@
 # El workflow 004 se gestiona desde n8n PRODUCCIÓN (VM 101):
 #   https://apps.powersolution.es/n8n/workflow/d1f7647e114a486e
 #
-# Para actualizar el JSON en n8n prod, usar desde power-solution-apps:
-#   cd apps/timesheet/src/workflows
-#   N8N_ENV=production ./update_workflow_n8n.sh 004_sync_bc_to_analytics.json
+# Para actualizar el JSON en n8n prod desde este repo:
+#   ./scripts/update-n8n-workflow-004-api.sh
 #
 # Ver: docs/ACTUALIZAR_WORKFLOW_004.md
 
@@ -19,8 +18,7 @@ echo "   UI:  https://apps.powersolution.es/n8n/workflow/d1f7647e114a486e"
 echo "   Sync: POST https://apps.powersolution.es/n8n/webhook/sync-bc-to-analytics?company=psi"
 echo ""
 echo "✅ Actualizar JSON:"
-echo "   power-solution-apps/apps/timesheet/src/workflows/update_workflow_n8n.sh"
-echo "   (con N8N_ENV=production)"
+echo "   ./scripts/update-n8n-workflow-004-api.sh"
 echo ""
 echo "📖 docs/ACTUALIZAR_WORKFLOW_004.md"
 exit 1

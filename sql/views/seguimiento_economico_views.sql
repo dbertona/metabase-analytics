@@ -1,11 +1,10 @@
 -- ============================================================================
 -- ANALYTICS DB ONLY (VM 100 / 102 / 103)
--- Espejo de vistas Seguimiento Económico (réplica PBI → Superset)
+-- Vistas canónicas Seguimiento Económico (réplica PBI → Superset)
 --
--- ⚠️  FUENTE DE VERDAD: migraciones en power-solution-apps/supabase/migrations/
---     (cadena incremental *analytics_*). Este archivo es un SNAPSHOT de la BD
---     live (VM 100) para referencia en este repo — NO aplicarlo a ciegas sobre
---     entornos que ya tienen migraciones más nuevas.
+-- ⚠️  FUENTE DE VERDAD: este archivo en superset-analytics.
+--     Cambios deben validarse contra PBI y aplicarse de forma controlada
+--     en el entorno de Analytics antes de promoverlos.
 --
 -- Regenerado: 2026-07-23 desde pg_get_viewdef / pg_get_functiondef
 -- Dashboard Superset (capa bi_v_*): scripts/sql/bi_dashboard_planificacion_views.sql

@@ -12,8 +12,8 @@ set -e
 
 WORKFLOW_FILE="src/workflows/004_sync_bc_to_ps_analytics.json"
 WORKFLOW_NAME="004_sync_bc_to_ps_analytics"
-N8N_URL="https://n8n-analytics.powersolution.es"
-WORKFLOW_ID="l5ux7p339Nejygra"
+N8N_URL="https://apps.powersolution.es/n8n"
+WORKFLOW_ID="d1f7647e114a486e"
 
 echo "🔧 Actualizando workflow 004 en n8n (método API REST)..."
 echo ""
@@ -33,7 +33,7 @@ fi
 echo "✅ Archivo JSON válido"
 echo ""
 
-# Obtener el ID del workflow del JSON
+# Verificar el ID declarado en el JSON (informativo)
 WORKFLOW_ID_FROM_JSON=$(python3 << 'PYTHON'
 import json
 import sys
@@ -46,8 +46,8 @@ except:
 PYTHON
 )
 
-if [ -n "$WORKFLOW_ID_FROM_JSON" ]; then
-    WORKFLOW_ID="$WORKFLOW_ID_FROM_JSON"
+if [ -n "$WORKFLOW_ID_FROM_JSON" ] && [ "$WORKFLOW_ID_FROM_JSON" != "$WORKFLOW_ID" ]; then
+    echo "⚠️  El JSON declara ID '${WORKFLOW_ID_FROM_JSON}', se usará el ID de producción '${WORKFLOW_ID}'."
 fi
 
 echo "✅ Workflow ID: $WORKFLOW_ID"

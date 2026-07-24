@@ -36,8 +36,8 @@ docker run --rm --network host postgres:15 \
 
 | Repo | Qué contiene | ¿Tocar desde aquí? |
 |------|-------------|-------------------|
-| **superset-analytics** (este) | Spec PBI, exports Superset, docs dashboards, SQL vistas | ✅ Sí |
-| **power-solution-apps** | Workflow 004, migraciones `ANALYTICS DB ONLY`, scripts apply | ❌ No (otro workspace) |
+| **superset-analytics** (este) | Spec PBI, exports Superset, docs dashboards, SQL vistas (canónico) | ✅ Sí |
+| **power-solution-apps** | App Timesheet/Gastos (fuera de alcance en este workspace) | ❌ No (otro workspace) |
 | **power-solution-docs** | Docs compartidas (`docs/shared/`) | Solo via submódulo |
 
 ---
@@ -79,8 +79,8 @@ Prefijo `bc_` — origen: workflow n8n 004 desde BC Production.
 
 ## 🔴 REGLAS CRÍTICAS
 
-- **Migraciones SQL** → crearlas en `power-solution-apps/supabase/migrations/` con prefijo `ANALYTICS DB ONLY`, NO aquí
-- **Workflow 004** → vive en `power-solution-apps/apps/timesheet/src/workflows/`; este repo solo documenta
+- **SQL Analytics (`v_se_*`, `bi_v_*`, helpers)** → fuente de verdad en este repo (`sql/views/`, `scripts/sql/`)
+- **Workflow 004** → se opera contra n8n VM 101; la documentación funcional vive en este repo
 - **Commits**: siempre rama `feat/` o `fix/` — nunca en `main` directamente
 - **Push**: siempre `gitea`, nunca `origin` (GitHub es solo mirror)
 - **Submodulo `docs/shared`**: actualizar con `git pull origin main` desde `docs/shared/` y commitear el puntero en el padre
