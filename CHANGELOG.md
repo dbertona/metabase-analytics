@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-25l] — Facturación/Beneficio ancho 2 (importes grandes)
+
+### Changed
+
+- COLUMN KPIs **6** + Probabilidad **6**: euros **2**, Margen/Crecimiento **1**.
+
 ## [2026-07-25k] — KPIs columna ancho 4 (antes 6)
 
 ### Changed

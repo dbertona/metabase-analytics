@@ -548,11 +548,11 @@ def persist_dashboard_config(
 
 
 def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
-    """Layout: COLUMN KPIs compactos (4) + Probabilidad (8) a la derecha.
+    """Layout: COLUMN KPIs (6) + Probabilidad (6) a la derecha.
 
     ROW-KPI-BAND
-      ├── COLUMN-KPIS (width 4): Obj + Plan — 1 unidad por tarjeta
-      └── Facturación por Probabilidad (width 8, height ≈ Obj+Plan)
+      ├── COLUMN-KPIS (width 6): euros=2, Margen/Crecimiento=1
+      └── Facturación por Probabilidad (width 6, height ≈ Obj+Plan)
     Luego Resumen mensual (12) y Evolución + Margen.
     """
     obj_keys = [c["key"] for c in charts if c["section"] == "obj"]
@@ -562,8 +562,8 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
     chart_keys = [c["key"] for c in charts if c["section"] == "chart"]
     prob_key = prob_keys[0] if prob_keys else None
 
-    # Ancho columna = 4 (1 por KPI). Probabilidad = 8.
-    kpi_col_width = 4
+    # Euros (Facturación/Beneficio)=2; % =1 → columna 6. Probabilidad = 6.
+    kpi_col_width = 6
     col_parents = ["ROOT_ID", "GRID_ID", "ROW-KPI-BAND", "COLUMN-KPIS"]
     position: dict[str, Any] = {
         "DASHBOARD_VERSION": "v2",
@@ -641,15 +641,15 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
     }
-    # KPIs: width 1 c/u (columna 4). Probabilidad: 8. Altura KPI sin tocar.
     sizes = {
         "obj": (1, 14),
         "plan": (1, 14),
         "table": (12, 32),
-        "prob": (8, 32),
+        "prob": (6, 32),
         "chart": (6, 36),
     }
-    kpi_widths = {"Facturación": 1, "Margen": 1, "Crecimiento": 1, "Beneficio": 1}
+    # Importes grandes (euros) más anchos; % compactos
+    kpi_widths = {"Facturación": 2, "Margen": 1, "Crecimiento": 1, "Beneficio": 2}
     for c in charts:
         w, h = sizes[c["section"]]
         display_name = c["name"].split("· ")[-1]
