@@ -67,8 +67,11 @@ GROUP BY tipo;
 |------|--------|------------|
 | **1** | ✅ | Views `v_se_*` + spec DAX/PQ |
 | **2** | ✅ | Sync 004 + paridad KPI Resumen (P/R factura y coste) |
-| **3** | Pendiente | Dashboard Superset «Resumen» |
+| **3** | ✅ | Dashboard Superset «Seguimiento Económico — Resumen» (`planificacion-ps-analytics`) |
 | **4** | Pendiente | Resto de páginas PBI |
+
+**Dashboard Fase 3:** http://192.168.36.100:8088/superset/dashboard/planificacion-ps-analytics/  
+Regenerar: `SKIP_APPLY_BI_VIEWS=1 SUPERSET_URL=http://192.168.36.100:8088 python3 scripts/setup-superset-planificacion.py`
 
 ## Páginas del informe PBI
 

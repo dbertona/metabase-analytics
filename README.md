@@ -25,7 +25,7 @@ cp env.example .env
 ```
 
 - **URL:** http://192.168.36.100:8088
-- **Dashboard:** http://192.168.36.100:8088/superset/dashboard/planificacion-ps-analytics/
+- **Dashboard Resumen:** http://192.168.36.100:8088/superset/dashboard/planificacion-ps-analytics/
 - **Usuario:** `admin`
 
 ## Gestión
@@ -61,11 +61,12 @@ Superset consulta vistas `bi_v_*` en PostgreSQL PS Analytics:
 
 Fuente única: `scripts/sql/bi_dashboard_planificacion_views.sql`
 
-## Dashboard Planificación PS Analytics
+## Dashboard Seguimiento Económico — Resumen (Fase 3)
 
-Réplica del informe Power BI — Objetivos Anuales y Planificación Actual.
+Réplica del panel **Resumen** de Power BI (slug estable `planificacion-ps-analytics`).
 
-- 8 tarjetas KPI (Facturación, Margen, Crecimiento, Beneficio × 2 secciones)
+- 8 tarjetas KPI (Objetivos Anuales + Planificación Actual)
+- Tabla **Resumen mensual** agregada: AñoMes | Facturación | Coste | Margen % (filtro Tipo P/R)
 - Filtros: Año, Empresas, Departamentos, Tipo P/R
 - Gráficos de evolución mensual y facturación por probabilidad
 
@@ -74,8 +75,8 @@ Réplica del informe Power BI — Objetivos Anuales y Planificación Actual.
 
 **Datos:**
 - Objetivos → `bc_objectives_by_department`
-- Planificación (P/R híbrido) → vistas `v_se_*` / `bi_v_planificacion_kpi`
-- Real (R) → `bc_job_ledger_entry_month`
+- Planificación (P/R híbrido en KPIs) → `bi_v_planificacion_kpi`
+- Tabla Resumen / Tipo P|R → `bi_v_evolucion_mensual` (`v_se_resumen_mensual`)
 
 ## Seguimiento Económico (PBI)
 

@@ -29,8 +29,8 @@ SUPERSET_URL = os.environ.get("SUPERSET_URL", "http://localhost:8088").rstrip("/
 SUPERSET_USER = os.environ.get("SUPERSET_USER", "admin")
 SUPERSET_PASSWORD = os.environ.get("SUPERSET_PASSWORD", "PsSuperset#2026xK9!")
 CURRENT_YEAR = datetime.date.today().year
-DASHBOARD_TITLE = "Planificación PS Analytics"
-DASHBOARD_SLUG = "planificacion-ps-analytics"
+DASHBOARD_TITLE = "Seguimiento Económico — Resumen"
+DASHBOARD_SLUG = "planificacion-ps-analytics"  # URL estable (Fase 3)
 
 PS_DB = {
     "database_name": "PS Analytics",
@@ -162,10 +162,16 @@ class SupersetClient:
         return cid
 
     def find_dashboard(self) -> dict[str, Any] | None:
-        q = {"filters": [{"col": "dashboard_title", "opr": "eq", "value": DASHBOARD_TITLE}]}
-        res = self._request("GET", f"/api/v1/dashboard/?q={urllib.parse.quote(json.dumps(q))}")
-        items = res.get("result") or []
-        return items[0] if items else None
+        # Preferir slug (estable); título puede cambiar entre regeneraciones.
+        for col, value in (("slug", DASHBOARD_SLUG), ("dashboard_title", DASHBOARD_TITLE)):
+            q = {"filters": [{"col": col, "opr": "eq", "value": value}]}
+            res = self._request(
+                "GET", f"/api/v1/dashboard/?q={urllib.parse.quote(json.dumps(q))}"
+            )
+            items = res.get("result") or []
+            if items:
+                return items[0]
+        return None
 
     def attach_charts(self, dash_id: int, chart_ids: list[int]) -> None:
         for cid in chart_ids:
@@ -173,6 +179,9 @@ class SupersetClient:
 
 
 def apply_bi_views() -> None:
+    if os.environ.get("SKIP_APPLY_BI_VIEWS", "").strip() in ("1", "true", "yes"):
+        print("SKIP_APPLY_BI_VIEWS=1 — omitiendo apply-bi-views.sh")
+        return
     script = ROOT / "scripts" / "apply-bi-views.sh"
     subprocess.run(["bash", str(script)], check=True)
 
@@ -190,12 +199,12 @@ def metric_sql(sql: str, label: str) -> dict[str, Any]:
     return {"expressionType": "SQL", "sqlExpression": sql, "label": label}
 
 
-def dim_adhoc_filters() -> list[dict[str, Any]]:
-    """Fuerza a Superset 6.x a exponer year/empresa/department_code en
-    /dashboard/.../datasets para charts big_number (si no, Apply queda disabled).
+def dim_adhoc_filters(*extra_cols: str) -> list[dict[str, Any]]:
+    """Fuerza a Superset 6.x a exponer dims en /dashboard/.../datasets
+    (si no, Apply queda disabled en big_number / table).
     """
     out: list[dict[str, Any]] = []
-    for col in ("year", "empresa", "department_code"):
+    for col in ("year", "empresa", "department_code", *extra_cols):
         out.append(
             {
                 "expressionType": "SIMPLE",
@@ -211,6 +220,40 @@ def dim_adhoc_filters() -> list[dict[str, Any]]:
             }
         )
     return out
+
+
+def resumen_mensual_params() -> dict[str, Any]:
+    """Tabla PBI Resumen: AñoMes | Facturación | Coste | Margen % (agregada)."""
+    return {
+        "adhoc_filters": dim_adhoc_filters("tipo"),
+        "groupby": ["ano_mes"],
+        "metrics": [
+            metric_sum("facturacion", "Facturación"),
+            metric_sum("coste", "Coste"),
+            metric_sql(
+                "(SUM(facturacion) - SUM(coste)) / NULLIF(SUM(facturacion), 0) * 100",
+                "Margen %",
+            ),
+        ],
+        "percent_metrics": [],
+        "order_by_cols": ['["ano_mes", true]'],
+        "row_limit": 1000,
+        "server_pagination": False,
+        "show_totals": True,
+        "include_search": False,
+        "table_timestamp_format": "smart_date",
+        "column_config": {
+            "Facturación": {
+                "d3NumberFormat": ",.0f",
+                "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
+            },
+            "Coste": {
+                "d3NumberFormat": ",.0f",
+                "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
+            },
+            "Margen %": {"d3NumberFormat": ".2f"},
+        },
+    }
 
 
 def big_number_params(metric: dict[str, Any], fmt: str, *, currency: bool = False) -> dict[str, Any]:
@@ -230,29 +273,23 @@ def big_number_params(metric: dict[str, Any], fmt: str, *, currency: bool = Fals
     return params
 
 
-def get_chart_uuids() -> dict[int, str]:
-    code = (
-        "from superset.app import create_app;"
-        "app=create_app();ctx=app.app_context();ctx.push();"
-        "from superset.models.slice import Slice;"
-        "from superset import db;"
-        "print('\\n'.join(f'{s.id}\\t{s.uuid}' for s in db.session.query(Slice).all()))"
-    )
-    out = subprocess.run(
-        ["docker", "exec", "superset", "python", "-c", code],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
+def get_chart_uuids(client: SupersetClient) -> dict[int, str]:
+    """UUID de charts vía API (evita docker exec; usable desde Mac contra VM 100)."""
     uuids: dict[int, str] = {}
-    for line in out.splitlines():
-        parts = line.strip().split("\t")
-        if len(parts) == 2 and parts[0].isdigit():
-            uuids[int(parts[0])] = parts[1]
+    for item in client.list_charts():
+        cid = item.get("id")
+        uuid = item.get("uuid")
+        if cid is not None and uuid:
+            uuids[int(cid)] = str(uuid)
     return uuids
 
 
-def persist_dashboard_config(dash_id: int, dataset_ids: dict[str, int], chart_ids: list[int]) -> None:
+def persist_dashboard_config(
+    client: SupersetClient,
+    dash_id: int,
+    dataset_ids: dict[str, int],
+    chart_ids: list[int],
+) -> None:
     # KPI cards (bi_v_planificacion_kpi) exponen year/empresa/department_code vía
     # adhoc_filters IS NOT NULL (ver dim_adhoc_filters). Valores de filtro Tipo
     # siguen en bi_v_evolucion_mensual.
@@ -313,85 +350,94 @@ def persist_dashboard_config(dash_id: int, dataset_ids: dict[str, int], chart_id
         "  padding: 4px 8px !important;\n"
         "}\n"
     )
-    code = f"""
-from superset.app import create_app
-import json
 
-app = create_app()
-with app.app_context():
-    from superset import db
-    from superset.models.dashboard import Dashboard
-
-    dash = db.session.query(Dashboard).get({dash_id})
-    jm = json.loads(dash.json_metadata or '{{}}')
-    jm['cross_filters_enabled'] = False
-    jm['chart_configuration'] = {{}}
-    jm['default_filters'] = '{{}}'
     # Superset 6.1: IDs DEBEN empezar por NATIVE_FILTER- (isFilterId en FiltersConfigModal).
-    # Prefijos FILTER-* se interpretan mal → modal "[untitled customization]" y panel vacío.
-    jm['native_filter_configuration'] = [
-        {{
-            'id': 'NATIVE_FILTER-YEAR',
-            'name': 'Año',
-            'filterType': 'filter_select',
-            'type': 'NATIVE_FILTER',
-            'targets': [{{'datasetId': {detail_ds}, 'column': {{'name': 'year'}}}}],
-            'defaultDataMask': {{
-                'filterState': {{'value': [{CURRENT_YEAR}]}},
-                'extraFormData': {{'filters': [{{'col': 'year', 'op': 'IN', 'val': [{CURRENT_YEAR}]}}]}},
-            }},
-            'controlValues': {{'multiSelect': False, 'enableEmptyFilter': False}},
-            'cascadeParentIds': [],
-            'scope': {{'rootPath': ['ROOT_ID'], 'excluded': []}},
-            'chartsInScope': {filter_scope_all!r},
-            'tabsInScope': [],
-        }},
-        {{
-            'id': 'NATIVE_FILTER-EMPRESA',
-            'name': 'Empresas',
-            'filterType': 'filter_select',
-            'type': 'NATIVE_FILTER',
-            'targets': [{{'datasetId': {detail_ds}, 'column': {{'name': 'empresa'}}}}],
-            'defaultDataMask': {{'filterState': {{'value': None}}}},
-            'controlValues': {{'multiSelect': True, 'enableEmptyFilter': False, 'sortAscending': True}},
-            'cascadeParentIds': [],
-            'scope': {{'rootPath': ['ROOT_ID'], 'excluded': []}},
-            'chartsInScope': {filter_scope_all!r},
-            'tabsInScope': [],
-        }},
-        {{
-            'id': 'NATIVE_FILTER-DEPT',
-            'name': 'Departamentos',
-            'filterType': 'filter_select',
-            'type': 'NATIVE_FILTER',
-            'targets': [{{'datasetId': {detail_ds}, 'column': {{'name': 'department_code'}}}}],
-            'defaultDataMask': {{'filterState': {{'value': None}}}},
-            'controlValues': {{'multiSelect': True, 'enableEmptyFilter': False, 'sortAscending': True}},
-            'cascadeParentIds': [],
-            'scope': {{'rootPath': ['ROOT_ID'], 'excluded': []}},
-            'chartsInScope': {filter_scope_all!r},
-            'tabsInScope': [],
-        }},
-        {{
-            'id': 'NATIVE_FILTER-TIPO',
-            'name': 'Tipo P/R',
-            'filterType': 'filter_select',
-            'type': 'NATIVE_FILTER',
-            'targets': [{{'datasetId': {evo_ds}, 'column': {{'name': 'tipo'}}}}],
-            'defaultDataMask': {{'filterState': {{'value': None}}}},
-            'controlValues': {{'multiSelect': False, 'enableEmptyFilter': False}},
-            'cascadeParentIds': [],
-            'scope': {{'rootPath': ['ROOT_ID'], 'excluded': []}},
-            'chartsInScope': {evo_chart_ids!r},
-            'tabsInScope': [],
-        }},
-    ]
-    dash.json_metadata = json.dumps(jm)
-    dash.css = {dashboard_css!r}
-    db.session.commit()
-    print('Dashboard config persistida (filtros evo_ds + KPI detail_ds={detail_ds})')
-"""
-    subprocess.run(["docker", "exec", "superset", "python", "-c", code], check=True)
+    json_metadata = {
+        "cross_filters_enabled": False,
+        "chart_configuration": {},
+        "default_filters": "{}",
+        "native_filter_configuration": [
+            {
+                "id": "NATIVE_FILTER-YEAR",
+                "name": "Año",
+                "filterType": "filter_select",
+                "type": "NATIVE_FILTER",
+                "targets": [{"datasetId": detail_ds, "column": {"name": "year"}}],
+                "defaultDataMask": {
+                    "filterState": {"value": [CURRENT_YEAR]},
+                    "extraFormData": {
+                        "filters": [{"col": "year", "op": "IN", "val": [CURRENT_YEAR]}]
+                    },
+                },
+                "controlValues": {"multiSelect": False, "enableEmptyFilter": False},
+                "cascadeParentIds": [],
+                "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
+                "chartsInScope": filter_scope_all,
+                "tabsInScope": [],
+            },
+            {
+                "id": "NATIVE_FILTER-EMPRESA",
+                "name": "Empresas",
+                "filterType": "filter_select",
+                "type": "NATIVE_FILTER",
+                "targets": [{"datasetId": detail_ds, "column": {"name": "empresa"}}],
+                "defaultDataMask": {"filterState": {"value": None}},
+                "controlValues": {
+                    "multiSelect": True,
+                    "enableEmptyFilter": False,
+                    "sortAscending": True,
+                },
+                "cascadeParentIds": [],
+                "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
+                "chartsInScope": filter_scope_all,
+                "tabsInScope": [],
+            },
+            {
+                "id": "NATIVE_FILTER-DEPT",
+                "name": "Departamentos",
+                "filterType": "filter_select",
+                "type": "NATIVE_FILTER",
+                "targets": [
+                    {"datasetId": detail_ds, "column": {"name": "department_code"}}
+                ],
+                "defaultDataMask": {"filterState": {"value": None}},
+                "controlValues": {
+                    "multiSelect": True,
+                    "enableEmptyFilter": False,
+                    "sortAscending": True,
+                },
+                "cascadeParentIds": [],
+                "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
+                "chartsInScope": filter_scope_all,
+                "tabsInScope": [],
+            },
+            {
+                "id": "NATIVE_FILTER-TIPO",
+                "name": "Tipo P/R",
+                "filterType": "filter_select",
+                "type": "NATIVE_FILTER",
+                "targets": [{"datasetId": evo_ds, "column": {"name": "tipo"}}],
+                "defaultDataMask": {"filterState": {"value": None}},
+                "controlValues": {"multiSelect": False, "enableEmptyFilter": False},
+                "cascadeParentIds": [],
+                "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
+                "chartsInScope": evo_chart_ids,
+                "tabsInScope": [],
+            },
+        ],
+    }
+    client._request(
+        "PUT",
+        f"/api/v1/dashboard/{dash_id}",
+        {
+            "json_metadata": json.dumps(json_metadata),
+            "css": dashboard_css,
+        },
+    )
+    print(
+        f"Dashboard config persistida vía API "
+        f"(filtros evo_ds={evo_ds} + KPI detail_ds={detail_ds})"
+    )
 
 
 def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
@@ -536,18 +582,15 @@ def main() -> int:
              ".2f")),
         ("Plan · Beneficio", "plan", kpi_ds, "big_number_total",
          big_number_params(metric_sum("plan_beneficio", "Beneficio"), ",.0f", currency=True)),
-        # Incluir dims para que /dashboard/.../datasets exponga columnas de filtro (Superset 6.x)
-        ("Resumen mensual", "table", evo_ds, "table",
-         {"all_columns": [
-             "empresa", "year", "ano_mes", "department_code", "department_name", "tipo",
-             "facturacion", "coste", "beneficio", "margen_pct",
-         ],
-          "order_by_cols": ['["ano_mes", true]']}),
+        # Tabla agregada estilo PBI Resumen (AñoMes / Facturación / Coste / Margen %)
+        ("Resumen mensual", "table", evo_ds, "table", resumen_mensual_params()),
         ("Evolución mensual", "chart", evo_ds, "echarts_timeseries_line",
-         {"x_axis": "ano_mes", "metrics": [metric_sum("facturacion", "Facturación")],
+         {"adhoc_filters": dim_adhoc_filters("tipo"),
+          "x_axis": "ano_mes", "metrics": [metric_sum("facturacion", "Facturación")],
           "groupby": [], "row_limit": 1000}),
         ("Margen acumulado", "chart", evo_ds, "echarts_timeseries_line",
-         {"x_axis": "ano_mes",
+         {"adhoc_filters": dim_adhoc_filters("tipo"),
+          "x_axis": "ano_mes",
           "metrics": [metric_sql("AVG(margen_pct)", "Margen %")],
           "row_limit": 1000}),
         ("Facturación por Probabilidad", "chart", prob_ds, "echarts_timeseries_bar",
@@ -564,9 +607,12 @@ def main() -> int:
         charts.append({"key": f"CHART-{idx}", "id": cid, "name": name, "section": section})
         existing[name] = cid
 
-    uuids = get_chart_uuids()
+    uuids = get_chart_uuids(client)
     for c in charts:
         c["uuid"] = uuids.get(c["id"], "")
+        if not c["uuid"]:
+            detail = client._request("GET", f"/api/v1/chart/{c['id']}")
+            c["uuid"] = str((detail.get("result") or {}).get("uuid") or "")
 
     print("==> 4/4 Configurando dashboard...")
     existing_dash = client.find_dashboard()
@@ -587,7 +633,9 @@ def main() -> int:
         })["id"]
 
     client.attach_charts(dash_id, [c["id"] for c in charts])
-    persist_dashboard_config(dash_id, dataset_ids, [c["id"] for c in charts])
+    persist_dashboard_config(
+        client, dash_id, dataset_ids, [c["id"] for c in charts]
+    )
 
     print(f"\n✅ Dashboard listo: {SUPERSET_URL}/superset/dashboard/{DASHBOARD_SLUG}/")
     print(f"   Año por defecto: {CURRENT_YEAR}")

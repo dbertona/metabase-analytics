@@ -1,7 +1,9 @@
-# Filtros nativos — Dashboard Planificación PS Analytics
+# Filtros nativos — Dashboard Seguimiento Económico — Resumen
 
 > Repo canónico: **`superset-analytics`**  
-> Regenerar: `python3 scripts/setup-superset-planificacion.py`  
+> Título UI: **Seguimiento Económico — Resumen** (slug estable `planificacion-ps-analytics`)  
+> Regenerar: `SUPERSET_URL=http://192.168.36.100:8088 python3 scripts/setup-superset-planificacion.py`  
+> (desde Mac sin Docker local: `SKIP_APPLY_BI_VIEWS=1` si las vistas BI ya están aplicadas)  
 > Vistas: `scripts/sql/bi_dashboard_planificacion_views.sql`  
 > URL: http://192.168.36.100:8088/superset/dashboard/planificacion-ps-analytics/
 

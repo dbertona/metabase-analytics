@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [2026-07-25d] — Fase 3: Dashboard Superset «Seguimiento Económico — Resumen»
+
+### Changed
+
+- **`scripts/setup-superset-planificacion.py`:**
+  - Título dashboard → `Seguimiento Económico — Resumen` (slug `planificacion-ps-analytics` sin cambio).
+  - Chart **Resumen mensual**: tabla agregada `ano_mes` + SUM Facturación/Coste + Margen % + totales (estilo PBI).
+  - Persistencia de filtros/CSS y UUID de charts vía API (sin `docker exec`; regenerable desde Mac).
+  - `SKIP_APPLY_BI_VIEWS=1` para omitir apply SQL cuando no hay cambios de vistas.
+- Docs: README, filtros, fases seguimiento-económico → Fase 3 ✅.
+
+### Validado (PSI 2026, live)
+
+| Tipo | Facturación | Coste | vs PBI |
+|------|-------------|-------|--------|
+| P | 3.685.687 | 3.838.008 | exacto |
+| R | 2.688.861 | 2.513.515 | Coste +582 € lag |
+
 ## [2026-07-25c] — Docs: alinear KPIs PBI con estado final CHANGELOG
 
 ### Changed
