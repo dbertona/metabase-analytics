@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-25ai] — OAuth Azure: redirect_uri absoluto bajo /analytics
+
+### Fixed
+
+- `redirect_uri` fijo a `/analytics/oauth-authorized/azure` para que el
+  callback no caiga en el catch-all de Timesheet (AppError 404 + early-init).
+
 ## [2026-07-25ah] — Fix 404 logo / blank screen APP_ROOT
 
 ### Fixed

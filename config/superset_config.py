@@ -179,6 +179,11 @@ if AZURE_CLIENT_SECRET:
             "remote_app": {
                 "client_id": AZURE_CLIENT_ID,
                 "client_secret": AZURE_CLIENT_SECRET,
+                # Fijo: si url_for pierde SCRIPT_NAME, Azure redirige a
+                # /oauth-authorized/azure → nginx lo manda a Timesheet (AppError 404).
+                "redirect_uri": (
+                    "https://apps.powersolution.es/analytics/oauth-authorized/azure"
+                ),
                 "server_metadata_url": (
                     f"https://login.microsoftonline.com/{AZURE_TENANT_ID}"
                     "/.well-known/openid-configuration"
