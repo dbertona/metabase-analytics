@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-25aa] — Resumen mensual sin selector de page size
+
+### Changed
+
+- Resumen mensual: sin `page_length` (oculta “Show entries per page”).
+- Altura Resumen mensual 46 (UI) + CSS ocultando controles de paginación.
+
 ## [2026-07-25z] — Totales al pie en Resumen mensual
 
 ### Changed

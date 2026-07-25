@@ -298,9 +298,8 @@ def resumen_mensual_params() -> dict[str, Any]:
         "percent_metrics": [],
         "order_by_cols": ['["ano_mes", true]'],
         "row_limit": 1000,
-        # Paginación cliente: con server_pagination el pie de totales a veces no se ve
+        # Sin page_length: evita el selector "Show N entries per page" (pocas filas/mes)
         "server_pagination": False,
-        "page_length": 25,
         "show_totals": True,
         "include_search": False,
         "show_cell_bars": False,
@@ -604,6 +603,15 @@ def persist_dashboard_config(
         "[data-test-chart-name*='Resumen mensual'] .slice_container {\n"
         "  padding: 0 !important;\n"
         "}\n"
+        "/* Resumen mensual: ocultar selector Show N entries per page */\n"
+        "[data-test-chart-name*='Resumen mensual'] .dt-length,\n"
+        "[data-test-chart-name*='Resumen mensual'] .dataTables_length,\n"
+        "[data-test-chart-name*='Resumen mensual'] .ant-pagination,\n"
+        "[data-test-chart-name*='Resumen mensual'] .pagination-container,\n"
+        "[data-test-chart-name*='Resumen mensual'] select[aria-label*='page'],\n"
+        "[data-test-chart-name*='Resumen mensual'] .row-count-container {\n"
+        "  display: none !important;\n"
+        "}\n"
         "/* Tablas: fila Total (summary) siempre visible al pie */\n"
         "[data-test-chart-name*='Proyectos'] tfoot,\n"
         "[data-test-chart-name*='Proyectos'] .dt-totals,\n"
@@ -819,7 +827,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         # Alturas desde UI (usuario): KPI 10, Probabilidad 36. Cabeceras 4 (evita scroll).
         "obj": (1, 10),
         "plan": (1, 10),
-        "table": (4, 36),  # Resumen mensual: altura para ver pie Total
+        "table": (4, 46),  # UI: usuario estiró Resumen mensual; pie Total visible
         "projects": (12, 74),  # UI: altura estirada para ver pie Total
         "prob": (6, 36),
         "chart": (6, 36),
