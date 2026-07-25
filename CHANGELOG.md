@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [2026-07-25b] — merge-safe.sh para cierre de rama
+
+### Added
+
+- **`scripts/merge-safe.sh`:** cierre auditado de ramas (`--no-ff` + push `gitea/main`).
+  Esqueleto git portado de Apps; validaciones propias (JSON workflows, aviso SQL).
+  Sin `npm lint/build` (este repo no tiene `package.json`).
+- **`.cursor/rules/merge-command-workflow.mdc`:** apunta al script real y a post-merge n8n/SQL.
+
 ## [2026-07-25] — Partition overwrite en línea (PlanificacionMes / ExpedienteMes)
 
 ### Fixed
