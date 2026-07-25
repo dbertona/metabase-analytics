@@ -541,97 +541,118 @@ def persist_dashboard_config(
 
 
 def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
+    """Layout: COLUMN KPIs (7) + Probabilidad (5) a la derecha a altura completa.
+
+    ROW-KPI-BAND
+      ├── COLUMN-KPIS (width 7): Obj + Plan (headers + 4 tarjetas c/u)
+      └── Facturación por Probabilidad (width 5, height ≈ Obj+Plan)
+    Luego Resumen mensual (12) y Evolución + Margen.
+    """
+    obj_keys = [c["key"] for c in charts if c["section"] == "obj"]
+    plan_keys = [c["key"] for c in charts if c["section"] == "plan"]
+    table_keys = [c["key"] for c in charts if c["section"] == "table"]
+    prob_keys = [c["key"] for c in charts if c["section"] == "prob"]
+    chart_keys = [c["key"] for c in charts if c["section"] == "chart"]
+    prob_key = prob_keys[0] if prob_keys else None
+
+    col_parents = ["ROOT_ID", "GRID_ID", "ROW-KPI-BAND", "COLUMN-KPIS"]
     position: dict[str, Any] = {
         "DASHBOARD_VERSION": "v2",
         "ROOT_ID": {"type": "ROOT", "id": "ROOT_ID", "children": ["GRID_ID"]},
         "GRID_ID": {
             "type": "GRID",
             "id": "GRID_ID",
-            "children": [
-                "ROW-HDR-OBJ", "ROW-OBJ",
-                "ROW-HDR-PLAN", "ROW-PLAN",
-                "ROW-TABLES",  # Resumen mensual + Facturación por Probabilidad
-                "ROW-CHARTS",  # Evolución + Margen
-            ],
+            "children": ["ROW-KPI-BAND", "ROW-TABLES", "ROW-CHARTS"],
             "parents": ["ROOT_ID"],
+        },
+        "ROW-KPI-BAND": {
+            "type": "ROW",
+            "id": "ROW-KPI-BAND",
+            "children": (["COLUMN-KPIS"] + ([prob_key] if prob_key else [])),
+            "parents": ["ROOT_ID", "GRID_ID"],
+            "meta": {"background": "BACKGROUND_TRANSPARENT"},
+        },
+        "COLUMN-KPIS": {
+            "type": "COLUMN",
+            "id": "COLUMN-KPIS",
+            "children": ["ROW-HDR-OBJ", "ROW-OBJ", "ROW-HDR-PLAN", "ROW-PLAN"],
+            "parents": ["ROOT_ID", "GRID_ID", "ROW-KPI-BAND"],
+            "meta": {"background": "BACKGROUND_TRANSPARENT", "width": 7},
         },
         "ROW-HDR-OBJ": {
             "type": "ROW", "id": "ROW-HDR-OBJ", "children": ["HEADER-OBJ"],
-            "parents": ["ROOT_ID", "GRID_ID"],
+            "parents": col_parents,
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
         "ROW-HDR-PLAN": {
             "type": "ROW", "id": "ROW-HDR-PLAN", "children": ["HEADER-PLAN"],
-            "parents": ["ROOT_ID", "GRID_ID"],
+            "parents": col_parents,
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
         "HEADER-OBJ": {
             "type": "MARKDOWN", "id": "HEADER-OBJ", "children": [],
-            "parents": ["ROOT_ID", "GRID_ID", "ROW-HDR-OBJ"],
-            "meta": {"code": "## Objetivos Anuales", "width": 12, "height": 2},
+            "parents": col_parents + ["ROW-HDR-OBJ"],
+            # width relativo al COLUMN (7)
+            "meta": {"code": "## Objetivos Anuales", "width": 7, "height": 2},
         },
         "HEADER-PLAN": {
             "type": "MARKDOWN", "id": "HEADER-PLAN", "children": [],
-            "parents": ["ROOT_ID", "GRID_ID", "ROW-HDR-PLAN"],
-            "meta": {"code": "## Planificación Actual", "width": 12, "height": 2},
+            "parents": col_parents + ["ROW-HDR-PLAN"],
+            "meta": {"code": "## Planificación Actual", "width": 7, "height": 2},
         },
         "ROW-OBJ": {
             "type": "ROW", "id": "ROW-OBJ",
-            "children": [c["key"] for c in charts if c["section"] == "obj"],
-            "parents": ["ROOT_ID", "GRID_ID"],
+            "children": obj_keys,
+            "parents": col_parents,
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
         "ROW-PLAN": {
             "type": "ROW", "id": "ROW-PLAN",
-            "children": [c["key"] for c in charts if c["section"] == "plan"],
-            "parents": ["ROOT_ID", "GRID_ID"],
+            "children": plan_keys,
+            "parents": col_parents,
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
         "ROW-TABLES": {
             "type": "ROW", "id": "ROW-TABLES",
-            "children": (
-                [c["key"] for c in charts if c["section"] == "table"]
-                + [c["key"] for c in charts if c["section"] == "prob"]
-            ),
+            "children": table_keys,
             "parents": ["ROOT_ID", "GRID_ID"],
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
         "ROW-CHARTS": {
             "type": "ROW", "id": "ROW-CHARTS",
-            "children": [c["key"] for c in charts if c["section"] == "chart"],
+            "children": chart_keys,
             "parents": ["ROOT_ID", "GRID_ID"],
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
     }
-    # Ancho en columnas de rejilla (12 = fila completa).
-    # Resumen (6) + Probabilidad (6) en la misma fila — como panel PBI.
+    # Dentro de COLUMN width 7: Facturación 2 + Margen 1 + Crecimiento 2 + Beneficio 2 = 7
+    # Probabilidad a la derecha: width 5, height ≈ headers(2+2) + KPIs(14+14) = 32
     sizes = {
         "obj": (2, 14),
         "plan": (2, 14),
-        "table": (6, 32),
-        "prob": (6, 32),
+        "table": (12, 32),
+        "prob": (5, 32),
         "chart": (6, 36),
     }
-    euro_metrics = {"Facturación", "Beneficio"}
+    kpi_widths = {"Facturación": 2, "Margen": 1, "Crecimiento": 2, "Beneficio": 2}
     for c in charts:
         w, h = sizes[c["section"]]
-        row = {
-            "obj": "ROW-OBJ",
-            "plan": "ROW-PLAN",
-            "table": "ROW-TABLES",
-            "prob": "ROW-TABLES",
-            "chart": "ROW-CHARTS",
-        }[c["section"]]
-        # Titulo mostrado: solo la metrica (Facturación, Margen, Crecimiento, Beneficio)
-        # sin el prefijo "Obj ·" / "Plan ·"; la cabecera de seccion ya da el contexto.
         display_name = c["name"].split("· ")[-1]
         if c["section"] == "prob":
             display_name = "Facturación por Probabilidad"
-        if c["section"] in ("obj", "plan"):
-            w = 3 if display_name in euro_metrics else 2
+            parents = ["ROOT_ID", "GRID_ID", "ROW-KPI-BAND"]
+        elif c["section"] in ("obj", "plan"):
+            parents = col_parents + [
+                "ROW-OBJ" if c["section"] == "obj" else "ROW-PLAN",
+            ]
+            w = kpi_widths.get(display_name, 2)
+        elif c["section"] == "table":
+            parents = ["ROOT_ID", "GRID_ID", "ROW-TABLES"]
+        else:
+            parents = ["ROOT_ID", "GRID_ID", "ROW-CHARTS"]
         position[c["key"]] = {
             "type": "CHART", "id": c["key"], "children": [],
-            "parents": ["ROOT_ID", "GRID_ID", row],
+            "parents": parents,
             "meta": {
                 "width": w, "height": h,
                 "chartId": c["id"], "uuid": c.get("uuid", ""),
@@ -703,7 +724,7 @@ def main() -> int:
          big_number_params(metric_sum("plan_beneficio", "Beneficio"), ",.0f", currency=True)),
         # Tabla agregada estilo PBI Resumen (AñoMes / Facturación / Coste / Margen %)
         ("Resumen mensual", "table", evo_ds, "table", resumen_mensual_params()),
-        # Misma fila que Resumen (layout PBI: izquierda tabla, derecha probabilidad)
+        # Al lado de KPIs (COLUMN 7 + Probabilidad 5), altura ≈ Obj+Plan
         ("Facturación por Probabilidad", "prob", prob_ds, "echarts_timeseries_bar",
          probabilidad_bar_params()),
         ("Evolución mensual", "chart", evo_ds, "echarts_timeseries_line",

@@ -26,11 +26,21 @@ Detalle: [`exports/superset-dashboard/README.md`](../exports/superset-dashboard/
 
 ## Diseño (Superset 6.1.0)
 
+### Layout superior (KPI + Probabilidad)
+
+```text
+ROW-KPI-BAND
+├── COLUMN-KPIS (width 7) — Objetivos Anuales + Planificación Actual
+└── Facturación por Probabilidad (width 5, height ≈ alto de las dos bandas KPI)
+```
+
+Debajo: Resumen mensual (ancho 12) · Evolución + Margen (6+6).
+
 | Pieza | Dataset | Motivo |
 |-------|---------|--------|
 | 8 tarjetas KPI (Obj/Plan) | `bi_v_planificacion_kpi` | Tiene `department_code` + `facturacion_real_anterior` → filtro Departamento y Crecimiento |
 | Resumen / Evolución / Margen | `bi_v_evolucion_mensual` | Fuente de **valores** de filtros Tipo P/R; dims también en Resumen |
-| Facturación por Probabilidad | `bi_v_facturacion_probabilidad` | Fuera del scope de filtros Año/Empresa/Dept (evita invalidar Apply) |
+| Facturación por Probabilidad | `bi_v_facturacion_probabilidad` | Al lado de KPIs (7+5); fuera del scope de filtros Año/Empresa/Dept |
 
 ### Filtros configurados
 

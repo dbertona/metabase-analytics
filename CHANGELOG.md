@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-25i] — Layout: KPIs en COLUMN (7) + Probabilidad (5)
+
+### Changed
+
+- **`build_layout`:** Obj + Plan agrupados en `COLUMN-KPIS` (ancho 7); **Facturación por
+  Probabilidad** a la derecha (ancho 5, height 32 ≈ alto de las dos bandas).
+- Resumen mensual pasa a fila completa (12) debajo.
+
 ## [2026-07-25h] — Docs/regla: pull UI obligatorio para agentes
 
 ### Added
