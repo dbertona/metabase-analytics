@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-25ac] — Pestaña Gráficos
+
+### Changed
+
+- Dashboard con tabs: **Resumen** (KPI + tablas) y **Gráficos** (Evolución + Margen).
+- Filtros nativos con `tabsInScope` en ambas pestañas.
+- Alturas tablas 45 (UI).
+
 ## [2026-07-25ab] — Proyectos al lado de Resumen + sin page size
 
 ### Changed

@@ -655,7 +655,7 @@ def persist_dashboard_config(
                 "cascadeParentIds": [],
                 "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
                 "chartsInScope": filter_scope_all,
-                "tabsInScope": [],
+                "tabsInScope": ["TAB-RESUMEN", "TAB-GRAFICOS"],
             },
             {
                 "id": "NATIVE_FILTER-EMPRESA",
@@ -679,7 +679,7 @@ def persist_dashboard_config(
                 "cascadeParentIds": [],
                 "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
                 "chartsInScope": filter_scope_all,
-                "tabsInScope": [],
+                "tabsInScope": ["TAB-RESUMEN", "TAB-GRAFICOS"],
             },
             {
                 "id": "NATIVE_FILTER-DEPT",
@@ -698,7 +698,7 @@ def persist_dashboard_config(
                 "cascadeParentIds": [],
                 "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
                 "chartsInScope": filter_scope_all,
-                "tabsInScope": [],
+                "tabsInScope": ["TAB-RESUMEN", "TAB-GRAFICOS"],
             },
             {
                 "id": "NATIVE_FILTER-TIPO",
@@ -711,7 +711,7 @@ def persist_dashboard_config(
                 "cascadeParentIds": [],
                 "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
                 "chartsInScope": evo_chart_ids + [table_id, projects_id],
-                "tabsInScope": [],
+                "tabsInScope": ["TAB-RESUMEN", "TAB-GRAFICOS"],
             },
         ],
     }
@@ -730,7 +730,7 @@ def persist_dashboard_config(
 
 
 def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
-    """Layout: COLUMN KPIs (6) + Probabilidad (6); Resumen|Proyectos; Evolución."""
+    """Layout con pestañas: Resumen (KPI+tablas) | Gráficos (evolución)."""
     obj_keys = [c["key"] for c in charts if c["section"] == "obj"]
     plan_keys = [c["key"] for c in charts if c["section"] == "plan"]
     table_keys = [c["key"] for c in charts if c["section"] == "table"]
@@ -741,30 +741,51 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
 
     # Euros (Facturación/Beneficio)=2; % =1 → columna 6. Probabilidad = 6.
     kpi_col_width = 6
-    col_parents = ["ROOT_ID", "GRID_ID", "ROW-KPI-BAND", "COLUMN-KPIS"]
+    tab_resumen = ["ROOT_ID", "GRID_ID", "TABS-MAIN", "TAB-RESUMEN"]
+    tab_graficos = ["ROOT_ID", "GRID_ID", "TABS-MAIN", "TAB-GRAFICOS"]
+    col_parents = tab_resumen + ["ROW-KPI-BAND", "COLUMN-KPIS"]
     position: dict[str, Any] = {
         "DASHBOARD_VERSION": "v2",
         "ROOT_ID": {"type": "ROOT", "id": "ROOT_ID", "children": ["GRID_ID"]},
         "GRID_ID": {
             "type": "GRID",
             "id": "GRID_ID",
-            "children": [
-                "ROW-KPI-BAND", "ROW-TABLES", "ROW-CHARTS",
-            ],
+            "children": ["TABS-MAIN"],
             "parents": ["ROOT_ID"],
+        },
+        "TABS-MAIN": {
+            "type": "TABS",
+            "id": "TABS-MAIN",
+            "children": ["TAB-RESUMEN", "TAB-GRAFICOS"],
+            "parents": ["ROOT_ID", "GRID_ID"],
+            "meta": {},
+        },
+        "TAB-RESUMEN": {
+            "type": "TAB",
+            "id": "TAB-RESUMEN",
+            "children": ["ROW-KPI-BAND", "ROW-TABLES"],
+            "parents": ["ROOT_ID", "GRID_ID", "TABS-MAIN"],
+            "meta": {"text": "Resumen", "defaultText": "Resumen"},
+        },
+        "TAB-GRAFICOS": {
+            "type": "TAB",
+            "id": "TAB-GRAFICOS",
+            "children": ["ROW-CHARTS"],
+            "parents": ["ROOT_ID", "GRID_ID", "TABS-MAIN"],
+            "meta": {"text": "Gráficos", "defaultText": "Gráficos"},
         },
         "ROW-KPI-BAND": {
             "type": "ROW",
             "id": "ROW-KPI-BAND",
             "children": (["COLUMN-KPIS"] + ([prob_key] if prob_key else [])),
-            "parents": ["ROOT_ID", "GRID_ID"],
+            "parents": list(tab_resumen),
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
         "COLUMN-KPIS": {
             "type": "COLUMN",
             "id": "COLUMN-KPIS",
             "children": ["ROW-HDR-OBJ", "ROW-OBJ", "ROW-HDR-PLAN", "ROW-PLAN"],
-            "parents": ["ROOT_ID", "GRID_ID", "ROW-KPI-BAND"],
+            "parents": tab_resumen + ["ROW-KPI-BAND"],
             "meta": {"background": "BACKGROUND_TRANSPARENT", "width": kpi_col_width},
         },
         "ROW-HDR-OBJ": {
@@ -812,22 +833,22 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         "ROW-TABLES": {
             "type": "ROW", "id": "ROW-TABLES",
             "children": table_keys + projects_keys,
-            "parents": ["ROOT_ID", "GRID_ID"],
+            "parents": list(tab_resumen),
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
         "ROW-CHARTS": {
             "type": "ROW", "id": "ROW-CHARTS",
             "children": chart_keys,
-            "parents": ["ROOT_ID", "GRID_ID"],
+            "parents": list(tab_graficos),
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
     }
     sizes = {
-        # Alturas desde UI (usuario): KPI 10, Probabilidad 36. Cabeceras 4 (evita scroll).
+        # Alturas desde UI: KPI 10, tablas 45, Probabilidad/charts 36.
         "obj": (1, 10),
         "plan": (1, 10),
-        "table": (4, 46),  # Resumen mensual | Proyectos (misma fila)
-        "projects": (8, 46),  # al lado de Resumen (4+8=12)
+        "table": (4, 45),
+        "projects": (8, 45),
         "prob": (6, 36),
         "chart": (6, 36),
     }
@@ -840,7 +861,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             display_name = "Δ %"
         if c["section"] == "prob":
             display_name = "Facturación por Probabilidad"
-            parents = ["ROOT_ID", "GRID_ID", "ROW-KPI-BAND"]
+            parents = tab_resumen + ["ROW-KPI-BAND"]
         elif c["section"] in ("obj", "plan"):
             parents = col_parents + [
                 "ROW-OBJ" if c["section"] == "obj" else "ROW-PLAN",
@@ -849,9 +870,9 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         elif c["section"] in ("table", "projects"):
             if c["section"] == "projects":
                 display_name = "Proyectos"
-            parents = ["ROOT_ID", "GRID_ID", "ROW-TABLES"]
+            parents = tab_resumen + ["ROW-TABLES"]
         else:
-            parents = ["ROOT_ID", "GRID_ID", "ROW-CHARTS"]
+            parents = tab_graficos + ["ROW-CHARTS"]
         position[c["key"]] = {
             "type": "CHART", "id": c["key"], "children": [],
             "parents": parents,
