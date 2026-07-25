@@ -655,10 +655,12 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         "chart": (6, 36),
     }
     # Importes grandes (euros) más anchos; % compactos
-    kpi_widths = {"Facturación": 2, "Margen": 1, "Crecimiento": 1, "Beneficio": 2}
+    kpi_widths = {"Facturación": 2, "Margen": 1, "Δ %": 1, "Crecimiento": 1, "Beneficio": 2}
     for c in charts:
         w, h = sizes[c["section"]]
         display_name = c["name"].split("· ")[-1]
+        if display_name == "Crecimiento":
+            display_name = "Δ %"
         if c["section"] == "prob":
             display_name = "Facturación por Probabilidad"
             parents = ["ROOT_ID", "GRID_ID", "ROW-KPI-BAND"]
@@ -725,7 +727,7 @@ def main() -> int:
              metric_sql(
                  "(SUM(obj_facturacion)-SUM(facturacion_real_anterior))"
                  "/NULLIF(SUM(facturacion_real_anterior),0)",
-                 "Crecimiento"),
+                 "Δ %"),
              ".2%")),
         ("Obj · Beneficio", "obj", kpi_ds, "big_number_total",
          big_number_params(metric_sum("obj_beneficio", "Beneficio"), ",.0f", currency=True)),
@@ -739,7 +741,7 @@ def main() -> int:
              metric_sql(
                  "(SUM(plan_facturacion)-SUM(facturacion_real_anterior))"
                  "/NULLIF(SUM(facturacion_real_anterior),0)",
-                 "Crecimiento"),
+                 "Δ %"),
              ".2%")),
         ("Plan · Beneficio", "plan", kpi_ds, "big_number_total",
          big_number_params(metric_sum("plan_beneficio", "Beneficio"), ",.0f", currency=True)),

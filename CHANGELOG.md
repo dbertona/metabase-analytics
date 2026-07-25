@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-25p] — Etiqueta KPI Crecimiento → Δ %
+
+### Changed
+
+- Subheader / override de Obj·Plan Crecimiento: **Δ %**.
+
 ## [2026-07-25o] — Símbolo % en Margen y Crecimiento
 
 ### Changed
