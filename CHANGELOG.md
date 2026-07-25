@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-25t] — Centrado vertical real en cabeceras y KPI
+
+### Changed
+
+- Markdown y big_number: cadena flex `height:100%` + `justify-content/align-items: center`
+  (antes los KPI tenían `align-items: flex-start`).
+
 ## [2026-07-25s] — Cabeceras Obj/Plan centradas sin scroll
 
 ### Changed
