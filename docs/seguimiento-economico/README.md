@@ -67,14 +67,17 @@ GROUP BY tipo;
 |------|--------|------------|
 | **1** | ✅ | Views `v_se_*` + spec DAX/PQ |
 | **2** | ✅ | Sync 004 + paridad KPI Resumen (P/R factura y coste) |
-| **3** | Pendiente | Dashboard Superset «Resumen» |
+| **3** | ✅ | Dashboard Superset «Seguimiento Económico — Resumen» (`planificacion-ps-analytics`) |
 | **4** | Pendiente | Resto de páginas PBI |
+
+**Dashboard Fase 3:** http://192.168.36.100:8088/superset/dashboard/planificacion-ps-analytics/  
+Regenerar: `SKIP_APPLY_BI_VIEWS=1 SUPERSET_URL=http://192.168.36.100:8088 python3 scripts/setup-superset-planificacion.py`
 
 ## Páginas del informe PBI
 
 1. **Resumen** — KPIs objetivos, margen, acumulados, histórico planificación
 2. **Unidad** — Pivot por concepto analítico (`descripcionCA`)
-3. **Resumen Proyectos** — Tabla por encabezado de proyecto
+3. **Resumen Proyectos** — Tabla por encabezado de proyecto ✅ (`bi_v_resumen_proyectos` + chart Proyectos; filtros PBI: Operational + estado Completed/Open/Planning)
 4. **Facturación** — Pivot mensual facturado
 5. **Gastos** — Pivot mensual costes
 6. **Mano de Obra** — Recursos y costes

@@ -1,17 +1,46 @@
-# Filtros nativos — Dashboard Planificación PS Analytics
+# Filtros nativos — Dashboard Seguimiento Económico — Resumen
 
 > Repo canónico: **`superset-analytics`**  
-> Regenerar: `python3 scripts/setup-superset-planificacion.py`  
+> Título UI: **Seguimiento Económico — Resumen** (slug estable `planificacion-ps-analytics`)  
+> Regenerar: `SUPERSET_URL=http://192.168.36.100:8088 python3 scripts/setup-superset-planificacion.py`  
+> (el setup hace **pull UI automático** primero — ver `.cursor/rules/superset-dashboard-ui-sync.mdc`)  
+> Pull solo: `python3 scripts/pull-superset-dashboard.py` → `exports/superset-dashboard/latest/`  
+> (desde Mac sin Docker local: `SKIP_APPLY_BI_VIEWS=1` si las vistas BI ya están aplicadas)  
 > Vistas: `scripts/sql/bi_dashboard_planificacion_views.sql`  
 > URL: http://192.168.36.100:8088/superset/dashboard/planificacion-ps-analytics/
 
+## ⚠️ Edits en la UI vs regeneración
+
+Cambios hechos a mano en Superset (mover charts, colores, métricas, filtros) **se pisan** al
+ejecutar `setup-superset-planificacion.py`.
+
+**Obligatorio para agentes:**
+
+1. `python3 scripts/pull-superset-dashboard.py` (o dejar que el setup lo haga en paso 0)
+2. Si hay divergencias vs `previous/` → avisar al usuario antes de regenerar
+3. Incorporar al script lo que se quiera conservar
+
+Detalle: [`exports/superset-dashboard/README.md`](../exports/superset-dashboard/README.md) · regla Cursor `superset-dashboard-ui-sync.mdc`.
+
+---
+
 ## Diseño (Superset 6.1.0)
+
+### Layout superior (KPI + Probabilidad)
+
+```text
+ROW-KPI-BAND
+├── COLUMN-KPIS (width 6) — Facturación/Beneficio=2, Margen/Crecimiento=1
+└── Facturación por Probabilidad (width 6, height ≈ alto de las dos bandas KPI)
+```
+
+Debajo: Resumen mensual (ancho 12) · Evolución + Margen (6+6).
 
 | Pieza | Dataset | Motivo |
 |-------|---------|--------|
 | 8 tarjetas KPI (Obj/Plan) | `bi_v_planificacion_kpi` | Tiene `department_code` + `facturacion_real_anterior` → filtro Departamento y Crecimiento |
 | Resumen / Evolución / Margen | `bi_v_evolucion_mensual` | Fuente de **valores** de filtros Tipo P/R; dims también en Resumen |
-| Facturación por Probabilidad | `bi_v_facturacion_probabilidad` | Fuera del scope de filtros Año/Empresa/Dept (evita invalidar Apply) |
+| Facturación por Probabilidad | `bi_v_facturacion_probabilidad` | Al lado de KPIs (7+5); fuera del scope de filtros Año/Empresa/Dept |
 
 ### Filtros configurados
 

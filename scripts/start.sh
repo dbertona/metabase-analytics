@@ -11,9 +11,13 @@ echo "==> Levantando Apache Superset..."
 docker compose build
 docker compose up -d
 
-echo "==> Esperando a que Superset responda en :8088..."
+APP_ROOT="${SUPERSET_APP_ROOT:-/analytics}"
+APP_ROOT="${APP_ROOT%/}"
+HEALTH_URL="http://localhost:${SUPERSET_PORT:-8088}${APP_ROOT}/health"
+
+echo "==> Esperando a que Superset responda (${HEALTH_URL})..."
 for i in $(seq 1 60); do
-  if curl -fsS "http://localhost:${SUPERSET_PORT:-8088}/health" >/dev/null 2>&1; then
+  if curl -fsS "${HEALTH_URL}" >/dev/null 2>&1; then
     echo "    Superset listo (${i}s)"
     break
   fi
@@ -25,24 +29,25 @@ for i in $(seq 1 60); do
 done
 
 echo "==> Configurando conexión PS Analytics y dashboard de planificación..."
-export SUPERSET_URL="${SUPERSET_URL:-http://localhost:8088}"
+export SUPERSET_URL="${SUPERSET_URL:-http://localhost:8088${APP_ROOT}}"
 export SUPERSET_USER="${SUPERSET_USER:-admin}"
 export SUPERSET_PASSWORD="${SUPERSET_PASSWORD:-PsSuperset#2026xK9!}"
 python3 scripts/setup-superset-planificacion.py
 
-cat <<'EOF'
+cat <<EOF
 
 ══════════════════════════════════════════════════════════════
 ✅ Superset listo
 ══════════════════════════════════════════════════════════════
-URL:       http://192.168.36.100:8088
-Dashboard: http://192.168.36.100:8088/superset/dashboard/planificacion-ps-analytics/
+Público:   https://apps.powersolution.es${APP_ROOT}/
+LAN:       http://192.168.36.100:8088${APP_ROOT}/
+Dashboard: https://apps.powersolution.es${APP_ROOT}/superset/dashboard/planificacion-ps-analytics/
 Usuario:   admin
 
 Fuente de datos:
   scripts/sql/bi_dashboard_planificacion_views.sql
 
 Regenerar dashboard:
-  python3 scripts/setup-superset-planificacion.py
+  SUPERSET_URL=http://192.168.36.100:8088${APP_ROOT} python3 scripts/setup-superset-planificacion.py
 ══════════════════════════════════════════════════════════════
 EOF

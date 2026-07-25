@@ -1,0 +1,65 @@
+---
+alwaysApply: true
+description: Obligatorio pull UI Superset antes de regenerar dashboard Resumen
+---
+
+# Superset Dashboard — Pull UI antes de regenerar (OBLIGATORIO)
+
+## Principio
+
+La **fuente de verdad del dashboard** es el código:
+
+- `scripts/setup-superset-planificacion.py`
+- `scripts/sql/bi_dashboard_planificacion_views.sql`
+
+Los cambios hechos **a mano en la UI** de Superset se **pisan** al regenerar.
+Por eso, **antes** de tocar el setup o regenerar en prod, el agente **debe** traer el estado UI.
+
+## Flujo obligatorio del agente
+
+```bash
+# 1) SIEMPRE primero — snapshot UI → exports/superset-dashboard/latest/
+SUPERSET_URL=http://192.168.36.100:8088 \
+  python3 scripts/pull-superset-dashboard.py
+
+# 2) Si el pull lista divergencias vs previous → AVISAR al usuario
+#    Incorporar al script lo que quiera conservar, o confirmar que se pisa.
+
+# 3) Solo entonces regenerar
+SKIP_APPLY_BI_VIEWS=1 SUPERSET_URL=http://192.168.36.100:8088 \
+  python3 scripts/setup-superset-planificacion.py
+```
+
+El propio `setup-superset-planificacion.py` invoca el pull en el paso 0.
+**No uses `SKIP_SUPERSET_PULL=1`** salvo petición explícita del usuario.
+
+## Triggers (ejecutar pull / leer esta regla)
+
+- regenerar dashboard, setup-superset, planificacion-ps-analytics
+- editar charts / layout / filtros nativos en Superset
+- "UI Superset", "cambié el dashboard", Facturación por Probabilidad, Resumen mensual
+
+## Docs
+
+| Doc | Contenido |
+|-----|-----------|
+| `exports/superset-dashboard/README.md` | Uso pull / variables / carpetas |
+| `docs/FILTROS_DASHBOARD_PLANIFICACION.md` | Filtros + regeneración |
+| `README.md` (raíz) | Tabla de comandos |
+| `.cursor/DOCUMENTATION_INDEX.md` § Analytics | Índice |
+
+## Prohibido
+
+- Regenerar el dashboard **sin** pull previo (ni vía setup ni a mano).
+- Asumir que la UI está vacía / igual al script.
+- Commitear `exports/superset-dashboard/latest/` o `previous/` (están en `.gitignore`).
+
+## Variables
+
+| Variable | Efecto |
+|----------|--------|
+| `SKIP_SUPERSET_PULL=1` | Omite pull (solo con OK del usuario) |
+| `STRICT_UI_SYNC=1` | Abortar regeneración si UI ≠ previous |
+| `SKIP_APPLY_BI_VIEWS=1` | Omite apply SQL (Mac sin Docker local) |
+
+**Última actualización:** 2026-07-25

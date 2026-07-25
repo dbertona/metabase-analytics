@@ -24,8 +24,9 @@ cp env.example .env
 ./scripts/start.sh
 ```
 
-- **URL:** http://192.168.36.100:8088
-- **Dashboard:** http://192.168.36.100:8088/superset/dashboard/planificacion-ps-analytics/
+- **URL pública:** https://apps.powersolution.es/analytics/
+- **URL LAN:** http://192.168.36.100:8088/analytics/
+- **Dashboard Resumen:** https://apps.powersolution.es/analytics/superset/dashboard/planificacion-ps-analytics/
 - **Usuario:** `admin`
 
 ## Gestión
@@ -36,7 +37,14 @@ cp env.example .env
 | Parar | `./scripts/stop.sh` |
 | Backup | `./scripts/backup.sh` |
 | Logs | `docker compose logs -f superset` |
-| Regenerar dashboard | `python3 scripts/setup-superset-planificacion.py` |
+| **Pull UI → snapshot** | `SUPERSET_URL=http://192.168.36.100:8088/analytics python3 scripts/pull-superset-dashboard.py` |
+| Regenerar dashboard | `SUPERSET_URL=http://192.168.36.100:8088/analytics python3 scripts/setup-superset-planificacion.py` (hace pull UI antes) |
+
+**Importante:** cambios hechos a mano en la UI de Superset se **pisan** al regenerar.
+Antes de regenerar, el setup hace **pull** a `exports/superset-dashboard/latest/` y avisa si hay
+divergencia vs el snapshot previous. Ver [`exports/superset-dashboard/README.md`](exports/superset-dashboard/README.md)
+y la regla Cursor [`.cursor/rules/superset-dashboard-ui-sync.mdc`](.cursor/rules/superset-dashboard-ui-sync.mdc)
+(`alwaysApply: true` — obligatorio para cualquier agente).
 
 ## Estructura
 
@@ -47,7 +55,9 @@ cp env.example .env
 │   ├── start.sh                # Arranque + vistas BI + dashboard
 │   ├── apply-bi-views.sh       # Vistas SQL en PostgreSQL
 │   ├── setup-superset-planificacion.py
+│   ├── pull-superset-dashboard.py   # Trae estado UI antes de regenerar
 │   └── sql/bi_dashboard_planificacion_views.sql
+├── exports/superset-dashboard/      # Snapshots UI (latest/previous gitignored)
 └── data/superset-home/         # Metadatos Superset (local)
 ```
 
@@ -61,11 +71,12 @@ Superset consulta vistas `bi_v_*` en PostgreSQL PS Analytics:
 
 Fuente única: `scripts/sql/bi_dashboard_planificacion_views.sql`
 
-## Dashboard Planificación PS Analytics
+## Dashboard Seguimiento Económico — Resumen (Fase 3)
 
-Réplica del informe Power BI — Objetivos Anuales y Planificación Actual.
+Réplica del panel **Resumen** de Power BI (slug estable `planificacion-ps-analytics`).
 
-- 8 tarjetas KPI (Facturación, Margen, Crecimiento, Beneficio × 2 secciones)
+- 8 tarjetas KPI (Objetivos Anuales + Planificación Actual)
+- Tabla **Resumen mensual** agregada: AñoMes | Facturación | Coste | Margen % (filtro Tipo P/R)
 - Filtros: Año, Empresas, Departamentos, Tipo P/R
 - Gráficos de evolución mensual y facturación por probabilidad
 
@@ -74,8 +85,8 @@ Réplica del informe Power BI — Objetivos Anuales y Planificación Actual.
 
 **Datos:**
 - Objetivos → `bc_objectives_by_department`
-- Planificación (P/R híbrido) → vistas `v_se_*` / `bi_v_planificacion_kpi`
-- Real (R) → `bc_job_ledger_entry_month`
+- Planificación Actual (P+R, paridad Resumen PBI) → `bi_v_planificacion_kpi`
+- Tabla Resumen: sin Tipo = P+R; filtro Tipo P|R → `bi_v_evolucion_mensual`
 
 ## Seguimiento Económico (PBI)
 

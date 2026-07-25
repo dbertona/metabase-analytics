@@ -2,6 +2,212 @@
 
 ## [Unreleased]
 
+## [2026-07-25] — Merge `feat/dashboard-resumen-fase3`
+
+Cierre de rama: dashboard Resumen (tabs KPI/tablas + Gráficos), tabla Proyectos,
+totales al pie, publicación `SUPERSET_APP_ROOT=/analytics` y sync UI antes de regenerar.
+Detalle en entradas `2026-07-25*` de este changelog.
+
+## [2026-07-25ad] — Publicación /analytics/ (apps.powersolution.es)
+
+### Changed
+
+- `SUPERSET_APP_ROOT=/analytics` + `ENABLE_PROXY_FIX` para path público.
+- Scripts/README usan `…:8088/analytics` (NPM ya apunta a VM 100).
+
+## [2026-07-25ac] — Pestaña Gráficos
+
+### Changed
+
+- Dashboard con tabs: **Resumen** (KPI + tablas) y **Gráficos** (Evolución + Margen).
+- Filtros nativos con `tabsInScope` en ambas pestañas.
+- Alturas tablas 45 (UI).
+
+## [2026-07-25ab] — Proyectos al lado de Resumen + sin page size
+
+### Changed
+
+- Proyectos: sin `page_length` (oculta “Show entries”).
+- Layout: Resumen mensual (4) | Proyectos (8) en la misma fila; altura 46.
+
+## [2026-07-25aa] — Resumen mensual sin selector de page size
+
+### Changed
+
+- Resumen mensual: sin `page_length` (oculta “Show entries per page”).
+- Altura Resumen mensual 46 (UI) + CSS ocultando controles de paginación.
+
+## [2026-07-25z] — Totales al pie en Resumen mensual
+
+### Changed
+
+- Resumen mensual: `query_mode=aggregate`, `page_length=25`, altura 36.
+- CSS sticky de fila Total también en Resumen mensual.
+
+## [2026-07-25y] — Totales al pie en tabla Proyectos
+
+### Changed
+
+- Proyectos: `show_totals` + paginación cliente (`page_length=25`); altura 74.
+- CSS sticky en fila summary/Total.
+
+## [2026-07-25x] — Proyectos: excluir filas 0/0
+
+### Changed
+
+- `bi_v_resumen_proyectos`: `HAVING` facturación o coste ≠ 0 (filtro PBI «Filtro no es 0»).
+
+## [2026-07-25w] — Tabla Proyectos (filtros PBI Operational + estado)
+
+### Added
+
+- Vista **`bi_v_resumen_proyectos`**: `tipo_proyecto = Operational` y
+  `estado IN (Completed, Open, Planning)` — paridad Total Coste **4.350.042 €** / Margen **31,76 %**.
+- Chart tabla **Proyectos** en dashboard Resumen.
+
+## [2026-07-25v] — Cabeceras HEADER nativo (sin scroll markdown)
+
+### Changed
+
+- Obj/Plan: `MARKDOWN` → componente **`HEADER`** (el scroll venía del renderer markdown).
+
+## [2026-07-25u] — Sync UI (KPI h=10) + cabeceras sin scroll
+
+### Changed
+
+- Incorpora alturas UI: KPI **10**, Probabilidad **36**.
+- Cabeceras markdown altura **4** + `overflow-y: hidden` agresivo (scroll volvía con h=2).
+
+## [2026-07-25t] — Centrado vertical real en cabeceras y KPI
+
+### Changed
+
+- Markdown y big_number: cadena flex `height:100%` + `justify-content/align-items: center`
+  (antes los KPI tenían `align-items: flex-start`).
+
+## [2026-07-25s] — Cabeceras Obj/Plan centradas sin scroll
+
+### Changed
+
+- CSS markdown: flex centrado vertical + `overflow: hidden` (Objetivos / Planificación).
+
+## [2026-07-25r] — KPI sin icono filtro ni menú ⋮
+
+### Changed
+
+- CSS: oculta `slice_header` completo en tarjetas big_number (filtro + ⋮).
+
+## [2026-07-25q] — Sin scrollbar en tarjetas KPI
+
+### Changed
+
+- CSS: `overflow: hidden` + ocultar scrollbar en big_number KPI.
+
+## [2026-07-25p] — Etiqueta KPI Crecimiento → Δ %
+
+### Changed
+
+- Subheader / override de Obj·Plan Crecimiento: **Δ %**.
+
+## [2026-07-25o] — Símbolo % en Margen y Crecimiento
+
+### Changed
+
+- KPIs Margen/Crecimiento: formato `.2%` (ratio sin `*100`) → p. ej. `17.43%`.
+
+## [2026-07-25n] — Pull UI (altura KPI 15) + fuente −5%
+
+### Changed
+
+- Incorpora altura KPI **15** y Probabilidad **34** desde edits UI.
+- Fuente KPI −5%: euros **22px**, % **16px**, etiquetas **15px**.
+
+## [2026-07-25m] — KPI font-size +30%
+
+### Changed
+
+- Valores euros **18→23px**, % **13→17px**, etiquetas **12→16px** (CSS dashboard).
+
+## [2026-07-25l] — Facturación/Beneficio ancho 2 (importes grandes)
+
+### Changed
+
+- COLUMN KPIs **6** + Probabilidad **6**: euros **2**, Margen/Crecimiento **1**.
+
+## [2026-07-25k] — KPIs columna ancho 4 (antes 6)
+
+### Changed
+
+- COLUMN KPIs **4** (1 por tarjeta) + Probabilidad **8**.
+
+## [2026-07-25j] — KPIs más estrechos (ancho 6; no altura)
+
+### Changed
+
+- COLUMN KPIs **6** + Probabilidad **6** (antes 7+5).
+- Anchos por contenido: euros **2**, Margen/Crecimiento **1** (antes Crecimiento=2).
+- Altura de tarjetas KPI sin cambios.
+
+## [2026-07-25i] — Layout: KPIs en COLUMN (7) + Probabilidad (5)
+
+### Changed
+
+- **`build_layout`:** Obj + Plan agrupados en `COLUMN-KPIS` (ancho 7); **Facturación por
+  Probabilidad** a la derecha (ancho 5, height 32 ≈ alto de las dos bandas).
+- Resumen mensual pasa a fila completa (12) debajo.
+
+## [2026-07-25h] — Docs/regla: pull UI obligatorio para agentes
+
+### Added
+
+- **`.cursor/rules/superset-dashboard-ui-sync.mdc`** (`alwaysApply: true`): todo agente debe
+  hacer pull UI antes de regenerar el dashboard Resumen.
+- Triggers / índice / `DOCUMENTATION_INDEX` / `FILTROS` / `exports/.../README` alineados.
+
+## [2026-07-25g] — Pull UI Superset antes de regenerar dashboard
+
+### Added
+
+- **`scripts/pull-superset-dashboard.py`:** descarga dashboard Resumen + charts a
+  `exports/superset-dashboard/latest/` y compara con `previous/`.
+- **`setup-superset-planificacion.py`:** paso 0 = pull UI automático (aviso si hay edits
+  manuales). `SKIP_SUPERSET_PULL=1` / `STRICT_UI_SYNC=1`.
+
+## [2026-07-25f] — Facturación por Probabilidad = P+R (0→100 como PBI)
+
+### Fixed
+
+- **`bi_v_facturacion_probabilidad`:** suma P+R; `probability=0` se muestra como **100** (regla PBI).
+  Bucket 100% PSI 2026 ≈ **5.707 mil €**.
+- Chart Superset: `dist_bar` con valores en barra; entra en filtros Año/Empresa/Dept.
+
+## [2026-07-25e] — Fix KPI Planificación Actual = P + R (paridad PBI)
+
+### Fixed
+
+- **`bi_v_planificacion_kpi`:** Planificación Actual y total Resumen PBI = **suma tipo P + tipo R**
+  (PSI 2026: 3.685.687 + 2.688.861 = **6.374.548 €**). Ni híbrido por mes cerrado (~6,29 M)
+  ni solo tipo P (3,69 M). Crecimiento vs Ingresos del año anterior (~18,07 %).
+- Default filtro Empresas = PSI. Tabla Resumen: sin Tipo = P+R; con Tipo P|R = desglose.
+
+## [2026-07-25d] — Fase 3: Dashboard Superset «Seguimiento Económico — Resumen»
+
+### Changed
+
+- **`scripts/setup-superset-planificacion.py`:**
+  - Título dashboard → `Seguimiento Económico — Resumen` (slug `planificacion-ps-analytics` sin cambio).
+  - Chart **Resumen mensual**: tabla agregada `ano_mes` + SUM Facturación/Coste + Margen % + totales (estilo PBI).
+  - Persistencia de filtros/CSS y UUID de charts vía API (sin `docker exec`; regenerable desde Mac).
+  - `SKIP_APPLY_BI_VIEWS=1` para omitir apply SQL cuando no hay cambios de vistas.
+- Docs: README, filtros, fases seguimiento-económico → Fase 3 ✅.
+
+### Validado (PSI 2026, live)
+
+| Tipo | Facturación | Coste | vs PBI |
+|------|-------------|-------|--------|
+| P | 3.685.687 | 3.838.008 | exacto |
+| R | 2.688.861 | 2.513.515 | Coste +582 € lag |
+
 ## [2026-07-25c] — Docs: alinear KPIs PBI con estado final CHANGELOG
 
 ### Changed

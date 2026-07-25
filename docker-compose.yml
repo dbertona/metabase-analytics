@@ -13,11 +13,14 @@ services:
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-PsSupersetSecretKey2026ChangeMe}
       SUPERSET_LOAD_EXAMPLES: "no"
       SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-PsSuperset#2026xK9!}
+      # Path público: https://apps.powersolution.es/analytics/
+      SUPERSET_APP_ROOT: ${SUPERSET_APP_ROOT:-/analytics}
     volumes:
       - ./config/superset_config.py:/app/pythonpath/superset_config.py:ro
       - ./data/superset-home:/app/superset_home
     command: >
       /bin/sh -c "
+      export FLASK_APP=\"superset.app:create_app(superset_app_root='$${SUPERSET_APP_ROOT:-/analytics}')\" &&
       superset db upgrade &&
       superset fab create-admin --username admin --firstname Admin --lastname PowerSolution --email admin@powersolution.es --password \"$$SUPERSET_ADMIN_PASSWORD\" || true &&
       superset init &&

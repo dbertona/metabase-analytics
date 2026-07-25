@@ -18,6 +18,10 @@ backups/
 *.backup
 *.sql.gz
 
+# Snapshots UI Superset (pull-superset-dashboard.py)
+exports/superset-dashboard/latest/
+exports/superset-dashboard/previous/
+
 # OS generated files
 .DS_Store
 .DS_Store?
