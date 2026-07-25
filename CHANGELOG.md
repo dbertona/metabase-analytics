@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-25h] — Docs/regla: pull UI obligatorio para agentes
+
+### Added
+
+- **`.cursor/rules/superset-dashboard-ui-sync.mdc`** (`alwaysApply: true`): todo agente debe
+  hacer pull UI antes de regenerar el dashboard Resumen.
+- Triggers / índice / `DOCUMENTATION_INDEX` / `FILTROS` / `exports/.../README` alineados.
+
 ## [2026-07-25g] — Pull UI Superset antes de regenerar dashboard
 
 ### Added

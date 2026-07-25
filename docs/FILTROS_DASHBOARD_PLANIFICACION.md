@@ -3,9 +3,26 @@
 > Repo canónico: **`superset-analytics`**  
 > Título UI: **Seguimiento Económico — Resumen** (slug estable `planificacion-ps-analytics`)  
 > Regenerar: `SUPERSET_URL=http://192.168.36.100:8088 python3 scripts/setup-superset-planificacion.py`  
+> (el setup hace **pull UI automático** primero — ver `.cursor/rules/superset-dashboard-ui-sync.mdc`)  
+> Pull solo: `python3 scripts/pull-superset-dashboard.py` → `exports/superset-dashboard/latest/`  
 > (desde Mac sin Docker local: `SKIP_APPLY_BI_VIEWS=1` si las vistas BI ya están aplicadas)  
 > Vistas: `scripts/sql/bi_dashboard_planificacion_views.sql`  
 > URL: http://192.168.36.100:8088/superset/dashboard/planificacion-ps-analytics/
+
+## ⚠️ Edits en la UI vs regeneración
+
+Cambios hechos a mano en Superset (mover charts, colores, métricas, filtros) **se pisan** al
+ejecutar `setup-superset-planificacion.py`.
+
+**Obligatorio para agentes:**
+
+1. `python3 scripts/pull-superset-dashboard.py` (o dejar que el setup lo haga en paso 0)
+2. Si hay divergencias vs `previous/` → avisar al usuario antes de regenerar
+3. Incorporar al script lo que se quiera conservar
+
+Detalle: [`exports/superset-dashboard/README.md`](../exports/superset-dashboard/README.md) · regla Cursor `superset-dashboard-ui-sync.mdc`.
+
+---
 
 ## Diseño (Superset 6.1.0)
 

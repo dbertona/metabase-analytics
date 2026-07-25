@@ -2,6 +2,10 @@
 
 Snapshots generados por `scripts/pull-superset-dashboard.py`.
 
+> **Agentes (obligatorio):** antes de regenerar el dashboard con `setup-superset-planificacion.py`,
+> ejecutar este pull (o dejar que el setup lo haga en el paso 0).  
+> Regla Cursor: `.cursor/rules/superset-dashboard-ui-sync.mdc` (`alwaysApply: true`).
+
 ## Uso
 
 ```bash
@@ -20,7 +24,7 @@ SUPERSET_URL=http://192.168.36.100:8088 python3 scripts/setup-superset-planifica
 
 | Variable | Efecto |
 |----------|--------|
-| `SKIP_SUPERSET_PULL=1` | No hace pull al regenerar |
+| `SKIP_SUPERSET_PULL=1` | No hace pull al regenerar — **solo con OK explícito del usuario** |
 | `STRICT_UI_SYNC=1` | Aborta regeneración si UI ≠ previous |
 
 ## Carpetas
@@ -32,3 +36,6 @@ SUPERSET_URL=http://192.168.36.100:8088 python3 scripts/setup-superset-planifica
 
 `latest/` y `previous/` están en `.gitignore` (estado runtime, no fuente de verdad).
 La fuente de verdad del dashboard sigue siendo `scripts/setup-superset-planificacion.py`.
+
+Si el pull detecta divergencias y el usuario quiere **conservar** cambios de la UI, hay que
+portarlos al script **antes** de regenerar; si no, se pisan.

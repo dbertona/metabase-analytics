@@ -41,7 +41,9 @@ cp env.example .env
 
 **Importante:** cambios hechos a mano en la UI de Superset se **pisan** al regenerar.
 Antes de regenerar, el setup hace **pull** a `exports/superset-dashboard/latest/` y avisa si hay
-divergencia vs el snapshot previous. Ver [`exports/superset-dashboard/README.md`](exports/superset-dashboard/README.md).
+divergencia vs el snapshot previous. Ver [`exports/superset-dashboard/README.md`](exports/superset-dashboard/README.md)
+y la regla Cursor [`.cursor/rules/superset-dashboard-ui-sync.mdc`](.cursor/rules/superset-dashboard-ui-sync.mdc)
+(`alwaysApply: true` — obligatorio para cualquier agente).
 
 ## Estructura
 

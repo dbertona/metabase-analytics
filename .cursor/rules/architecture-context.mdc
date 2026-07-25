@@ -13,7 +13,8 @@ NO contiene código de la app Timesheet/Gastos (eso está en `power-solution-app
 
 **Doc maestra:** `docs/GUIA_COMPLETA_ANALYTICS.md`  
 **Troubleshooting P/R:** `docs/shared/analytics/ANALYTICS_FACTURACION_PBI_ALIGNMENT.md`  
-**Workflow 004 (sync):** `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md`
+**Workflow 004 (sync):** `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md`  
+**Dashboard UI sync:** `.cursor/rules/superset-dashboard-ui-sync.mdc` ⭐ pull antes de regenerar
 
 ---
 
@@ -109,9 +110,13 @@ superset-analytics/
     update-n8n-workflow-004-api.sh      ← aplica vía API n8n
     download-workflow-004.sh            ← descarga estado actual de prod
     apply-bi-views.sh                   ← aplica vistas SQL en analytics DB
+    setup-superset-planificacion.py     ← regenera dashboard Resumen (fuente de verdad UI)
+    pull-superset-dashboard.py          ← snapshot UI ANTES de regenerar (obligatorio)
+  exports/superset-dashboard/           ← latest/previous (gitignored) + README
   docker/                               ← config Superset Docker
   docs/
     GUIA_COMPLETA_ANALYTICS.md          ← referencia principal
+    FILTROS_DASHBOARD_PLANIFICACION.md  ← filtros + aviso regeneración
     ACTUALIZAR_WORKFLOW_004.md          ← cómo actualizar el sync
     seguimiento-economico/README.md     ← especificación de dashboards
     shared/                             ← submódulo power-solution-docs
@@ -119,3 +124,6 @@ superset-analytics/
         004_SYNC_BC_ANALYTICS.md        ← arquitectura workflow 004
         ANALYTICS_FACTURACION_PBI_ALIGNMENT.md ← troubleshooting P/R
 ```
+
+**Regla agentes — dashboard:** `.cursor/rules/superset-dashboard-ui-sync.mdc`  
+Pull UI obligatorio antes de `setup-superset-planificacion.py` (edits en UI se pisan al regenerar).
