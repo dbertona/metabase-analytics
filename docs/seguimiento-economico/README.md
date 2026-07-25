@@ -35,33 +35,30 @@ Workflow: [d1f7647e114a486e](https://apps.powersolution.es/n8n/workflow/d1f7647e
 
 ## Paridad KPI PSI 2026
 
-### Facturación (validado 2026-07-22) — fuente `v_se_facturacion`
+> **Estado:** ✅ Paridad KPI Resumen (2026-07-24b; revalidado live 2026-07-25).  
+> Detalle: [ANALYTICS_FACTURACION_PBI_ALIGNMENT.md](../shared/analytics/ANALYTICS_FACTURACION_PBI_ALIGNMENT.md)
 
-| Métrica | Power BI | Analytics |
-|---------|----------|-----------|
-| Real (tipo R) | 2.604.816 € | 2.604.816 € ✅ |
-| Plan (tipo P) | 3.712.417 € | 3.712.450 € ✅ |
+### Totales (panel Resumen PBI vs analytics)
 
-### Coste — fuente `v_se_coste` (capa dedicada; no tocar facturado)
-
-| Métrica | Power BI | Analytics (baseline) |
-|---------|----------|----------------------|
-| Coste P | 3.788.848 € | 3.953.354 € (gap ~+164k) |
-| Coste R | 2.271.735 € | 1.497.530 € (gap ~−774k) |
+| Métrica | Fuente | Power BI | Analytics | Gap |
+|---------|--------|----------|-----------|-----|
+| Factura P | `v_se_facturacion` | 3.685.687 € | 3.685.687 € | 0 ✅ |
+| Coste P | `v_se_coste` | 3.838.008 € | 3.838.008 € | 0 ✅ |
+| Factura R | `v_se_facturacion` | 2.688.861 € | 2.688.861 € | 0 ✅ |
+| Coste R | `v_se_coste` | 2.512.933 € | 2.513.515 € | +582 € (lag réplica) ✅ |
 
 ```sql
 -- Facturación canónica
 SELECT tipo, ROUND(SUM(facturado)::numeric, 0)
 FROM v_se_facturacion
-WHERE empresa = 'Power Solution Iberia SL' AND year = 2026
+WHERE empresa ILIKE '%Iberia%' AND year = 2026
 GROUP BY tipo;
 
 -- Coste (capa separada)
-SELECT tipo, fuente, ROUND(SUM(coste)::numeric, 2)
+SELECT tipo, ROUND(SUM(coste)::numeric, 0)
 FROM v_se_coste
 WHERE empresa ILIKE '%Iberia%' AND year = 2026
-GROUP BY tipo, fuente
-ORDER BY tipo, fuente;
+GROUP BY tipo;
 ```
 
 ## Fases del proyecto
@@ -69,7 +66,7 @@ ORDER BY tipo, fuente;
 | Fase | Estado | Entregable |
 |------|--------|------------|
 | **1** | ✅ | Views `v_se_*` + spec DAX/PQ |
-| **2** | ✅ | Sync 004 Fase 2 + paridad KPI Resumen |
+| **2** | ✅ | Sync 004 + paridad KPI Resumen (P/R factura y coste) |
 | **3** | Pendiente | Dashboard Superset «Resumen» |
 | **4** | Pendiente | Resto de páginas PBI |
 

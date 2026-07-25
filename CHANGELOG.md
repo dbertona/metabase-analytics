@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-25c] — Docs: alinear KPIs PBI con estado final CHANGELOG
+
+### Changed
+
+- **`ANALYTICS_FACTURACION_PBI_ALIGNMENT.md`:** §7 y §9 actualizados — paridad exacta Factura/Coste P y Factura R; Coste R +582 € (lag). §9 marca el gap ~79k / hipótesis blank-lineType como archivo histórico.
+- **`004_SYNC_BC_ANALYTICS.md`:** tabla de alineación PBI con targets 3.685.687 / 3.838.008 / 2.688.861 / 2.512.933.
+- **`docs/seguimiento-economico/README.md`:** misma tabla de paridad; fase 2 marcada como paridad KPI Resumen cerrada.
+
 ## [2026-07-25b] — merge-safe.sh para cierre de rama
 
 ### Added
