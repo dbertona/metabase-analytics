@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-25u] — Sync UI (KPI h=10) + cabeceras sin scroll
+
+### Changed
+
+- Incorpora alturas UI: KPI **10**, Probabilidad **36**.
+- Cabeceras markdown altura **4** + `overflow-y: hidden` agresivo (scroll volvía con h=2).
+
 ## [2026-07-25t] — Centrado vertical real en cabeceras y KPI
 
 ### Changed

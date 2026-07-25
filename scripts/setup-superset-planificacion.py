@@ -434,9 +434,19 @@ def persist_dashboard_config(
         "  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;\n"
         "}\n"
         "/* Cabeceras de seccion (markdown): centrado vertical + sin scroll */\n"
-        ".dashboard-component-chart-holder:has(.dashboard-markdown) {\n"
+        ".dashboard-component-chart-holder:has(.dashboard-markdown),\n"
+        ".dashboard-component-chart-holder:has(.dashboard-markdown) .chart-slice,\n"
+        ".dashboard-component-chart-holder:has(.dashboard-markdown) .slice_container,\n"
+        ".dashboard-component-chart-holder:has(.dashboard-markdown) .dashboard-markdown,\n"
+        ".dashboard-component-chart-holder:has(.dashboard-markdown) .markdown-content,\n"
+        ".dashboard-component-chart-holder:has(.dashboard-markdown) .renderedMarkdown {\n"
         "  overflow: hidden !important;\n"
+        "  overflow-x: hidden !important;\n"
+        "  overflow-y: hidden !important;\n"
         "  scrollbar-width: none !important;\n"
+        "  -ms-overflow-style: none !important;\n"
+        "}\n"
+        ".dashboard-component-chart-holder:has(.dashboard-markdown) {\n"
         "  display: flex !important;\n"
         "  align-items: center !important;\n"
         "  justify-content: flex-start !important;\n"
@@ -445,44 +455,34 @@ def persist_dashboard_config(
         "}\n"
         ".dashboard-component-chart-holder:has(.dashboard-markdown) .chart-slice,\n"
         ".dashboard-component-chart-holder:has(.dashboard-markdown) .slice_container,\n"
-        ".dashboard-component-chart-holder:has(.dashboard-markdown) .dashboard-markdown {\n"
-        "  overflow: hidden !important;\n"
-        "  scrollbar-width: none !important;\n"
+        ".dashboard-component-chart-holder:has(.dashboard-markdown) .dashboard-markdown,\n"
+        ".dashboard-component-chart-holder:has(.dashboard-markdown) .markdown-content,\n"
+        ".dashboard-component-chart-holder:has(.dashboard-markdown) .renderedMarkdown {\n"
         "  display: flex !important;\n"
         "  align-items: center !important;\n"
         "  justify-content: flex-start !important;\n"
         "  height: 100% !important;\n"
         "  width: 100% !important;\n"
+        "  max-height: 100% !important;\n"
         "  margin: 0 !important;\n"
         "  padding: 0 !important;\n"
         "  box-sizing: border-box !important;\n"
         "}\n"
-        ".dashboard-component-chart-holder:has(.dashboard-markdown)::-webkit-scrollbar,\n"
-        ".dashboard-markdown::-webkit-scrollbar {\n"
+        ".dashboard-component-chart-holder:has(.dashboard-markdown) *::-webkit-scrollbar {\n"
         "  width: 0 !important; height: 0 !important; display: none !important;\n"
         "}\n"
         ".dashboard-component-chart-holder:has(.dashboard-markdown) .slice_header {\n"
         "  display: none !important;\n"
         "  height: 0 !important;\n"
         "}\n"
-        ".dashboard-markdown .markdown-content,\n"
-        ".dashboard-markdown .renderedMarkdown {\n"
-        "  display: flex !important;\n"
-        "  align-items: center !important;\n"
-        "  height: 100% !important;\n"
-        "  width: 100% !important;\n"
-        "  margin: 0 !important;\n"
-        "  padding: 0 !important;\n"
-        "  overflow: hidden !important;\n"
-        "}\n"
         ".dashboard-markdown h1,\n"
         ".dashboard-markdown h2,\n"
         ".dashboard-markdown h3,\n"
         ".dashboard-markdown p {\n"
         "  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;\n"
-        "  font-size: 18px !important; font-weight: 700 !important; color: #143b41;\n"
+        "  font-size: 16px !important; font-weight: 700 !important; color: #143b41;\n"
         "  margin: 0 !important; padding: 0 !important;\n"
-        "  line-height: 1.2 !important;\n"
+        "  line-height: 1.15 !important;\n"
         "}\n"
         "/* Tarjetas KPI: centrado vertical + sin scroll */\n"
         ".dashboard-component-chart-holder:has(.superset-legacy-chart-big-number) {\n"
@@ -705,7 +705,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "meta": {
                 "code": "## Objetivos Anuales",
                 "width": kpi_col_width,
-                "height": 2,
+                "height": 4,
             },
         },
         "HEADER-PLAN": {
@@ -714,7 +714,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "meta": {
                 "code": "## Planificación Actual",
                 "width": kpi_col_width,
-                "height": 2,
+                "height": 4,
             },
         },
         "ROW-OBJ": {
@@ -743,11 +743,11 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         },
     }
     sizes = {
-        # Altura KPI desde UI (usuario estiró a 15); Prob ≈ headers(4)+KPIs(30)=34
-        "obj": (1, 15),
-        "plan": (1, 15),
+        # Alturas desde UI (usuario): KPI 10, Probabilidad 36. Cabeceras 4 (evita scroll).
+        "obj": (1, 10),
+        "plan": (1, 10),
         "table": (12, 32),
-        "prob": (6, 34),
+        "prob": (6, 36),
         "chart": (6, 36),
     }
     # Importes grandes (euros) más anchos; % compactos
