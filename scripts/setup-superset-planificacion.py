@@ -285,6 +285,7 @@ def resumen_mensual_params() -> dict[str, Any]:
     """Tabla PBI Resumen: AñoMes | Facturación | Coste | Margen % (agregada)."""
     return {
         "adhoc_filters": dim_adhoc_filters("tipo"),
+        "query_mode": "aggregate",
         "groupby": ["ano_mes"],
         "metrics": [
             metric_sum("facturacion", "Facturación"),
@@ -297,7 +298,9 @@ def resumen_mensual_params() -> dict[str, Any]:
         "percent_metrics": [],
         "order_by_cols": ['["ano_mes", true]'],
         "row_limit": 1000,
+        # Paginación cliente: con server_pagination el pie de totales a veces no se ve
         "server_pagination": False,
+        "page_length": 25,
         "show_totals": True,
         "include_search": False,
         "show_cell_bars": False,
@@ -601,10 +604,13 @@ def persist_dashboard_config(
         "[data-test-chart-name*='Resumen mensual'] .slice_container {\n"
         "  padding: 0 !important;\n"
         "}\n"
-        "/* Proyectos: fila Total (summary) siempre visible al pie */\n"
+        "/* Tablas: fila Total (summary) siempre visible al pie */\n"
         "[data-test-chart-name*='Proyectos'] tfoot,\n"
         "[data-test-chart-name*='Proyectos'] .dt-totals,\n"
-        "[data-test-chart-name='Proyectos'] tfoot {\n"
+        "[data-test-chart-name='Proyectos'] tfoot,\n"
+        "[data-test-chart-name*='Resumen mensual'] tfoot,\n"
+        "[data-test-chart-name*='Resumen mensual'] .dt-totals,\n"
+        "[data-test-chart-name='Resumen mensual'] tfoot {\n"
         "  display: table-footer-group !important;\n"
         "  position: sticky !important;\n"
         "  bottom: 0 !important;\n"
@@ -813,7 +819,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         # Alturas desde UI (usuario): KPI 10, Probabilidad 36. Cabeceras 4 (evita scroll).
         "obj": (1, 10),
         "plan": (1, 10),
-        "table": (4, 32),  # UI: Resumen mensual width 4
+        "table": (4, 36),  # Resumen mensual: altura para ver pie Total
         "projects": (12, 74),  # UI: altura estirada para ver pie Total
         "prob": (6, 36),
         "chart": (6, 36),

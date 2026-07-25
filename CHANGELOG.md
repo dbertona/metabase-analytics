@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-25z] — Totales al pie en Resumen mensual
+
+### Changed
+
+- Resumen mensual: `query_mode=aggregate`, `page_length=25`, altura 36.
+- CSS sticky de fila Total también en Resumen mensual.
+
 ## [2026-07-25y] — Totales al pie en tabla Proyectos
 
 ### Changed
