@@ -342,9 +342,8 @@ def resumen_proyectos_params() -> dict[str, Any]:
         "percent_metrics": [],
         "order_by_cols": ['["Facturación", false]'],
         "row_limit": 5000,
-        # Paginación cliente: con server_pagination el pie de totales a veces no se ve
+        # Sin page_length: evita el selector "Show N entries per page"
         "server_pagination": False,
-        "page_length": 25,
         "show_totals": True,
         "include_search": True,
         "show_cell_bars": False,
@@ -352,7 +351,7 @@ def resumen_proyectos_params() -> dict[str, Any]:
         "align_pn": False,
         "table_timestamp_format": "smart_date",
         "column_config": {
-            "proyecto": {"columnWidth": 380},
+            "proyecto": {"columnWidth": 220},
             "Facturación": {
                 "d3NumberFormat": ",.0f",
                 "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
@@ -603,13 +602,19 @@ def persist_dashboard_config(
         "[data-test-chart-name*='Resumen mensual'] .slice_container {\n"
         "  padding: 0 !important;\n"
         "}\n"
-        "/* Resumen mensual: ocultar selector Show N entries per page */\n"
+        "/* Tablas: ocultar selector Show N entries per page */\n"
         "[data-test-chart-name*='Resumen mensual'] .dt-length,\n"
         "[data-test-chart-name*='Resumen mensual'] .dataTables_length,\n"
         "[data-test-chart-name*='Resumen mensual'] .ant-pagination,\n"
         "[data-test-chart-name*='Resumen mensual'] .pagination-container,\n"
         "[data-test-chart-name*='Resumen mensual'] select[aria-label*='page'],\n"
-        "[data-test-chart-name*='Resumen mensual'] .row-count-container {\n"
+        "[data-test-chart-name*='Resumen mensual'] .row-count-container,\n"
+        "[data-test-chart-name*='Proyectos'] .dt-length,\n"
+        "[data-test-chart-name*='Proyectos'] .dataTables_length,\n"
+        "[data-test-chart-name*='Proyectos'] .ant-pagination,\n"
+        "[data-test-chart-name*='Proyectos'] .pagination-container,\n"
+        "[data-test-chart-name*='Proyectos'] select[aria-label*='page'],\n"
+        "[data-test-chart-name*='Proyectos'] .row-count-container {\n"
         "  display: none !important;\n"
         "}\n"
         "/* Tablas: fila Total (summary) siempre visible al pie */\n"
@@ -725,7 +730,7 @@ def persist_dashboard_config(
 
 
 def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
-    """Layout: COLUMN KPIs (6) + Probabilidad (6); Resumen; Proyectos; Evolución."""
+    """Layout: COLUMN KPIs (6) + Probabilidad (6); Resumen|Proyectos; Evolución."""
     obj_keys = [c["key"] for c in charts if c["section"] == "obj"]
     plan_keys = [c["key"] for c in charts if c["section"] == "plan"]
     table_keys = [c["key"] for c in charts if c["section"] == "table"]
@@ -744,7 +749,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "type": "GRID",
             "id": "GRID_ID",
             "children": [
-                "ROW-KPI-BAND", "ROW-TABLES", "ROW-PROJECTS", "ROW-CHARTS",
+                "ROW-KPI-BAND", "ROW-TABLES", "ROW-CHARTS",
             ],
             "parents": ["ROOT_ID"],
         },
@@ -806,13 +811,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         },
         "ROW-TABLES": {
             "type": "ROW", "id": "ROW-TABLES",
-            "children": table_keys,
-            "parents": ["ROOT_ID", "GRID_ID"],
-            "meta": {"background": "BACKGROUND_TRANSPARENT"},
-        },
-        "ROW-PROJECTS": {
-            "type": "ROW", "id": "ROW-PROJECTS",
-            "children": projects_keys,
+            "children": table_keys + projects_keys,
             "parents": ["ROOT_ID", "GRID_ID"],
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
@@ -827,8 +826,8 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         # Alturas desde UI (usuario): KPI 10, Probabilidad 36. Cabeceras 4 (evita scroll).
         "obj": (1, 10),
         "plan": (1, 10),
-        "table": (4, 46),  # UI: usuario estiró Resumen mensual; pie Total visible
-        "projects": (12, 74),  # UI: altura estirada para ver pie Total
+        "table": (4, 46),  # Resumen mensual | Proyectos (misma fila)
+        "projects": (8, 46),  # al lado de Resumen (4+8=12)
         "prob": (6, 36),
         "chart": (6, 36),
     }
@@ -847,11 +846,10 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
                 "ROW-OBJ" if c["section"] == "obj" else "ROW-PLAN",
             ]
             w = kpi_widths.get(display_name, 1)
-        elif c["section"] == "table":
+        elif c["section"] in ("table", "projects"):
+            if c["section"] == "projects":
+                display_name = "Proyectos"
             parents = ["ROOT_ID", "GRID_ID", "ROW-TABLES"]
-        elif c["section"] == "projects":
-            display_name = "Proyectos"
-            parents = ["ROOT_ID", "GRID_ID", "ROW-PROJECTS"]
         else:
             parents = ["ROOT_ID", "GRID_ID", "ROW-CHARTS"]
         position[c["key"]] = {

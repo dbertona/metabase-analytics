@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-25ab] — Proyectos al lado de Resumen + sin page size
+
+### Changed
+
+- Proyectos: sin `page_length` (oculta “Show entries”).
+- Layout: Resumen mensual (4) | Proyectos (8) en la misma fila; altura 46.
+
 ## [2026-07-25aa] — Resumen mensual sin selector de page size
 
 ### Changed
