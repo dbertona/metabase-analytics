@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-25m] — KPI font-size +30%
+
+### Changed
+
+- Valores euros **18→23px**, % **13→17px**, etiquetas **12→16px** (CSS dashboard).
+
 ## [2026-07-25l] — Facturación/Beneficio ancho 2 (importes grandes)
 
 ### Changed
