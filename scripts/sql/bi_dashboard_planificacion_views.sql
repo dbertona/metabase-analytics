@@ -15,12 +15,12 @@ GROUP BY year, company_name;
 
 -- -----------------------------------------------------------------------------
 -- KPI detalle por empresa / año / departamento
--- Planificación Actual = solo tipo P (paridad panel Resumen PBI / v_se_kpi_cards).
--- NO usar híbrido P/R aquí: inflaba ~6,29 M€ vs 3,685,687 € (PSI 2026).
--- + real año anterior por departamento (filtro Departamento en Crecimiento)
+-- Planificación Actual (PBI Resumen) = tipo P + tipo R (suma).
+-- PSI 2026: 3.685.687 + 2.688.861 = 6.374.548 €. Ni híbrido ni solo P.
+-- + real año anterior (Ingresos) por departamento (Crecimiento %)
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE VIEW bi_v_planificacion_kpi AS
-WITH plan_tipo_p AS (
+WITH plan_actual AS (
     SELECT
         f.empresa,
         f.year,
@@ -29,7 +29,7 @@ WITH plan_tipo_p AS (
         SUM(f.coste) AS plan_coste,
         SUM(f.facturado - f.coste) AS plan_beneficio
     FROM v_se_facturacion f
-    WHERE f.tipo = 'P'
+    WHERE f.tipo IN ('P', 'R')
     GROUP BY f.empresa, f.year, f.departamento
 ),
 obj AS (
@@ -49,12 +49,13 @@ real_anterior_dept AS (
         departamento AS department_code,
         SUM(invoice) AS facturacion_real_anterior
     FROM bc_job_ledger_entry_month
+    WHERE concepto_analitico_descripcion = 'Ingresos'
     GROUP BY company_name, year + 1, departamento
 )
 SELECT
-    COALESCE(obj.empresa, plan_tipo_p.empresa) AS empresa,
-    COALESCE(obj.year, plan_tipo_p.year) AS year,
-    COALESCE(obj.department_code, plan_tipo_p.department_code) AS department_code,
+    COALESCE(obj.empresa, plan_actual.empresa) AS empresa,
+    COALESCE(obj.year, plan_actual.year) AS year,
+    COALESCE(obj.department_code, plan_actual.department_code) AS department_code,
     d.department_name,
     obj.obj_facturacion,
     obj.obj_coste,
@@ -63,12 +64,12 @@ SELECT
         WHEN obj.obj_facturacion > 0
             THEN (obj.obj_facturacion - obj.obj_coste) / obj.obj_facturacion * 100
     END AS obj_margen_pct,
-    COALESCE(plan_tipo_p.plan_facturacion, 0) AS plan_facturacion,
-    COALESCE(plan_tipo_p.plan_coste, 0) AS plan_coste,
-    COALESCE(plan_tipo_p.plan_beneficio, 0) AS plan_beneficio,
+    COALESCE(plan_actual.plan_facturacion, 0) AS plan_facturacion,
+    COALESCE(plan_actual.plan_coste, 0) AS plan_coste,
+    COALESCE(plan_actual.plan_beneficio, 0) AS plan_beneficio,
     CASE
-        WHEN COALESCE(plan_tipo_p.plan_facturacion, 0) > 0
-            THEN plan_tipo_p.plan_beneficio / plan_tipo_p.plan_facturacion * 100
+        WHEN COALESCE(plan_actual.plan_facturacion, 0) > 0
+            THEN plan_actual.plan_beneficio / plan_actual.plan_facturacion * 100
     END AS plan_margen_pct,
     ra.facturacion_real_anterior,
     CASE
@@ -78,21 +79,21 @@ SELECT
     END AS obj_crecimiento_pct,
     CASE
         WHEN ra.facturacion_real_anterior > 0
-            THEN (COALESCE(plan_tipo_p.plan_facturacion, 0) - ra.facturacion_real_anterior)
+            THEN (COALESCE(plan_actual.plan_facturacion, 0) - ra.facturacion_real_anterior)
                  / ra.facturacion_real_anterior * 100
     END AS plan_crecimiento_pct
 FROM obj
-FULL OUTER JOIN plan_tipo_p
-    ON obj.empresa = plan_tipo_p.empresa
-   AND obj.year = plan_tipo_p.year
-   AND obj.department_code = plan_tipo_p.department_code
+FULL OUTER JOIN plan_actual
+    ON obj.empresa = plan_actual.empresa
+   AND obj.year = plan_actual.year
+   AND obj.department_code = plan_actual.department_code
 LEFT JOIN mb_v_dim_departamento d
-    ON d.company_name = COALESCE(obj.empresa, plan_tipo_p.empresa)
-   AND d.department_code = COALESCE(obj.department_code, plan_tipo_p.department_code)
+    ON d.company_name = COALESCE(obj.empresa, plan_actual.empresa)
+   AND d.department_code = COALESCE(obj.department_code, plan_actual.department_code)
 LEFT JOIN real_anterior_dept ra
-    ON ra.empresa = COALESCE(obj.empresa, plan_tipo_p.empresa)
-   AND ra.year = COALESCE(obj.year, plan_tipo_p.year)
-   AND ra.department_code = COALESCE(obj.department_code, plan_tipo_p.department_code);
+    ON ra.empresa = COALESCE(obj.empresa, plan_actual.empresa)
+   AND ra.year = COALESCE(obj.year, plan_actual.year)
+   AND ra.department_code = COALESCE(obj.department_code, plan_actual.department_code);
 
 -- Evolución mensual (tablas y gráficos + fuente de valores de filtros nativos)
 CREATE OR REPLACE VIEW bi_v_evolucion_mensual AS
@@ -136,7 +137,7 @@ GROUP BY
     COALESCE(f.probability, 0);
 
 COMMENT ON VIEW bi_v_planificacion_kpi IS
-  'KPIs Objetivos/Plan por dept (Plan=tipo P, paridad Resumen PBI; crecimiento vs real anterior). Filtro Departamento OK.';
+  'KPIs Objetivos/Plan por dept (Planificación Actual = P+R; crecimiento vs Ingresos año ant.). Filtro Departamento OK.';
 COMMENT ON VIEW bi_v_evolucion_mensual IS
   'Evolución mensual facturación/coste/margen por tipo P o R. Fuente de filtros Año/Empresa/Dept/Tipo.';
 COMMENT ON VIEW bi_v_facturacion_probabilidad IS

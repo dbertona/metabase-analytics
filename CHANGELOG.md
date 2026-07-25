@@ -2,13 +2,14 @@
 
 ## [Unreleased]
 
-## [2026-07-25e] — Fix KPI Planificación Actual = tipo P (paridad PBI)
+## [2026-07-25e] — Fix KPI Planificación Actual = P + R (paridad PBI)
 
 ### Fixed
 
-- **`bi_v_planificacion_kpi`:** dejaba de usar híbrido P/R (R en meses cerrados), que inflaba
-  Planificación Actual a ~6,29 M€ en PSI 2026. Ahora usa solo `tipo = 'P'`, igual que
-  `v_se_kpi_cards` y el panel Resumen PBI (3.685.687 € / margen −4,13 %).
+- **`bi_v_planificacion_kpi`:** Planificación Actual y total Resumen PBI = **suma tipo P + tipo R**
+  (PSI 2026: 3.685.687 + 2.688.861 = **6.374.548 €**). Ni híbrido por mes cerrado (~6,29 M)
+  ni solo tipo P (3,69 M). Crecimiento vs Ingresos del año anterior (~18,07 %).
+- Default filtro Empresas = PSI. Tabla Resumen: sin Tipo = P+R; con Tipo P|R = desglose.
 
 ## [2026-07-25d] — Fase 3: Dashboard Superset «Seguimiento Económico — Resumen»
 
