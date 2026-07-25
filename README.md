@@ -27,7 +27,9 @@ cp env.example .env
 - **URL pública:** https://apps.powersolution.es/analytics/
 - **URL LAN:** http://192.168.36.100:8088/analytics/
 - **Dashboard Resumen:** https://apps.powersolution.es/analytics/superset/dashboard/planificacion-ps-analytics/
-- **Usuario:** `admin`
+- **Login:** Microsoft (Azure AD) — misma App Registration que Timesheet  
+  Redirect: `https://apps.powersolution.es/analytics/oauth-authorized/azure`
+- **Usuario local (fallback sin `AZURE_CLIENT_SECRET`):** `admin`
 
 ## Gestión
 

@@ -15,6 +15,12 @@ services:
       SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-PsSuperset#2026xK9!}
       # Path público: https://apps.powersolution.es/analytics/
       SUPERSET_APP_ROOT: ${SUPERSET_APP_ROOT:-/analytics}
+      # Azure AD — IDs públicos; el secret SOLO desde .env (env_file),
+      # no interpolar aquí o un vacío pisa el valor del fichero.
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID:-a18dc497-a8b8-4740-b723-65362ab7a3fb}
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:-3975625e-617d-410c-a166-9a3c88563344}
+    env_file:
+      - .env
     volumes:
       - ./config/superset_config.py:/app/pythonpath/superset_config.py:ro
       - ./data/superset-home:/app/superset_home

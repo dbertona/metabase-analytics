@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-25ae] — SSO Microsoft (Azure AD) en Superset
+
+### Added
+
+- OAuth Entra ID (`AUTH_OAUTH`) con misma App Registration que Timesheet.
+- Rol por defecto `Gamma` (lectura); Admin se asigna a mano.
+- Secret vía `.env` (`AZURE_CLIENT_SECRET`) — no versionado.
+
 ## [2026-07-25] — Merge `feat/dashboard-resumen-fase3`
 
 Cierre de rama: dashboard Resumen (tabs KPI/tablas + Gráficos), tabla Proyectos,
