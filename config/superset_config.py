@@ -24,10 +24,9 @@ FEATURE_FLAGS = {
 WTF_CSRF_ENABLED = True
 
 # Publicación bajo https://apps.powersolution.es/analytics/
-_app_root = (os.environ.get("SUPERSET_APP_ROOT") or "").rstrip("/") or None
-if _app_root:
-    APPLICATION_ROOT = _app_root
-    STATIC_ASSETS_PREFIX = _app_root
+# El prefijo lo fija create_app(superset_app_root=...) vía SUPERSET_APP_ROOT.
+# NO repetir APPLICATION_ROOT/STATIC_ASSETS_PREFIX aquí: duplica rutas
+# (/analytics/analytics/static/...) y provoca 404 en logo y assets.
 
 ENABLE_PROXY_FIX = True
 PROXY_FIX_CONFIG = {"x_for": 1, "x_proto": 1, "x_host": 1, "x_port": 1, "x_prefix": 1}
