@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-25] — Merge `feat/dashboard-resumen-fase3`
+
+Cierre de rama: dashboard Resumen (tabs KPI/tablas + Gráficos), tabla Proyectos,
+totales al pie, publicación `SUPERSET_APP_ROOT=/analytics` y sync UI antes de regenerar.
+Detalle en entradas `2026-07-25*` de este changelog.
+
 ## [2026-07-25ad] — Publicación /analytics/ (apps.powersolution.es)
 
 ### Changed
