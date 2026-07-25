@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-25r] — KPI sin icono filtro ni menú ⋮
+
+### Changed
+
+- CSS: oculta `slice_header` completo en tarjetas big_number (filtro + ⋮).
+
 ## [2026-07-25q] — Sin scrollbar en tarjetas KPI
 
 ### Changed
