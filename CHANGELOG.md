@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-25n] — Pull UI (altura KPI 15) + fuente −5%
+
+### Changed
+
+- Incorpora altura KPI **15** y Probabilidad **34** desde edits UI.
+- Fuente KPI −5%: euros **22px**, % **16px**, etiquetas **15px**.
+
 ## [2026-07-25m] — KPI font-size +30%
 
 ### Changed

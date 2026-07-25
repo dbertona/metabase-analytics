@@ -381,28 +381,28 @@ def persist_dashboard_config(
         "  font-weight: 700 !important; color: #143b41;\n"
         "  line-height: 1.2 !important; white-space: nowrap;\n"
         "}\n"
-        "/* Euros (Facturación, Beneficio): +30% → 23px */\n"
+        "/* Euros (Facturación, Beneficio): 23px -5% → 22px */\n"
         ".dashboard-component-chart-holder:has(.superset-legacy-chart-big-number)"
         "[data-test-chart-name*='Facturación'] .header-line,\n"
         ".dashboard-component-chart-holder:has(.superset-legacy-chart-big-number)"
         "[data-test-chart-name*='Beneficio'] .header-line,\n"
         ".superset-legacy-chart-big-number .header-line {\n"
-        "  font-size: 23px !important;\n"
+        "  font-size: 22px !important;\n"
         "}\n"
-        "/* Porcentajes (Margen, Crecimiento): +30% → 17px */\n"
+        "/* Porcentajes (Margen, Crecimiento): 17px -5% → 16px */\n"
         ".dashboard-component-chart-holder:has(.superset-legacy-chart-big-number)"
         "[data-test-chart-name*='Margen'] .header-line,\n"
         ".dashboard-component-chart-holder:has(.superset-legacy-chart-big-number)"
         "[data-test-chart-name*='Crecimiento'] .header-line {\n"
-        "  font-size: 17px !important;\n"
+        "  font-size: 16px !important;\n"
         "}\n"
         "/* Ocultar titulo superior en tarjetas KPI; la etiqueta va en subheader */\n"
         ".dashboard-component-chart-holder:has(.superset-legacy-chart-big-number) .header-title {\n"
         "  display: none !important;\n"
         "}\n"
-        "/* Etiqueta bajo el valor: +30% → 16px */\n"
+        "/* Etiqueta bajo el valor: 16px -5% → 15px */\n"
         ".superset-legacy-chart-big-number .subheader-line {\n"
-        "  font-size: 16px !important; font-weight: 600 !important; color: #5f7377 !important;\n"
+        "  font-size: 15px !important; font-weight: 600 !important; color: #5f7377 !important;\n"
         "  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;\n"
         "  text-align: left !important; margin-top: 2px !important;\n"
         "}\n"
@@ -647,10 +647,11 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         },
     }
     sizes = {
-        "obj": (1, 14),
-        "plan": (1, 14),
+        # Altura KPI desde UI (usuario estiró a 15); Prob ≈ headers(4)+KPIs(30)=34
+        "obj": (1, 15),
+        "plan": (1, 15),
         "table": (12, 32),
-        "prob": (6, 32),
+        "prob": (6, 34),
         "chart": (6, 36),
     }
     # Importes grandes (euros) más anchos; % compactos
