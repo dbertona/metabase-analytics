@@ -324,11 +324,11 @@ def persist_dashboard_config(
     detail_ds = dataset_ids["bi_v_planificacion_kpi"]
     evo_ds = dataset_ids["bi_v_evolucion_mensual"]
     kpi_chart_ids = chart_ids[:8]  # 8 tarjetas Obj/Plan
-    evo_chart_ids = [cid for cid in chart_ids[8:11]]  # Resumen, Evolución, Margen
-    # Probabilidad: Año/Empresa/Dept (siempre P+R; no entra en filtro Tipo)
-    prob_chart_ids = chart_ids[11:12] if len(chart_ids) > 11 else []
-    filter_scope_dims = kpi_chart_ids + evo_chart_ids + prob_chart_ids
-    filter_scope_all = filter_scope_dims  # alias usado abajo
+    # order: table, prob, evo, margen
+    table_id = chart_ids[8]
+    prob_chart_ids = [chart_ids[9]] if len(chart_ids) > 9 else []
+    evo_chart_ids = chart_ids[10:12]  # Evolución + Margen (filtro Tipo)
+    filter_scope_all = kpi_chart_ids + [table_id] + evo_chart_ids + prob_chart_ids
 
     dashboard_css = (
         "/* Power BI look: Segoe UI 20px en valor KPI */\n"
@@ -512,7 +512,8 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "children": [
                 "ROW-HDR-OBJ", "ROW-OBJ",
                 "ROW-HDR-PLAN", "ROW-PLAN",
-                "ROW-TABLES", "ROW-CHARTS",
+                "ROW-TABLES",  # Resumen mensual + Facturación por Probabilidad
+                "ROW-CHARTS",  # Evolución + Margen
             ],
             "parents": ["ROOT_ID"],
         },
@@ -550,7 +551,10 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         },
         "ROW-TABLES": {
             "type": "ROW", "id": "ROW-TABLES",
-            "children": [c["key"] for c in charts if c["section"] == "table"],
+            "children": (
+                [c["key"] for c in charts if c["section"] == "table"]
+                + [c["key"] for c in charts if c["section"] == "prob"]
+            ),
             "parents": ["ROOT_ID", "GRID_ID"],
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
@@ -561,17 +565,30 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
     }
-    # Ancho en columnas de rejilla (12 = fila completa). Se ajusta al contenido:
-    #  - Euros (Facturación, Beneficio): mas ancho (3) para "7.748.763 €"
-    #  - Porcentajes (Margen, Crecimiento): mas estrecho (2)
-    sizes = {"obj": (2, 14), "plan": (2, 14), "table": (6, 28), "chart": (6, 40)}
+    # Ancho en columnas de rejilla (12 = fila completa).
+    # Resumen (6) + Probabilidad (6) en la misma fila — como panel PBI.
+    sizes = {
+        "obj": (2, 14),
+        "plan": (2, 14),
+        "table": (6, 32),
+        "prob": (6, 32),
+        "chart": (6, 36),
+    }
     euro_metrics = {"Facturación", "Beneficio"}
     for c in charts:
         w, h = sizes[c["section"]]
-        row = {"obj": "ROW-OBJ", "plan": "ROW-PLAN", "table": "ROW-TABLES", "chart": "ROW-CHARTS"}[c["section"]]
+        row = {
+            "obj": "ROW-OBJ",
+            "plan": "ROW-PLAN",
+            "table": "ROW-TABLES",
+            "prob": "ROW-TABLES",
+            "chart": "ROW-CHARTS",
+        }[c["section"]]
         # Titulo mostrado: solo la metrica (Facturación, Margen, Crecimiento, Beneficio)
         # sin el prefijo "Obj ·" / "Plan ·"; la cabecera de seccion ya da el contexto.
         display_name = c["name"].split("· ")[-1]
+        if c["section"] == "prob":
+            display_name = "Facturación por Probabilidad"
         if c["section"] in ("obj", "plan"):
             w = 3 if display_name in euro_metrics else 2
         position[c["key"]] = {
@@ -646,6 +663,9 @@ def main() -> int:
          big_number_params(metric_sum("plan_beneficio", "Beneficio"), ",.0f", currency=True)),
         # Tabla agregada estilo PBI Resumen (AñoMes / Facturación / Coste / Margen %)
         ("Resumen mensual", "table", evo_ds, "table", resumen_mensual_params()),
+        # Misma fila que Resumen (layout PBI: izquierda tabla, derecha probabilidad)
+        ("Facturación por Probabilidad", "prob", prob_ds, "dist_bar",
+         probabilidad_bar_params()),
         ("Evolución mensual", "chart", evo_ds, "echarts_timeseries_line",
          {"adhoc_filters": dim_adhoc_filters("tipo"),
           "x_axis": "ano_mes", "metrics": [metric_sum("facturacion", "Facturación")],
@@ -655,8 +675,6 @@ def main() -> int:
           "x_axis": "ano_mes",
           "metrics": [metric_sql("AVG(margen_pct)", "Margen %")],
           "row_limit": 1000}),
-        ("Facturación por Probabilidad", "chart", prob_ds, "dist_bar",
-         probabilidad_bar_params()),
     ]
 
     charts: list[dict[str, Any]] = []
