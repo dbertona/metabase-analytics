@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-25ah] — Fix 404 logo /analytics/analytics/static
+
+### Fixed
+
+- Workaround bug APP_ROOT (Superset 6.1): evitar doble prefijo en assets/hrefs
+  (`STATIC_ASSETS_PREFIX=/` + `APPLICATION_ROOT=""`; middleware sigue con
+  `create_app(superset_app_root=/analytics)`).
+
 ## [2026-07-25ag] — Fix OAuth state CSRF detrás de /analytics/
 
 ### Fixed

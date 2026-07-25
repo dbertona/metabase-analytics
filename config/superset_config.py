@@ -24,9 +24,17 @@ FEATURE_FLAGS = {
 WTF_CSRF_ENABLED = True
 
 # Publicación bajo https://apps.powersolution.es/analytics/
-# El prefijo lo fija create_app(superset_app_root=...) vía SUPERSET_APP_ROOT.
-# NO repetir APPLICATION_ROOT/STATIC_ASSETS_PREFIX aquí: duplica rutas
-# (/analytics/analytics/static/...) y provoca 404 en logo y assets.
+# El montaje real lo hace AppRootMiddleware vía create_app(superset_app_root=...).
+#
+# Workaround bug BETA APP_ROOT (Superset 6.1): create_app antepone el prefijo a
+# brandLogoUrl / APP_ICON, y el frontend vuelve a anteponer
+# static_assets_prefix / application_root → /analytics/analytics/... (404).
+# - STATIC_ASSETS_PREFIX="/" es truthy (create_app no lo pisa) y el JS lo
+#   normaliza quitando la barra final → prefijo vacío.
+# - APPLICATION_ROOT="" evita que create_app lo sustituya por /analytics y que
+#   el JS duplique hrefs ya prefijados en el bootstrap.
+STATIC_ASSETS_PREFIX = "/"
+APPLICATION_ROOT = ""
 
 ENABLE_PROXY_FIX = True
 PROXY_FIX_CONFIG = {"x_for": 1, "x_proto": 1, "x_host": 1, "x_port": 1, "x_prefix": 1}
