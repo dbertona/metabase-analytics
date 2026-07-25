@@ -224,21 +224,28 @@ def dim_adhoc_filters(*extra_cols: str) -> list[dict[str, Any]]:
 
 
 def probabilidad_bar_params() -> dict[str, Any]:
-    """Barras horizontales PBI: probabilidad (100..10) × facturación P+R."""
+    """Barras PBI: probabilidad (100..10) × facturación P+R.
+    Superset 6.1: dist_bar legacy no está registrado → echarts_timeseries_bar.
+    """
     return {
         "adhoc_filters": dim_adhoc_filters(),
-        "groupby": ["probabilidad"],
+        "x_axis": "probabilidad",
         "metrics": [metric_sum("facturacion", "Facturación")],
-        "order_desc": True,
-        "row_limit": 20,
-        "show_bar_value": True,
-        "bar_stacked": False,
+        "groupby": [],
+        "orientation": "horizontal",
+        "seriesType": "bar",
+        "show_value": True,
         "y_axis_format": ",.0f",
-        "y_axis_bounds": [None, None],
-        "bottom_margin": "auto",
-        "x_ticks_layout": "auto",
-        "color_scheme": "supersetColors",
+        "x_axis_title": "%",
+        "y_axis_title": "",
+        "rich_tooltip": True,
         "show_legend": False,
+        "row_limit": 20,
+        "truncate_metric": True,
+        "x_axis_sort_asc": False,
+        "x_axis_sort_series": "name",
+        "x_axis_sort_series_ascending": False,
+        "color_scheme": "supersetColors",
     }
 
 
@@ -664,7 +671,7 @@ def main() -> int:
         # Tabla agregada estilo PBI Resumen (AñoMes / Facturación / Coste / Margen %)
         ("Resumen mensual", "table", evo_ds, "table", resumen_mensual_params()),
         # Misma fila que Resumen (layout PBI: izquierda tabla, derecha probabilidad)
-        ("Facturación por Probabilidad", "prob", prob_ds, "dist_bar",
+        ("Facturación por Probabilidad", "prob", prob_ds, "echarts_timeseries_bar",
          probabilidad_bar_params()),
         ("Evolución mensual", "chart", evo_ds, "echarts_timeseries_line",
          {"adhoc_filters": dim_adhoc_filters("tipo"),
