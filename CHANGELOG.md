@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+## [2026-07-25] — Partition overwrite en línea (PlanificacionMes / ExpedienteMes)
+
+### Fixed
+
+- **Huérfanos por cambio de `budgetDateMonth`:** el UPSERT incremental no borraba la PK antigua
+  cuando BC movía la versión de presupuesto. Se elimina la necesidad de resync mensual completo.
+- **`Prepare Expediente BC Requests`:** `fields` pasa de 3 timestamps a 1 (`lastModifiedDateTime`),
+  evitando inflación Nx / OOM en el discovery (mismo criterio que PlanificacionMes).
+
+### Changed
+
+- **Workflow 004 — partition overwrite:** para `bc_job_planning_line` y `bc_expediente_mes`:
+  1. Discovery por watermark (timestamp) detecta cambios.
+  2. Se extraen particiones `(year, month)` tocadas.
+  3. Snapshot OData completo: `$filter=year eq Y and month eq M`.
+  4. `DELETE` de esas particiones en analytics + `INSERT` del snapshot (primer chunk).
+  5. Watermark solo avanza con timestamp real de filas (no a `NOW()` vacío).
+- Nodos nuevos: `Discover Partitions *`, `Prepare Snapshot *`, `BC API - * Snapshot`.
+
+### Docs
+
+- Retirada la recomendación de resync mensual DELETE+watermark como operación normal.
+- Documentado el patrón partition overwrite en `004_SYNC_BC_ANALYTICS.md` y
+  `ANALYTICS_FACTURACION_PBI_ALIGNMENT.md`.
+
 ## [2026-07-24b] — Alineación completa Factura P / Coste P con PBI (PSI 2026)
 
 ### Fixed
@@ -70,14 +95,11 @@ tras el último sync). No requiere acción técnica.
 - Incluye filas con `lineType = ''` (Both Budget & Billable) y `Billable`.
 - Excluye meses con movimientos reales de tipo Ingresos (no muestra P si ya hay R).
 
-**Causa raíz de huérfanos (patrón UPSERT):**
-El sync 004 hace UPSERT por PK `(company, job, year, month, budget_date_year, budget_date_month)`.
-Cuando BC actualiza `budgetDateMonth` de una línea (ej. 6→7), el registro antiguo
-`(job, month=6, budget=6)` queda huérfano en analytics porque el UPSERT solo inserta/actualiza,
-no borra. La única solución operativa es el resync completo periódico.
-
-**Recomendación operativa:** Programar un resync completo mensual de `bc_expediente_mes`
-y `bc_job_planning_line` (DELETE + reset watermark + sync) para evitar acumulación de huérfanos.
+**Causa raíz de huérfanos (patrón UPSERT) — mitigada 2026-07-25:**
+El UPSERT por PK no borraba la versión antigua al cambiar `budgetDateMonth`.
+Mitigación: **partition overwrite** en el 004 (discovery → snapshot por `(year,month)` →
+DELETE partición + INSERT). Ver `004_SYNC_BC_ANALYTICS.md` § Partition overwrite.
+Full wipe + watermark queda solo como recuperación excepcional.
 
 ## [2026-07-24] — Fix watermark n8n 004 + resync completo PSI
 
