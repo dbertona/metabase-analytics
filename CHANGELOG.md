@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-25af] — Nombre de recurso en barra (bc_resource)
+
+### Added
+
+- Al login Azure, lookup `bc_resource.name` por email y actualiza `first_name`/`last_name`
+  (visible en la barra superior, estilo Timesheet).
+
 ## [2026-07-25ae] — SSO Microsoft (Azure AD) en Superset
 
 ### Added

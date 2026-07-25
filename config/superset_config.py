@@ -7,6 +7,7 @@ import os
 from typing import Any
 
 import jwt
+import psycopg2
 from flask_appbuilder.security.manager import AUTH_DB, AUTH_OAUTH
 from superset.security import SupersetSecurityManager
 
@@ -31,6 +32,67 @@ if _app_root:
 ENABLE_PROXY_FIX = True
 PROXY_FIX_CONFIG = {"x_for": 1, "x_proto": 1, "x_host": 1, "x_port": 1, "x_prefix": 1}
 PREFERRED_URL_SCHEME = "https"
+
+# Analytics DB (misma red Docker: supabase-db) — lookup bc_resource
+PS_ANALYTICS_HOST = os.environ.get("PS_ANALYTICS_HOST", "supabase-db").strip()
+PS_ANALYTICS_PORT = int(os.environ.get("PS_ANALYTICS_PORT", "5432"))
+PS_ANALYTICS_DB = os.environ.get("PS_ANALYTICS_DB", "postgres").strip()
+PS_ANALYTICS_USER = os.environ.get("PS_ANALYTICS_USER", "postgres").strip()
+PS_ANALYTICS_PASSWORD = os.environ.get(
+    "PS_ANALYTICS_PASSWORD", "SuperSecurePassword2025"
+).strip()
+
+
+def lookup_resource_name(email: str) -> str | None:
+    """Nombre completo en bc_resource por email (como Timesheet)."""
+    email = (email or "").strip().lower()
+    if not email or "@" not in email:
+        return None
+    try:
+        with psycopg2.connect(
+            host=PS_ANALYTICS_HOST,
+            port=PS_ANALYTICS_PORT,
+            dbname=PS_ANALYTICS_DB,
+            user=PS_ANALYTICS_USER,
+            password=PS_ANALYTICS_PASSWORD,
+            connect_timeout=5,
+        ) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT name
+                    FROM public.bc_resource
+                    WHERE lower(trim(email)) = %s
+                      AND coalesce(trim(name), '') <> ''
+                    ORDER BY company_name
+                    LIMIT 1
+                    """,
+                    (email,),
+                )
+                row = cur.fetchone()
+                if row and row[0]:
+                    return str(row[0]).strip()
+    except Exception:
+        logger.exception("No se pudo leer bc_resource para email=%s", email)
+    return None
+
+
+def split_resource_display_name(full_name: str, email: str) -> tuple[str, str]:
+    """Convierte 'Apellido, Nombre' (BC) → (Nombre, Apellido) para la barra."""
+    full_name = (full_name or "").strip()
+    if not full_name:
+        local = email.split("@")[0] if email else "usuario"
+        return local, ""
+    if "," in full_name:
+        last, first = full_name.split(",", 1)
+        first, last = first.strip(), last.strip()
+        if first:
+            return first, last
+    parts = full_name.split(None, 1)
+    if len(parts) == 2:
+        return parts[0], parts[1]
+    return full_name, ""
+
 
 # ── Azure AD / Entra ID (misma App Registration que Timesheet) ─────────────
 # Redirect URI (plataforma Web en Azure):
@@ -84,7 +146,7 @@ if AZURE_CLIENT_SECRET:
     ]
 
     class AzureSsoSecurityManager(SupersetSecurityManager):
-        """Mapea claims de Azure (UPN/email) a usuario Superset."""
+        """Azure SSO + nombre desde bc_resource (igual que Timesheet)."""
 
         def get_oauth_user_info(
             self, provider: str, response: dict[str, Any] | None = None
@@ -98,7 +160,6 @@ if AZURE_CLIENT_SECRET:
                 logger.error("Azure OAuth: respuesta sin id_token")
                 return {}
 
-            # Claims del id_token (firma ya validada por Authlib/OIDC en el flujo)
             me = jwt.decode(
                 id_token,
                 options={"verify_signature": False},
@@ -116,18 +177,58 @@ if AZURE_CLIENT_SECRET:
                 logger.error("Azure OAuth: sin email/UPN en id_token keys=%s", list(me))
                 return {}
 
-            info = {
+            resource_name = lookup_resource_name(email)
+            if resource_name:
+                first_name, last_name = split_resource_display_name(resource_name, email)
+                logger.info(
+                    "Azure OAuth: %s → bc_resource.name=%r → %s %s",
+                    email,
+                    resource_name,
+                    first_name,
+                    last_name,
+                )
+            else:
+                first_name = me.get("given_name") or email.split("@")[0]
+                last_name = me.get("family_name") or ""
+                logger.info(
+                    "Azure OAuth: %s sin match en bc_resource; usando claims Azure",
+                    email,
+                )
+
+            return {
                 "username": email,
                 "email": email,
-                "first_name": me.get("given_name") or email.split("@")[0],
-                "last_name": me.get("family_name") or "",
+                "first_name": first_name,
+                "last_name": last_name,
             }
-            logger.info("Azure OAuth login: %s", email)
-            return info
 
-        # Compat FAB versiones que llaman oauth_user_info
         def oauth_user_info(self, provider: str, response: dict[str, Any] | None = None):
             return self.get_oauth_user_info(provider, response)
+
+        def auth_user_oauth(self, userinfo: dict[str, Any]):
+            """Crea o actualiza first/last name en cada login (barra superior)."""
+            user = super().auth_user_oauth(userinfo)
+            if not user or not userinfo:
+                return user
+            first_name = (userinfo.get("first_name") or "").strip()
+            last_name = (userinfo.get("last_name") or "").strip()
+            if not first_name and not last_name:
+                return user
+            if user.first_name == first_name and user.last_name == last_name:
+                return user
+            try:
+                user.first_name = first_name or user.first_name
+                user.last_name = last_name
+                self.update_user(user)
+                logger.info(
+                    "Usuario actualizado: %s → %s %s",
+                    user.username,
+                    user.first_name,
+                    user.last_name,
+                )
+            except Exception:
+                logger.exception("No se pudo actualizar nombre de %s", user.username)
+            return user
 
     CUSTOM_SECURITY_MANAGER = AzureSsoSecurityManager
 else:
