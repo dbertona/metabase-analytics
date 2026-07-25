@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-25o] — Símbolo % en Margen y Crecimiento
+
+### Changed
+
+- KPIs Margen/Crecimiento: formato `.2%` (ratio sin `*100`) → p. ej. `17.43%`.
+
 ## [2026-07-25n] — Pull UI (altura KPI 15) + fuente −5%
 
 ### Changed

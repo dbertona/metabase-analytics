@@ -719,28 +719,28 @@ def main() -> int:
          big_number_params(metric_sum("obj_facturacion", "Facturación"), ",.0f", currency=True)),
         ("Obj · Margen", "obj", kpi_ds, "big_number_total",
          big_number_params(
-             metric_sql("SUM(obj_beneficio)/NULLIF(SUM(obj_facturacion),0)*100", "Margen"), ".2f")),
+             metric_sql("SUM(obj_beneficio)/NULLIF(SUM(obj_facturacion),0)", "Margen"), ".2%")),
         ("Obj · Crecimiento", "obj", kpi_ds, "big_number_total",
          big_number_params(
              metric_sql(
                  "(SUM(obj_facturacion)-SUM(facturacion_real_anterior))"
-                 "/NULLIF(SUM(facturacion_real_anterior),0)*100",
+                 "/NULLIF(SUM(facturacion_real_anterior),0)",
                  "Crecimiento"),
-             ".2f")),
+             ".2%")),
         ("Obj · Beneficio", "obj", kpi_ds, "big_number_total",
          big_number_params(metric_sum("obj_beneficio", "Beneficio"), ",.0f", currency=True)),
         ("Plan · Facturación", "plan", kpi_ds, "big_number_total",
          big_number_params(metric_sum("plan_facturacion", "Facturación"), ",.0f", currency=True)),
         ("Plan · Margen", "plan", kpi_ds, "big_number_total",
          big_number_params(
-             metric_sql("SUM(plan_beneficio)/NULLIF(SUM(plan_facturacion),0)*100", "Margen"), ".2f")),
+             metric_sql("SUM(plan_beneficio)/NULLIF(SUM(plan_facturacion),0)", "Margen"), ".2%")),
         ("Plan · Crecimiento", "plan", kpi_ds, "big_number_total",
          big_number_params(
              metric_sql(
                  "(SUM(plan_facturacion)-SUM(facturacion_real_anterior))"
-                 "/NULLIF(SUM(facturacion_real_anterior),0)*100",
+                 "/NULLIF(SUM(facturacion_real_anterior),0)",
                  "Crecimiento"),
-             ".2f")),
+             ".2%")),
         ("Plan · Beneficio", "plan", kpi_ds, "big_number_total",
          big_number_params(metric_sum("plan_beneficio", "Beneficio"), ",.0f", currency=True)),
         # Tabla agregada estilo PBI Resumen (AñoMes / Facturación / Coste / Margen %)
