@@ -242,17 +242,25 @@ def resumen_mensual_params() -> dict[str, Any]:
         "server_pagination": False,
         "show_totals": True,
         "include_search": False,
+        "show_cell_bars": False,
+        "color_pn": False,
+        "align_pn": False,
         "table_timestamp_format": "smart_date",
         "column_config": {
             "Facturación": {
                 "d3NumberFormat": ",.0f",
                 "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
+                "showCellBars": False,
             },
             "Coste": {
                 "d3NumberFormat": ",.0f",
                 "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
+                "showCellBars": False,
             },
-            "Margen %": {"d3NumberFormat": ".2f"},
+            "Margen %": {
+                "d3NumberFormat": ".2f",
+                "showCellBars": False,
+            },
         },
     }
 
@@ -349,6 +357,30 @@ def persist_dashboard_config(
         "/* Tarjetas KPI compactas */\n"
         ".dashboard-component-chart-holder {\n"
         "  padding: 4px 8px !important;\n"
+        "}\n"
+        "/* Tabla Resumen mensual: sin barras de color, filas compactas */\n"
+        "[data-test-chart-name*='Resumen mensual'] .table,\n"
+        "[data-test-chart-name*='Resumen mensual'] table {\n"
+        "  font-size: 12px !important;\n"
+        "  line-height: 1.15 !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Resumen mensual'] th,\n"
+        "[data-test-chart-name*='Resumen mensual'] td {\n"
+        "  padding: 2px 8px !important;\n"
+        "  height: auto !important;\n"
+        "  line-height: 1.15 !important;\n"
+        "  background-image: none !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Resumen mensual'] .cell-bar,\n"
+        "[data-test-chart-name*='Resumen mensual'] .cell-bars,\n"
+        "[data-test-chart-name*='Resumen mensual'] td > div[style*='background'],\n"
+        "[data-test-chart-name*='Resumen mensual'] .dt-cell-bar {\n"
+        "  display: none !important;\n"
+        "  background: none !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Resumen mensual'] .chart-slice,\n"
+        "[data-test-chart-name*='Resumen mensual'] .slice_container {\n"
+        "  padding: 0 !important;\n"
         "}\n"
     )
 
@@ -510,7 +542,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
     # Ancho en columnas de rejilla (12 = fila completa). Se ajusta al contenido:
     #  - Euros (Facturación, Beneficio): mas ancho (3) para "7.748.763 €"
     #  - Porcentajes (Margen, Crecimiento): mas estrecho (2)
-    sizes = {"obj": (2, 14), "plan": (2, 14), "table": (6, 40), "chart": (6, 40)}
+    sizes = {"obj": (2, 14), "plan": (2, 14), "table": (6, 28), "chart": (6, 40)}
     euro_metrics = {"Facturación", "Beneficio"}
     for c in charts:
         w, h = sizes[c["section"]]
