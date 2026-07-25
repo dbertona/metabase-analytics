@@ -327,6 +327,7 @@ def resumen_proyectos_params() -> dict[str, Any]:
     """Tabla PBI Resumen Proyectos: Proyecto | Facturación | Coste | Margen %."""
     return {
         "adhoc_filters": dim_adhoc_filters("tipo"),
+        "query_mode": "aggregate",
         "groupby": ["proyecto"],
         "metrics": [
             metric_sum("facturacion", "Facturación"),
@@ -339,8 +340,9 @@ def resumen_proyectos_params() -> dict[str, Any]:
         "percent_metrics": [],
         "order_by_cols": ['["Facturación", false]'],
         "row_limit": 5000,
-        "server_pagination": True,
-        "server_page_length": 25,
+        # Paginación cliente: con server_pagination el pie de totales a veces no se ve
+        "server_pagination": False,
+        "page_length": 25,
         "show_totals": True,
         "include_search": True,
         "show_cell_bars": False,
@@ -599,6 +601,17 @@ def persist_dashboard_config(
         "[data-test-chart-name*='Resumen mensual'] .slice_container {\n"
         "  padding: 0 !important;\n"
         "}\n"
+        "/* Proyectos: fila Total (summary) siempre visible al pie */\n"
+        "[data-test-chart-name*='Proyectos'] tfoot,\n"
+        "[data-test-chart-name*='Proyectos'] .dt-totals,\n"
+        "[data-test-chart-name='Proyectos'] tfoot {\n"
+        "  display: table-footer-group !important;\n"
+        "  position: sticky !important;\n"
+        "  bottom: 0 !important;\n"
+        "  background: #f5f8f9 !important;\n"
+        "  font-weight: 700 !important;\n"
+        "  z-index: 2 !important;\n"
+        "}\n"
     )
 
     # Superset 6.1: IDs DEBEN empezar por NATIVE_FILTER- (isFilterId en FiltersConfigModal).
@@ -801,7 +814,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         "obj": (1, 10),
         "plan": (1, 10),
         "table": (4, 32),  # UI: Resumen mensual width 4
-        "projects": (12, 48),
+        "projects": (12, 74),  # UI: altura estirada para ver pie Total
         "prob": (6, 36),
         "chart": (6, 36),
     }

@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-25y] — Totales al pie en tabla Proyectos
+
+### Changed
+
+- Proyectos: `show_totals` + paginación cliente (`page_length=25`); altura 74.
+- CSS sticky en fila summary/Total.
+
 ## [2026-07-25x] — Proyectos: excluir filas 0/0
 
 ### Changed
