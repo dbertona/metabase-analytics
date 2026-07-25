@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-25x] — Proyectos: excluir filas 0/0
+
+### Changed
+
+- `bi_v_resumen_proyectos`: `HAVING` facturación o coste ≠ 0 (filtro PBI «Filtro no es 0»).
+
 ## [2026-07-25w] — Tabla Proyectos (filtros PBI Operational + estado)
 
 ### Added

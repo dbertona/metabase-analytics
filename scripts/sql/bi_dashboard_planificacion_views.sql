@@ -190,10 +190,12 @@ GROUP BY
     f.tipo_proyecto,
     f.estado,
     f.job,
-    f.encabezado;
+    f.encabezado
+-- PBI «Filtro no es 0»: excluir filas sin importe ni coste
+HAVING ABS(SUM(f.facturado)) > 0.0001 OR ABS(SUM(f.coste)) > 0.0001;
 
 COMMENT ON VIEW bi_v_resumen_proyectos IS
-  'Resumen Proyectos PBI: Operational + estado Completed/Open/Planning (sin Lost). P+R.';
+  'Resumen Proyectos PBI: Operational + Completed/Open/Planning; excluye filas 0/0.';
 
 -- KPI agregados por empresa/año (referencia / legacy; tarjetas usan bi_v_planificacion_kpi)
 CREATE OR REPLACE VIEW bi_v_kpi_anual_empresa AS
