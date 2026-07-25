@@ -223,6 +223,25 @@ def dim_adhoc_filters(*extra_cols: str) -> list[dict[str, Any]]:
     return out
 
 
+def probabilidad_bar_params() -> dict[str, Any]:
+    """Barras horizontales PBI: probabilidad (100..10) × facturación P+R."""
+    return {
+        "adhoc_filters": dim_adhoc_filters(),
+        "groupby": ["probabilidad"],
+        "metrics": [metric_sum("facturacion", "Facturación")],
+        "order_desc": True,
+        "row_limit": 20,
+        "show_bar_value": True,
+        "bar_stacked": False,
+        "y_axis_format": ",.0f",
+        "y_axis_bounds": [None, None],
+        "bottom_margin": "auto",
+        "x_ticks_layout": "auto",
+        "color_scheme": "supersetColors",
+        "show_legend": False,
+    }
+
+
 def resumen_mensual_params() -> dict[str, Any]:
     """Tabla PBI Resumen: AñoMes | Facturación | Coste | Margen % (agregada)."""
     return {
@@ -306,7 +325,10 @@ def persist_dashboard_config(
     evo_ds = dataset_ids["bi_v_evolucion_mensual"]
     kpi_chart_ids = chart_ids[:8]  # 8 tarjetas Obj/Plan
     evo_chart_ids = [cid for cid in chart_ids[8:11]]  # Resumen, Evolución, Margen
-    filter_scope_all = kpi_chart_ids + evo_chart_ids  # sin Probabilidad (ds distinto)
+    # Probabilidad: Año/Empresa/Dept (siempre P+R; no entra en filtro Tipo)
+    prob_chart_ids = chart_ids[11:12] if len(chart_ids) > 11 else []
+    filter_scope_dims = kpi_chart_ids + evo_chart_ids + prob_chart_ids
+    filter_scope_all = filter_scope_dims  # alias usado abajo
 
     dashboard_css = (
         "/* Power BI look: Segoe UI 20px en valor KPI */\n"
@@ -633,9 +655,8 @@ def main() -> int:
           "x_axis": "ano_mes",
           "metrics": [metric_sql("AVG(margen_pct)", "Margen %")],
           "row_limit": 1000}),
-        ("Facturación por Probabilidad", "chart", prob_ds, "echarts_timeseries_bar",
-         {"x_axis": "probabilidad", "metrics": [metric_sum("facturacion", "Facturación")],
-          "row_limit": 100}),
+        ("Facturación por Probabilidad", "chart", prob_ds, "dist_bar",
+         probabilidad_bar_params()),
     ]
 
     charts: list[dict[str, Any]] = []

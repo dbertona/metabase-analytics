@@ -115,33 +115,41 @@ LEFT JOIN mb_v_dim_departamento d
     ON d.company_name = r.empresa
    AND d.department_code = split_part(r.codigo_unico_departamento, ':', 2);
 
--- Facturación por probabilidad (gráfico de barras)
+-- Facturación por probabilidad (gráfico de barras — panel Resumen PBI)
+-- PBI: % = probability=0 → 100; resto = probability. Total = P + R.
+-- PSI 2026 bucket 100%: ~5.707 mil €
 CREATE OR REPLACE VIEW bi_v_facturacion_probabilidad AS
 SELECT
     f.empresa,
     f.year,
     f.departamento AS department_code,
     d.department_name,
-    COALESCE(f.probability, 0) AS probabilidad,
+    CASE
+        WHEN COALESCE(f.probability, 0) = 0 THEN 100::numeric
+        ELSE COALESCE(f.probability, 0)
+    END AS probabilidad,
     SUM(f.facturado) AS facturacion
 FROM v_se_facturacion f
 LEFT JOIN mb_v_dim_departamento d
     ON d.company_name = f.empresa
    AND d.department_code = f.departamento
-WHERE f.tipo = 'P'
+WHERE f.tipo IN ('P', 'R')
 GROUP BY
     f.empresa,
     f.year,
     f.departamento,
     d.department_name,
-    COALESCE(f.probability, 0);
+    CASE
+        WHEN COALESCE(f.probability, 0) = 0 THEN 100::numeric
+        ELSE COALESCE(f.probability, 0)
+    END;
 
 COMMENT ON VIEW bi_v_planificacion_kpi IS
   'KPIs Objetivos/Plan por dept (Planificación Actual = P+R; crecimiento vs Ingresos año ant.). Filtro Departamento OK.';
 COMMENT ON VIEW bi_v_evolucion_mensual IS
   'Evolución mensual facturación/coste/margen por tipo P o R. Fuente de filtros Año/Empresa/Dept/Tipo.';
 COMMENT ON VIEW bi_v_facturacion_probabilidad IS
-  'Facturación planificada agrupada por probabilidad de cierre.';
+  'Facturación P+R por probabilidad (0→100 como PBI). Panel Resumen.';
 
 -- KPI agregados por empresa/año (referencia / legacy; tarjetas usan bi_v_planificacion_kpi)
 CREATE OR REPLACE VIEW bi_v_kpi_anual_empresa AS

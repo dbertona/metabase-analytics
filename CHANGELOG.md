@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-25f] — Facturación por Probabilidad = P+R (0→100 como PBI)
+
+### Fixed
+
+- **`bi_v_facturacion_probabilidad`:** suma P+R; `probability=0` se muestra como **100** (regla PBI).
+  Bucket 100% PSI 2026 ≈ **5.707 mil €**.
+- Chart Superset: `dist_bar` con valores en barra; entra en filtros Año/Empresa/Dept.
+
 ## [2026-07-25e] — Fix KPI Planificación Actual = P + R (paridad PBI)
 
 ### Fixed
