@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-25s] — Cabeceras Obj/Plan centradas sin scroll
+
+### Changed
+
+- CSS markdown: flex centrado vertical + `overflow: hidden` (Objetivos / Planificación).
+
 ## [2026-07-25r] — KPI sin icono filtro ni menú ⋮
 
 ### Changed
