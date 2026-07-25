@@ -433,56 +433,57 @@ def persist_dashboard_config(
         "  font-size: 12px !important; font-weight: 600 !important; color: #5f7377 !important;\n"
         "  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;\n"
         "}\n"
-        "/* Cabeceras de seccion (markdown): centrado vertical + sin scroll */\n"
-        ".dashboard-component-chart-holder:has(.dashboard-markdown),\n"
-        ".dashboard-component-chart-holder:has(.dashboard-markdown) .chart-slice,\n"
-        ".dashboard-component-chart-holder:has(.dashboard-markdown) .slice_container,\n"
-        ".dashboard-component-chart-holder:has(.dashboard-markdown) .dashboard-markdown,\n"
-        ".dashboard-component-chart-holder:has(.dashboard-markdown) .markdown-content,\n"
-        ".dashboard-component-chart-holder:has(.dashboard-markdown) .renderedMarkdown {\n"
+        "/* Cabeceras de seccion: HEADER nativo (sin scroll markdown) */\n"
+        ".dashboard-component-header,\n"
+        ".dashboard-component-header .header-controls,\n"
+        ".dashboard-component-header .editable-title,\n"
+        ".dashboard-component-header .editable-title input,\n"
+        ".dashboard-component-header .editable-title span,\n"
+        ".dashboard-component-header h1,\n"
+        ".dashboard-component-header h2,\n"
+        ".dashboard-component-header h3 {\n"
         "  overflow: hidden !important;\n"
-        "  overflow-x: hidden !important;\n"
         "  overflow-y: hidden !important;\n"
         "  scrollbar-width: none !important;\n"
         "  -ms-overflow-style: none !important;\n"
         "}\n"
-        ".dashboard-component-chart-holder:has(.dashboard-markdown) {\n"
-        "  display: flex !important;\n"
-        "  align-items: center !important;\n"
-        "  justify-content: flex-start !important;\n"
-        "  padding: 0 8px !important;\n"
-        "  box-sizing: border-box !important;\n"
-        "}\n"
-        ".dashboard-component-chart-holder:has(.dashboard-markdown) .chart-slice,\n"
-        ".dashboard-component-chart-holder:has(.dashboard-markdown) .slice_container,\n"
-        ".dashboard-component-chart-holder:has(.dashboard-markdown) .dashboard-markdown,\n"
-        ".dashboard-component-chart-holder:has(.dashboard-markdown) .markdown-content,\n"
-        ".dashboard-component-chart-holder:has(.dashboard-markdown) .renderedMarkdown {\n"
+        ".dashboard-component-header {\n"
         "  display: flex !important;\n"
         "  align-items: center !important;\n"
         "  justify-content: flex-start !important;\n"
         "  height: 100% !important;\n"
-        "  width: 100% !important;\n"
         "  max-height: 100% !important;\n"
         "  margin: 0 !important;\n"
-        "  padding: 0 !important;\n"
+        "  padding: 0 8px !important;\n"
         "  box-sizing: border-box !important;\n"
+        "}\n"
+        ".dashboard-component-header *::-webkit-scrollbar {\n"
+        "  width: 0 !important; height: 0 !important; display: none !important;\n"
+        "}\n"
+        ".dashboard-component-header .editable-title,\n"
+        ".dashboard-component-header .editable-title input,\n"
+        ".dashboard-component-header .editable-title span,\n"
+        ".dashboard-component-header h1,\n"
+        ".dashboard-component-header h2,\n"
+        ".dashboard-component-header h3 {\n"
+        "  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;\n"
+        "  font-size: 16px !important; font-weight: 700 !important; color: #143b41 !important;\n"
+        "  margin: 0 !important; padding: 0 !important;\n"
+        "  line-height: 1.15 !important;\n"
+        "  height: auto !important;\n"
+        "}\n"
+        "/* Fallback si quedara algun markdown de cabecera */\n"
+        ".dashboard-component-chart-holder:has(.dashboard-markdown),\n"
+        ".dashboard-component-chart-holder:has(.dashboard-markdown) .dashboard-markdown,\n"
+        ".dashboard-component-chart-holder:has(.dashboard-markdown) .markdown-content,\n"
+        ".dashboard-component-chart-holder:has(.dashboard-markdown) .renderedMarkdown {\n"
+        "  overflow: hidden !important;\n"
+        "  overflow-y: clip !important;\n"
+        "  scrollbar-width: none !important;\n"
+        "  max-height: 100% !important;\n"
         "}\n"
         ".dashboard-component-chart-holder:has(.dashboard-markdown) *::-webkit-scrollbar {\n"
         "  width: 0 !important; height: 0 !important; display: none !important;\n"
-        "}\n"
-        ".dashboard-component-chart-holder:has(.dashboard-markdown) .slice_header {\n"
-        "  display: none !important;\n"
-        "  height: 0 !important;\n"
-        "}\n"
-        ".dashboard-markdown h1,\n"
-        ".dashboard-markdown h2,\n"
-        ".dashboard-markdown h3,\n"
-        ".dashboard-markdown p {\n"
-        "  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;\n"
-        "  font-size: 16px !important; font-weight: 700 !important; color: #143b41;\n"
-        "  margin: 0 !important; padding: 0 !important;\n"
-        "  line-height: 1.15 !important;\n"
         "}\n"
         "/* Tarjetas KPI: centrado vertical + sin scroll */\n"
         ".dashboard-component-chart-holder:has(.superset-legacy-chart-big-number) {\n"
@@ -700,19 +701,22 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
         "HEADER-OBJ": {
-            "type": "MARKDOWN", "id": "HEADER-OBJ", "children": [],
+            "type": "HEADER", "id": "HEADER-OBJ", "children": [],
             "parents": col_parents + ["ROW-HDR-OBJ"],
+            # HEADER nativo (no MARKDOWN): evita scrollbar del renderer markdown
             "meta": {
-                "code": "## Objetivos Anuales",
+                "text": "Objetivos Anuales",
+                "headerSize": "MEDIUM_HEADER",
                 "width": kpi_col_width,
                 "height": 4,
             },
         },
         "HEADER-PLAN": {
-            "type": "MARKDOWN", "id": "HEADER-PLAN", "children": [],
+            "type": "HEADER", "id": "HEADER-PLAN", "children": [],
             "parents": col_parents + ["ROW-HDR-PLAN"],
             "meta": {
-                "code": "## Planificación Actual",
+                "text": "Planificación Actual",
+                "headerSize": "MEDIUM_HEADER",
                 "width": kpi_col_width,
                 "height": 4,
             },

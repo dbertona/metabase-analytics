@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-25v] — Cabeceras HEADER nativo (sin scroll markdown)
+
+### Changed
+
+- Obj/Plan: `MARKDOWN` → componente **`HEADER`** (el scroll venía del renderer markdown).
+
 ## [2026-07-25u] — Sync UI (KPI h=10) + cabeceras sin scroll
 
 ### Changed
