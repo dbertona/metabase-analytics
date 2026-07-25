@@ -151,6 +151,50 @@ COMMENT ON VIEW bi_v_evolucion_mensual IS
 COMMENT ON VIEW bi_v_facturacion_probabilidad IS
   'Facturación P+R por probabilidad (0→100 como PBI). Panel Resumen.';
 
+-- -----------------------------------------------------------------------------
+-- Resumen por proyecto (página PBI «Resumen Proyectos»)
+-- Filtros PBI visual: tipo_proyecto = Operational; estado IN (Completed,Open,Planning)
+--   (= excluye Lost). Con PSI 2026: Fact 6.374.548 / Coste 4.350.042 / Margen 31,76 %.
+-- Encabezado = job || ' --- ' || left(descripcion,36) — ya en v_se_facturacion.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE VIEW bi_v_resumen_proyectos AS
+SELECT
+    f.empresa,
+    f.year,
+    f.departamento AS department_code,
+    d.department_name,
+    f.tipo,
+    f.tipo_proyecto,
+    f.estado,
+    f.job,
+    f.encabezado AS proyecto,
+    SUM(f.facturado) AS facturacion,
+    SUM(f.coste) AS coste,
+    CASE
+        WHEN SUM(f.facturado) > 0
+            THEN (SUM(f.facturado) - SUM(f.coste)) / SUM(f.facturado) * 100
+    END AS margen_pct
+FROM v_se_facturacion f
+LEFT JOIN mb_v_dim_departamento d
+    ON d.company_name = f.empresa
+   AND d.department_code = f.departamento
+WHERE f.tipo IN ('P', 'R')
+  AND f.tipo_proyecto = 'Operational'
+  AND COALESCE(f.estado, '') IN ('Completed', 'Open', 'Planning')
+GROUP BY
+    f.empresa,
+    f.year,
+    f.departamento,
+    d.department_name,
+    f.tipo,
+    f.tipo_proyecto,
+    f.estado,
+    f.job,
+    f.encabezado;
+
+COMMENT ON VIEW bi_v_resumen_proyectos IS
+  'Resumen Proyectos PBI: Operational + estado Completed/Open/Planning (sin Lost). P+R.';
+
 -- KPI agregados por empresa/año (referencia / legacy; tarjetas usan bi_v_planificacion_kpi)
 CREATE OR REPLACE VIEW bi_v_kpi_anual_empresa AS
 WITH agg AS (

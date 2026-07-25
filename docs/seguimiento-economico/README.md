@@ -77,7 +77,7 @@ Regenerar: `SKIP_APPLY_BI_VIEWS=1 SUPERSET_URL=http://192.168.36.100:8088 python
 
 1. **Resumen** — KPIs objetivos, margen, acumulados, histórico planificación
 2. **Unidad** — Pivot por concepto analítico (`descripcionCA`)
-3. **Resumen Proyectos** — Tabla por encabezado de proyecto
+3. **Resumen Proyectos** — Tabla por encabezado de proyecto ✅ (`bi_v_resumen_proyectos` + chart Proyectos; filtros PBI: Operational + estado Completed/Open/Planning)
 4. **Facturación** — Pivot mensual facturado
 5. **Gastos** — Pivot mensual costes
 6. **Mano de Obra** — Recursos y costes

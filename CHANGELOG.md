@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-25w] — Tabla Proyectos (filtros PBI Operational + estado)
+
+### Added
+
+- Vista **`bi_v_resumen_proyectos`**: `tipo_proyecto = Operational` y
+  `estado IN (Completed, Open, Planning)` — paridad Total Coste **4.350.042 €** / Margen **31,76 %**.
+- Chart tabla **Proyectos** en dashboard Resumen.
+
 ## [2026-07-25v] — Cabeceras HEADER nativo (sin scroll markdown)
 
 ### Changed

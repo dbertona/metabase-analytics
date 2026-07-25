@@ -49,6 +49,7 @@ DATASETS = [
     "bi_v_planificacion_kpi",
     "bi_v_evolucion_mensual",
     "bi_v_facturacion_probabilidad",
+    "bi_v_resumen_proyectos",
 ]
 
 
@@ -322,6 +323,50 @@ def resumen_mensual_params() -> dict[str, Any]:
     }
 
 
+def resumen_proyectos_params() -> dict[str, Any]:
+    """Tabla PBI Resumen Proyectos: Proyecto | Facturación | Coste | Margen %."""
+    return {
+        "adhoc_filters": dim_adhoc_filters("tipo"),
+        "groupby": ["proyecto"],
+        "metrics": [
+            metric_sum("facturacion", "Facturación"),
+            metric_sum("coste", "Coste"),
+            metric_sql(
+                "(SUM(facturacion) - SUM(coste)) / NULLIF(SUM(facturacion), 0) * 100",
+                "Margen %",
+            ),
+        ],
+        "percent_metrics": [],
+        "order_by_cols": ['["Facturación", false]'],
+        "row_limit": 5000,
+        "server_pagination": True,
+        "server_page_length": 25,
+        "show_totals": True,
+        "include_search": True,
+        "show_cell_bars": False,
+        "color_pn": True,
+        "align_pn": False,
+        "table_timestamp_format": "smart_date",
+        "column_config": {
+            "proyecto": {"columnWidth": 380},
+            "Facturación": {
+                "d3NumberFormat": ",.0f",
+                "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
+                "showCellBars": False,
+            },
+            "Coste": {
+                "d3NumberFormat": ",.0f",
+                "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
+                "showCellBars": False,
+            },
+            "Margen %": {
+                "d3NumberFormat": ".2f",
+                "showCellBars": False,
+            },
+        },
+    }
+
+
 def big_number_params(metric: dict[str, Any], fmt: str, *, currency: bool = False) -> dict[str, Any]:
     # header_font_size es factor × 16px; 1.25 ≈ 20px (Segoe UI solicitado)
     # subheader = etiqueta bajo el valor (Facturación, Margen, etc.) como en Power BI
@@ -362,11 +407,14 @@ def persist_dashboard_config(
     detail_ds = dataset_ids["bi_v_planificacion_kpi"]
     evo_ds = dataset_ids["bi_v_evolucion_mensual"]
     kpi_chart_ids = chart_ids[:8]  # 8 tarjetas Obj/Plan
-    # order: table, prob, evo, margen
+    # order: resumen mensual, proyectos, prob, evo, margen
     table_id = chart_ids[8]
-    prob_chart_ids = [chart_ids[9]] if len(chart_ids) > 9 else []
-    evo_chart_ids = chart_ids[10:12]  # Evolución + Margen (filtro Tipo)
-    filter_scope_all = kpi_chart_ids + [table_id] + evo_chart_ids + prob_chart_ids
+    projects_id = chart_ids[9]
+    prob_chart_ids = [chart_ids[10]] if len(chart_ids) > 10 else []
+    evo_chart_ids = chart_ids[11:13]  # Evolución + Margen (filtro Tipo)
+    filter_scope_all = (
+        kpi_chart_ids + [table_id, projects_id] + evo_chart_ids + prob_chart_ids
+    )
 
     dashboard_css = (
         "/* Power BI look: Segoe UI 20px en valor KPI */\n"
@@ -630,7 +678,7 @@ def persist_dashboard_config(
                 "controlValues": {"multiSelect": False, "enableEmptyFilter": False},
                 "cascadeParentIds": [],
                 "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
-                "chartsInScope": evo_chart_ids,
+                "chartsInScope": evo_chart_ids + [table_id, projects_id],
                 "tabsInScope": [],
             },
         ],
@@ -650,16 +698,11 @@ def persist_dashboard_config(
 
 
 def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
-    """Layout: COLUMN KPIs (6) + Probabilidad (6) a la derecha.
-
-    ROW-KPI-BAND
-      ├── COLUMN-KPIS (width 6): euros=2, Margen/Crecimiento=1
-      └── Facturación por Probabilidad (width 6, height ≈ Obj+Plan)
-    Luego Resumen mensual (12) y Evolución + Margen.
-    """
+    """Layout: COLUMN KPIs (6) + Probabilidad (6); Resumen; Proyectos; Evolución."""
     obj_keys = [c["key"] for c in charts if c["section"] == "obj"]
     plan_keys = [c["key"] for c in charts if c["section"] == "plan"]
     table_keys = [c["key"] for c in charts if c["section"] == "table"]
+    projects_keys = [c["key"] for c in charts if c["section"] == "projects"]
     prob_keys = [c["key"] for c in charts if c["section"] == "prob"]
     chart_keys = [c["key"] for c in charts if c["section"] == "chart"]
     prob_key = prob_keys[0] if prob_keys else None
@@ -673,7 +716,9 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         "GRID_ID": {
             "type": "GRID",
             "id": "GRID_ID",
-            "children": ["ROW-KPI-BAND", "ROW-TABLES", "ROW-CHARTS"],
+            "children": [
+                "ROW-KPI-BAND", "ROW-TABLES", "ROW-PROJECTS", "ROW-CHARTS",
+            ],
             "parents": ["ROOT_ID"],
         },
         "ROW-KPI-BAND": {
@@ -703,7 +748,6 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         "HEADER-OBJ": {
             "type": "HEADER", "id": "HEADER-OBJ", "children": [],
             "parents": col_parents + ["ROW-HDR-OBJ"],
-            # HEADER nativo (no MARKDOWN): evita scrollbar del renderer markdown
             "meta": {
                 "text": "Objetivos Anuales",
                 "headerSize": "MEDIUM_HEADER",
@@ -739,6 +783,12 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "parents": ["ROOT_ID", "GRID_ID"],
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
+        "ROW-PROJECTS": {
+            "type": "ROW", "id": "ROW-PROJECTS",
+            "children": projects_keys,
+            "parents": ["ROOT_ID", "GRID_ID"],
+            "meta": {"background": "BACKGROUND_TRANSPARENT"},
+        },
         "ROW-CHARTS": {
             "type": "ROW", "id": "ROW-CHARTS",
             "children": chart_keys,
@@ -750,7 +800,8 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         # Alturas desde UI (usuario): KPI 10, Probabilidad 36. Cabeceras 4 (evita scroll).
         "obj": (1, 10),
         "plan": (1, 10),
-        "table": (12, 32),
+        "table": (4, 32),  # UI: Resumen mensual width 4
+        "projects": (12, 48),
         "prob": (6, 36),
         "chart": (6, 36),
     }
@@ -771,6 +822,9 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             w = kpi_widths.get(display_name, 1)
         elif c["section"] == "table":
             parents = ["ROOT_ID", "GRID_ID", "ROW-TABLES"]
+        elif c["section"] == "projects":
+            display_name = "Proyectos"
+            parents = ["ROOT_ID", "GRID_ID", "ROW-PROJECTS"]
         else:
             parents = ["ROOT_ID", "GRID_ID", "ROW-CHARTS"]
         position[c["key"]] = {
@@ -803,14 +857,16 @@ def main() -> int:
     kpi_ds = dataset_ids["bi_v_planificacion_kpi"]
     evo_ds = dataset_ids["bi_v_evolucion_mensual"]
     prob_ds = dataset_ids["bi_v_facturacion_probabilidad"]
+    proy_ds = dataset_ids["bi_v_resumen_proyectos"]
 
     print("==> 3/4 Creando charts...")
     existing = {c["slice_name"]: c["id"] for c in client.list_charts()}
     stale_names = set(existing) - {
         "Obj · Facturación", "Obj · Margen", "Obj · Crecimiento", "Obj · Beneficio",
         "Plan · Facturación", "Plan · Margen", "Plan · Crecimiento", "Plan · Beneficio",
-        "Resumen mensual", "Evolución mensual", "Margen acumulado", "Facturación por Probabilidad",
-        "Facturación", "Margen", "Crecimiento", "Beneficio",
+        "Resumen mensual", "Proyectos", "Evolución mensual", "Margen acumulado",
+        "Facturación por Probabilidad",
+        "Facturación", "Margen", "Crecimiento", "Beneficio", "Δ %",
     }
     for name in stale_names:
         if name.startswith(("Obj", "Plan")) or "Planificación" in name:
@@ -845,9 +901,9 @@ def main() -> int:
              ".2%")),
         ("Plan · Beneficio", "plan", kpi_ds, "big_number_total",
          big_number_params(metric_sum("plan_beneficio", "Beneficio"), ",.0f", currency=True)),
-        # Tabla agregada estilo PBI Resumen (AñoMes / Facturación / Coste / Margen %)
         ("Resumen mensual", "table", evo_ds, "table", resumen_mensual_params()),
-        # Al lado de KPIs (COLUMN 7 + Probabilidad 5), altura ≈ Obj+Plan
+        # PBI Resumen Proyectos: Operational + estado Completed/Open/Planning
+        ("Proyectos", "projects", proy_ds, "table", resumen_proyectos_params()),
         ("Facturación por Probabilidad", "prob", prob_ds, "echarts_timeseries_bar",
          probabilidad_bar_params()),
         ("Evolución mensual", "chart", evo_ds, "echarts_timeseries_line",
