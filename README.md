@@ -24,8 +24,9 @@ cp env.example .env
 ./scripts/start.sh
 ```
 
-- **URL:** http://192.168.36.100:8088
-- **Dashboard Resumen:** http://192.168.36.100:8088/superset/dashboard/planificacion-ps-analytics/
+- **URL pública:** https://apps.powersolution.es/analytics/
+- **URL LAN:** http://192.168.36.100:8088/analytics/
+- **Dashboard Resumen:** https://apps.powersolution.es/analytics/superset/dashboard/planificacion-ps-analytics/
 - **Usuario:** `admin`
 
 ## Gestión
@@ -36,8 +37,8 @@ cp env.example .env
 | Parar | `./scripts/stop.sh` |
 | Backup | `./scripts/backup.sh` |
 | Logs | `docker compose logs -f superset` |
-| **Pull UI → snapshot** | `SUPERSET_URL=http://192.168.36.100:8088 python3 scripts/pull-superset-dashboard.py` |
-| Regenerar dashboard | `python3 scripts/setup-superset-planificacion.py` (hace pull UI antes) |
+| **Pull UI → snapshot** | `SUPERSET_URL=http://192.168.36.100:8088/analytics python3 scripts/pull-superset-dashboard.py` |
+| Regenerar dashboard | `SUPERSET_URL=http://192.168.36.100:8088/analytics python3 scripts/setup-superset-planificacion.py` (hace pull UI antes) |
 
 **Importante:** cambios hechos a mano en la UI de Superset se **pisan** al regenerar.
 Antes de regenerar, el setup hace **pull** a `exports/superset-dashboard/latest/` y avisa si hay

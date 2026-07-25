@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-25ad] — Publicación /analytics/ (apps.powersolution.es)
+
+### Changed
+
+- `SUPERSET_APP_ROOT=/analytics` + `ENABLE_PROXY_FIX` para path público.
+- Scripts/README usan `…:8088/analytics` (NPM ya apunta a VM 100).
+
 ## [2026-07-25ac] — Pestaña Gráficos
 
 ### Changed

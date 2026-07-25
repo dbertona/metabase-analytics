@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-SUPERSET_URL = os.environ.get("SUPERSET_URL", "http://localhost:8088").rstrip("/")
+SUPERSET_URL = os.environ.get("SUPERSET_URL", "http://localhost:8088/analytics").rstrip("/")
 SUPERSET_USER = os.environ.get("SUPERSET_USER", "admin")
 SUPERSET_PASSWORD = os.environ.get("SUPERSET_PASSWORD", "PsSuperset#2026xK9!")
 CURRENT_YEAR = datetime.date.today().year

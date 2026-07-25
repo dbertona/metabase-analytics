@@ -10,7 +10,7 @@ déjalo que lo invoque el setup) para:
 Así los cambios hechos a mano en la UI no se pierden sin aviso.
 
 Uso:
-  SUPERSET_URL=http://192.168.36.100:8088 python3 scripts/pull-superset-dashboard.py
+  SUPERSET_URL=http://192.168.36.100:8088/analytics python3 scripts/pull-superset-dashboard.py
   python3 scripts/pull-superset-dashboard.py --strict   # exit 1 si hay diff vs snapshot previo
 
 Variables:
@@ -39,7 +39,7 @@ EXPORT_ROOT = ROOT / "exports" / "superset-dashboard"
 LATEST_DIR = EXPORT_ROOT / "latest"
 PREV_DIR = EXPORT_ROOT / "previous"
 
-SUPERSET_URL = os.environ.get("SUPERSET_URL", "http://localhost:8088").rstrip("/")
+SUPERSET_URL = os.environ.get("SUPERSET_URL", "http://localhost:8088/analytics").rstrip("/")
 SUPERSET_USER = os.environ.get("SUPERSET_USER", "admin")
 SUPERSET_PASSWORD = os.environ.get("SUPERSET_PASSWORD", "PsSuperset#2026xK9!")
 DASHBOARD_SLUG = os.environ.get("DASHBOARD_SLUG", "planificacion-ps-analytics")
