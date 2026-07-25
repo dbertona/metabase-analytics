@@ -2,13 +2,14 @@
 
 ## [Unreleased]
 
-## [2026-07-25ah] — Fix 404 logo /analytics/analytics/static
+## [2026-07-25ah] — Fix 404 logo / blank screen APP_ROOT
 
 ### Fixed
 
-- Workaround bug APP_ROOT (Superset 6.1): evitar doble prefijo en assets/hrefs
-  (`STATIC_ASSETS_PREFIX=/` + `APPLICATION_ROOT=""`; middleware sigue con
-  `create_app(superset_app_root=/analytics)`).
+- Bug APP_ROOT (Superset 6.1): `PsAppInitializer` deshace el doble prefijo en
+  `brandLogoUrl`/`APP_ICON` (el JS ya antepone `static_assets_prefix`).
+- Revertido workaround `STATIC_ASSETS_PREFIX=/` que generaba `//static/...`
+  (pantalla en blanco + CSP).
 
 ## [2026-07-25ag] — Fix OAuth state CSRF detrás de /analytics/
 

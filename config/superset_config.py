@@ -9,6 +9,8 @@ from typing import Any
 import jwt
 import psycopg2
 from flask_appbuilder.security.manager import AUTH_DB, AUTH_OAUTH
+from flask import Flask
+from superset.initialization import SupersetAppInitializer
 from superset.security import SupersetSecurityManager
 
 logger = logging.getLogger(__name__)
@@ -24,17 +26,56 @@ FEATURE_FLAGS = {
 WTF_CSRF_ENABLED = True
 
 # Publicación bajo https://apps.powersolution.es/analytics/
-# El montaje real lo hace AppRootMiddleware vía create_app(superset_app_root=...).
+# create_app(superset_app_root=...) monta AppRootMiddleware y fija
+# APPLICATION_ROOT / STATIC_ASSETS_PREFIX = /analytics.
 #
-# Workaround bug BETA APP_ROOT (Superset 6.1): create_app antepone el prefijo a
-# brandLogoUrl / APP_ICON, y el frontend vuelve a anteponer
-# static_assets_prefix / application_root → /analytics/analytics/... (404).
-# - STATIC_ASSETS_PREFIX="/" es truthy (create_app no lo pisa) y el JS lo
-#   normaliza quitando la barra final → prefijo vacío.
-# - APPLICATION_ROOT="" evita que create_app lo sustituya por /analytics y que
-#   el JS duplique hrefs ya prefijados en el bootstrap.
-STATIC_ASSETS_PREFIX = "/"
-APPLICATION_ROOT = ""
+# Bug BETA APP_ROOT (Superset 6.1): create_app también antepone /analytics a
+# brandLogoUrl / APP_ICON, pero el frontend vuelve a anteponer
+# static_assets_prefix → /analytics/analytics/... (404) o, si se fuerza
+# STATIC_ASSETS_PREFIX="/", el HTML genera //static/... (host inventado).
+# Solución: dejar prefijos normales y deshacer el doble prefijo del theme
+# en APP_INITIALIZER (abajo).
+
+
+class PsAppInitializer(SupersetAppInitializer):
+    """Corrige URLs de theme duplicadas por create_app + APP_ROOT."""
+
+    def __init__(self, app: Flask) -> None:
+        super().__init__(app)
+        self._unprefix_app_root_theme_urls()
+
+    def _unprefix_app_root_theme_urls(self) -> None:
+        app_root = (
+            os.environ.get("SUPERSET_APP_ROOT")
+            or self.superset_app.config.get("APPLICATION_ROOT")
+            or ""
+        ).rstrip("/")
+        if not app_root or app_root == "/":
+            return
+
+        def strip_root(path: str) -> str:
+            if path.startswith(f"{app_root}/"):
+                return path[len(app_root) :]
+            if path == app_root:
+                return "/"
+            return path
+
+        icon = self.superset_app.config.get("APP_ICON") or ""
+        if icon.startswith(f"{app_root}/static/"):
+            self.superset_app.config["APP_ICON"] = strip_root(icon)
+
+        for theme_key in ("THEME_DEFAULT", "THEME_DARK"):
+            theme = self.superset_app.config.get(theme_key) or {}
+            token = theme.get("token") or {}
+            url = token.get("brandLogoUrl") or ""
+            if url.startswith(f"{app_root}/static/"):
+                token["brandLogoUrl"] = strip_root(url)
+            href = token.get("brandLogoHref") or ""
+            if href == app_root or href == f"{app_root}/":
+                token["brandLogoHref"] = "/"
+
+
+APP_INITIALIZER = PsAppInitializer
 
 ENABLE_PROXY_FIX = True
 PROXY_FIX_CONFIG = {"x_for": 1, "x_proto": 1, "x_host": 1, "x_port": 1, "x_prefix": 1}
