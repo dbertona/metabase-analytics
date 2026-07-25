@@ -33,6 +33,17 @@ ENABLE_PROXY_FIX = True
 PROXY_FIX_CONFIG = {"x_for": 1, "x_proto": 1, "x_host": 1, "x_port": 1, "x_prefix": 1}
 PREFERRED_URL_SCHEME = "https"
 
+# Sesión detrás de NPM + /analytics/: evita
+# "mismatching_state: CSRF Warning! State not equal" en OAuth Azure
+# (si Path=/analytics a veces se pierde el state al volver de Microsoft).
+SESSION_COOKIE_NAME = "superset_session"
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_PATH = "/"
+REMEMBER_COOKIE_SECURE = True
+REMEMBER_COOKIE_PATH = "/"
+
 # Analytics DB (misma red Docker: supabase-db) — lookup bc_resource
 PS_ANALYTICS_HOST = os.environ.get("PS_ANALYTICS_HOST", "supabase-db").strip()
 PS_ANALYTICS_PORT = int(os.environ.get("PS_ANALYTICS_PORT", "5432"))

@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-25ag] — Fix OAuth state CSRF detrás de /analytics/
+
+### Fixed
+
+- Cookies de sesión `Path=/` + `Secure` para que Azure OAuth no falle con
+  `mismatching_state` (dejaba al usuario colgado como `admin`).
+
 ## [2026-07-25af] — Nombre de recurso en barra (bc_resource)
 
 ### Added
