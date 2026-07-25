@@ -2,7 +2,13 @@
 
 ## [Unreleased]
 
-## [2026-07-25j] — KPIs más estrechos (ancho, no altura)
+## [2026-07-25k] — KPIs columna ancho 4 (antes 6)
+
+### Changed
+
+- COLUMN KPIs **4** (1 por tarjeta) + Probabilidad **8**.
+
+## [2026-07-25j] — KPIs más estrechos (ancho 6; no altura)
 
 ### Changed
 

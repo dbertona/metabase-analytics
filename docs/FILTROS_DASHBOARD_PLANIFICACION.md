@@ -30,9 +30,8 @@ Detalle: [`exports/superset-dashboard/README.md`](../exports/superset-dashboard/
 
 ```text
 ROW-KPI-BAND
-├── COLUMN-KPIS (width 6) — Objetivos + Planificación
-│     anchos mínimos: Facturación/Beneficio=2, Margen/Crecimiento=1
-└── Facturación por Probabilidad (width 6, height ≈ alto de las dos bandas KPI)
+├── COLUMN-KPIS (width 4) — Objetivos + Planificación (1 unidad por tarjeta)
+└── Facturación por Probabilidad (width 8, height ≈ alto de las dos bandas KPI)
 ```
 
 Debajo: Resumen mensual (ancho 12) · Evolución + Margen (6+6).

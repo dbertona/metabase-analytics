@@ -548,12 +548,11 @@ def persist_dashboard_config(
 
 
 def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
-    """Layout: COLUMN KPIs compactos (6) + Probabilidad (6) a la derecha.
+    """Layout: COLUMN KPIs compactos (4) + Probabilidad (8) a la derecha.
 
     ROW-KPI-BAND
-      ├── COLUMN-KPIS (width 6): Obj + Plan — anchos mínimos por contenido
-      │     Facturación/Beneficio=2 (euros largos), Margen/Crecimiento=1
-      └── Facturación por Probabilidad (width 6, height ≈ Obj+Plan)
+      ├── COLUMN-KPIS (width 4): Obj + Plan — 1 unidad por tarjeta
+      └── Facturación por Probabilidad (width 8, height ≈ Obj+Plan)
     Luego Resumen mensual (12) y Evolución + Margen.
     """
     obj_keys = [c["key"] for c in charts if c["section"] == "obj"]
@@ -563,8 +562,8 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
     chart_keys = [c["key"] for c in charts if c["section"] == "chart"]
     prob_key = prob_keys[0] if prob_keys else None
 
-    # Ancho columna = suma anchos KPI (2+1+1+2). No estirar tarjetas de más.
-    kpi_col_width = 6
+    # Ancho columna = 4 (1 por KPI). Probabilidad = 8.
+    kpi_col_width = 4
     col_parents = ["ROOT_ID", "GRID_ID", "ROW-KPI-BAND", "COLUMN-KPIS"]
     position: dict[str, Any] = {
         "DASHBOARD_VERSION": "v2",
@@ -642,16 +641,15 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
     }
-    # Anchos horizontales mínimos (altura KPI sin tocar). Prob = resto (12-6=6).
+    # KPIs: width 1 c/u (columna 4). Probabilidad: 8. Altura KPI sin tocar.
     sizes = {
-        "obj": (2, 14),
-        "plan": (2, 14),
+        "obj": (1, 14),
+        "plan": (1, 14),
         "table": (12, 32),
-        "prob": (6, 32),
+        "prob": (8, 32),
         "chart": (6, 36),
     }
-    # Euros largos → 2; porcentajes cortos → 1 (total 6 = COLUMN)
-    kpi_widths = {"Facturación": 2, "Margen": 1, "Crecimiento": 1, "Beneficio": 2}
+    kpi_widths = {"Facturación": 1, "Margen": 1, "Crecimiento": 1, "Beneficio": 1}
     for c in charts:
         w, h = sizes[c["section"]]
         display_name = c["name"].split("· ")[-1]
@@ -662,7 +660,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             parents = col_parents + [
                 "ROW-OBJ" if c["section"] == "obj" else "ROW-PLAN",
             ]
-            w = kpi_widths.get(display_name, 2)
+            w = kpi_widths.get(display_name, 1)
         elif c["section"] == "table":
             parents = ["ROOT_ID", "GRID_ID", "ROW-TABLES"]
         else:
