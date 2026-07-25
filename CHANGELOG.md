@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-25j] — KPIs más estrechos (ancho, no altura)
+
+### Changed
+
+- COLUMN KPIs **6** + Probabilidad **6** (antes 7+5).
+- Anchos por contenido: euros **2**, Margen/Crecimiento **1** (antes Crecimiento=2).
+- Altura de tarjetas KPI sin cambios.
+
 ## [2026-07-25i] — Layout: KPIs en COLUMN (7) + Probabilidad (5)
 
 ### Changed

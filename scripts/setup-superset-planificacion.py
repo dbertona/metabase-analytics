@@ -414,9 +414,16 @@ def persist_dashboard_config(
         "  font-size: 20px !important; font-weight: 700 !important; color: #143b41;\n"
         "  margin: 4px 0 !important;\n"
         "}\n"
-        "/* Tarjetas KPI compactas */\n"
-        ".dashboard-component-chart-holder {\n"
-        "  padding: 4px 8px !important;\n"
+        "/* Tarjetas KPI: padding horizontal mínimo (ancho = rejilla compacta) */\n"
+        ".dashboard-component-chart-holder:has(.superset-legacy-chart-big-number) {\n"
+        "  padding: 4px 4px !important;\n"
+        "}\n"
+        ".superset-legacy-chart-big-number {\n"
+        "  align-items: flex-start !important;\n"
+        "}\n"
+        ".superset-legacy-chart-big-number .header-line,\n"
+        ".superset-legacy-chart-big-number .subheader-line {\n"
+        "  text-align: left !important;\n"
         "}\n"
         "/* Tabla Resumen mensual: sin barras de color, filas compactas */\n"
         "[data-test-chart-name*='Resumen mensual'] .table,\n"
@@ -541,11 +548,12 @@ def persist_dashboard_config(
 
 
 def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
-    """Layout: COLUMN KPIs (7) + Probabilidad (5) a la derecha a altura completa.
+    """Layout: COLUMN KPIs compactos (6) + Probabilidad (6) a la derecha.
 
     ROW-KPI-BAND
-      ├── COLUMN-KPIS (width 7): Obj + Plan (headers + 4 tarjetas c/u)
-      └── Facturación por Probabilidad (width 5, height ≈ Obj+Plan)
+      ├── COLUMN-KPIS (width 6): Obj + Plan — anchos mínimos por contenido
+      │     Facturación/Beneficio=2 (euros largos), Margen/Crecimiento=1
+      └── Facturación por Probabilidad (width 6, height ≈ Obj+Plan)
     Luego Resumen mensual (12) y Evolución + Margen.
     """
     obj_keys = [c["key"] for c in charts if c["section"] == "obj"]
@@ -555,6 +563,8 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
     chart_keys = [c["key"] for c in charts if c["section"] == "chart"]
     prob_key = prob_keys[0] if prob_keys else None
 
+    # Ancho columna = suma anchos KPI (2+1+1+2). No estirar tarjetas de más.
+    kpi_col_width = 6
     col_parents = ["ROOT_ID", "GRID_ID", "ROW-KPI-BAND", "COLUMN-KPIS"]
     position: dict[str, Any] = {
         "DASHBOARD_VERSION": "v2",
@@ -577,7 +587,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "id": "COLUMN-KPIS",
             "children": ["ROW-HDR-OBJ", "ROW-OBJ", "ROW-HDR-PLAN", "ROW-PLAN"],
             "parents": ["ROOT_ID", "GRID_ID", "ROW-KPI-BAND"],
-            "meta": {"background": "BACKGROUND_TRANSPARENT", "width": 7},
+            "meta": {"background": "BACKGROUND_TRANSPARENT", "width": kpi_col_width},
         },
         "ROW-HDR-OBJ": {
             "type": "ROW", "id": "ROW-HDR-OBJ", "children": ["HEADER-OBJ"],
@@ -592,13 +602,20 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         "HEADER-OBJ": {
             "type": "MARKDOWN", "id": "HEADER-OBJ", "children": [],
             "parents": col_parents + ["ROW-HDR-OBJ"],
-            # width relativo al COLUMN (7)
-            "meta": {"code": "## Objetivos Anuales", "width": 7, "height": 2},
+            "meta": {
+                "code": "## Objetivos Anuales",
+                "width": kpi_col_width,
+                "height": 2,
+            },
         },
         "HEADER-PLAN": {
             "type": "MARKDOWN", "id": "HEADER-PLAN", "children": [],
             "parents": col_parents + ["ROW-HDR-PLAN"],
-            "meta": {"code": "## Planificación Actual", "width": 7, "height": 2},
+            "meta": {
+                "code": "## Planificación Actual",
+                "width": kpi_col_width,
+                "height": 2,
+            },
         },
         "ROW-OBJ": {
             "type": "ROW", "id": "ROW-OBJ",
@@ -625,16 +642,16 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
     }
-    # Dentro de COLUMN width 7: Facturación 2 + Margen 1 + Crecimiento 2 + Beneficio 2 = 7
-    # Probabilidad a la derecha: width 5, height ≈ headers(2+2) + KPIs(14+14) = 32
+    # Anchos horizontales mínimos (altura KPI sin tocar). Prob = resto (12-6=6).
     sizes = {
         "obj": (2, 14),
         "plan": (2, 14),
         "table": (12, 32),
-        "prob": (5, 32),
+        "prob": (6, 32),
         "chart": (6, 36),
     }
-    kpi_widths = {"Facturación": 2, "Margen": 1, "Crecimiento": 2, "Beneficio": 2}
+    # Euros largos → 2; porcentajes cortos → 1 (total 6 = COLUMN)
+    kpi_widths = {"Facturación": 2, "Margen": 1, "Crecimiento": 1, "Beneficio": 2}
     for c in charts:
         w, h = sizes[c["section"]]
         display_name = c["name"].split("· ")[-1]
