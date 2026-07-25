@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-25aj] — Azure OAuth: metadata OIDC v2.0 (fix iss)
+
+### Fixed
+
+- `server_metadata_url` apunta a `/v2.0/.well-known/...` para alinear el
+  claim `iss` del id_token (evita quedarse en login tras Azure).
+
 ## [2026-07-25ai] — OAuth Azure: redirect_uri absoluto bajo /analytics
 
 ### Fixed

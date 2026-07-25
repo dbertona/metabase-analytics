@@ -185,11 +185,15 @@ if AZURE_CLIENT_SECRET:
                     "https://apps.powersolution.es/analytics/oauth-authorized/azure"
                 ),
                 "server_metadata_url": (
+                    # Debe ser /v2.0/... : el metadata v1 expone iss
+                    # sts.windows.net y el id_token v2.0 usa
+                    # login.microsoftonline.com/.../v2.0 → invalid_claim 'iss'
                     f"https://login.microsoftonline.com/{AZURE_TENANT_ID}"
-                    "/.well-known/openid-configuration"
+                    "/v2.0/.well-known/openid-configuration"
                 ),
                 "client_kwargs": {
                     "scope": "openid email profile User.Read offline_access",
+                    "token_endpoint_auth_method": "client_secret_post",
                 },
                 "api_base_url": "https://graph.microsoft.com/v1.0/",
                 "request_token_url": None,
