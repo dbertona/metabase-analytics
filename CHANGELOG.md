@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-25q] — Sin scrollbar en tarjetas KPI
+
+### Changed
+
+- CSS: `overflow: hidden` + ocultar scrollbar en big_number KPI.
+
 ## [2026-07-25p] — Etiqueta KPI Crecimiento → Δ %
 
 ### Changed
