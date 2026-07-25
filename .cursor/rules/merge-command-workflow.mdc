@@ -1,1 +1,87 @@
-../../docs/shared/cursor-rules/merge-command-workflow.mdc
+---
+alwaysApply: true
+priority: CRITICAL
+description: Comando «merge» — documentar, cerrar rama y merge a main sin confirmación extra
+---
+
+# 🔀 COMANDO «MERGE» — DOCUMENTAR + CERRAR + MERGE
+
+> **Repo:** `superset-analytics` — regla local (no symlink al submódulo shared).
+> El script canónico es `./scripts/merge-safe.sh` (sin npm; valida JSON workflows).
+
+## Trigger
+
+Cuando el usuario diga **«merge»** (o sinónimos válidos), ejecutar **todo el flujo** sin pedir confirmación adicional.
+
+**Palabras válidas (case-insensitive):** `merge`, `merge a main`, `haz merge`, `haz el merge`, `cierra la rama`, `cierra rama`, `cierra`, `publica`, `publicar`, `despliega`, `está listo`, `sube a main`
+
+**⛔ NO pedir segunda confirmación** si el mensaje ya contiene una palabra válida.
+
+---
+
+## Flujo obligatorio (en orden)
+
+### 1. Documentar
+
+1. `git log main..HEAD --oneline` — resumir cambios de la rama.
+2. **`CHANGELOG.md`:** sección fechada o ampliar `[Unreleased]` según convenga.
+3. **Docs del área** si el diff lo requiere (`docs/shared/analytics/`, `docs/ACTUALIZAR_WORKFLOW_004.md`, runbooks).
+4. Commit en la rama si hay docs pendientes: `docs: documentar cierre de rama <nombre-rama>`.
+
+### 2. Pre-flight
+
+- Working tree limpio; si hay cambios sin commitear → commitear primero.
+- Verificar rama `feat/*`, `fix/*` o `hotfix/*` (NO `main`).
+- Submódulo `docs/shared` sin cambios pendientes en el padre.
+
+### 3. Versión
+
+- Este repo **no** usa bump de `package.json` / `app.json` en el cierre.
+- No inventar versión semver salvo pedido explícito del usuario.
+
+### 4. Cerrar rama — ejecutar `./scripts/merge-safe.sh`
+
+**El agente ejecuta el script** (no delegar al usuario salvo fallo del hook).
+
+Este repo **no tiene npm lint/build**. El script valida JSON de workflows tocados y avisa de SQL; el esqueleto git (`--no-ff`, push gitea, overrides) sigue el patrón de Apps.
+
+| Tipo de cambio | Comando |
+| --- | --- |
+| Workflows n8n / SQL / scripts ops | `QUIET=1 ./scripts/merge-safe.sh <rama>` |
+| Solo docs / reglas `.mdc` | `QUIET=1 SKIP_VALIDATE=1 ./scripts/merge-safe.sh <rama>` |
+| Dry-run | `DRY_RUN=1 ./scripts/merge-safe.sh <rama>` |
+
+Aliases aceptados (compat regla Apps): `SKIP_BUILD=1` / `SKIP_CONSIST=1` → equivalen a `SKIP_VALIDATE=1`.
+
+```bash
+# Desde la raíz del repo, en la rama a cerrar:
+QUIET=1 ./scripts/merge-safe.sh
+QUIET=1 ./scripts/merge-safe.sh fix/mi-rama
+```
+
+Tras el merge el checkout queda en `main`. No volver a la rama de feature.
+
+### 5. Post-merge (runtime)
+
+Si la rama tocó `src/workflows/004_*.json` → actualizar n8n (DEV y/o prod según alcance) con `update_n8n_workflow_postgres.py` — ver `docs/ACTUALIZAR_WORKFLOW_004.md`.
+
+Si tocó `sql/views/` → aplicar vistas en analytics DB (`./scripts/apply-bi-views.sh` o procedimiento documentado).
+
+### 6. Reportar
+
+```
+✅ Rama cerrada: <rama>
+📝 Documentado: CHANGELOG + <otros docs>
+🔀 Merge: <hash corto>
+📂 Rama actual: main
+⭐ Post-merge: <n8n / SQL / nada>
+```
+
+---
+
+## Errores
+
+- Validación JSON falla → **DETENER**, corregir en la rama, no mergear.
+- Errores críticos → `never-ignore-without-approval.mdc` antes de `--no-verify`.
+
+**Última actualización:** 2026-07-25
