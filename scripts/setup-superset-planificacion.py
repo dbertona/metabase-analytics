@@ -187,6 +187,37 @@ def apply_bi_views() -> None:
     subprocess.run(["bash", str(script)], check=True)
 
 
+def pull_ui_snapshot_before_push() -> None:
+    """Trae estado UI de Superset y avisa si difiere del snapshot previous.
+
+    Evita pisar edits manuales sin aviso. Override:
+      SKIP_SUPERSET_PULL=1
+      STRICT_UI_SYNC=1  → falla si hay divergencia vs previous
+    """
+    if os.environ.get("SKIP_SUPERSET_PULL", "").strip() in ("1", "true", "yes"):
+        print("SKIP_SUPERSET_PULL=1 — omitiendo pull de UI")
+        return
+    pull_script = ROOT / "scripts" / "pull-superset-dashboard.py"
+    if not pull_script.is_file():
+        print(f"AVISO: no existe {pull_script.name}; continuo sin pull")
+        return
+    strict = os.environ.get("STRICT_UI_SYNC", "").strip() in ("1", "true", "yes")
+    cmd = [sys.executable, str(pull_script)]
+    if strict:
+        cmd.append("--strict")
+    print("==> 0/4 Pull estado UI Superset (snapshot)...")
+    env = os.environ.copy()
+    env.setdefault("SUPERSET_URL", SUPERSET_URL)
+    env.setdefault("SUPERSET_USER", SUPERSET_USER)
+    env.setdefault("SUPERSET_PASSWORD", SUPERSET_PASSWORD)
+    result = subprocess.run(cmd, env=env, check=False)
+    if result.returncode != 0:
+        raise RuntimeError(
+            "Pull UI detectó divergencias (STRICT_UI_SYNC=1) o falló. "
+            "Revisa exports/superset-dashboard/latest/ o usa SKIP_SUPERSET_PULL=1."
+        )
+
+
 def metric_sum(column: str, label: str) -> dict[str, Any]:
     return {
         "expressionType": "SIMPLE",
@@ -612,6 +643,8 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def main() -> int:
+    pull_ui_snapshot_before_push()
+
     print("==> 1/4 Aplicando vistas BI en PostgreSQL...")
     apply_bi_views()
 

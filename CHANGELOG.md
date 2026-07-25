@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [2026-07-25g] — Pull UI Superset antes de regenerar dashboard
+
+### Added
+
+- **`scripts/pull-superset-dashboard.py`:** descarga dashboard Resumen + charts a
+  `exports/superset-dashboard/latest/` y compara con `previous/`.
+- **`setup-superset-planificacion.py`:** paso 0 = pull UI automático (aviso si hay edits
+  manuales). `SKIP_SUPERSET_PULL=1` / `STRICT_UI_SYNC=1`.
+
 ## [2026-07-25f] — Facturación por Probabilidad = P+R (0→100 como PBI)
 
 ### Fixed

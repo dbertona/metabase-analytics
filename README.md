@@ -36,7 +36,12 @@ cp env.example .env
 | Parar | `./scripts/stop.sh` |
 | Backup | `./scripts/backup.sh` |
 | Logs | `docker compose logs -f superset` |
-| Regenerar dashboard | `python3 scripts/setup-superset-planificacion.py` |
+| **Pull UI → snapshot** | `SUPERSET_URL=http://192.168.36.100:8088 python3 scripts/pull-superset-dashboard.py` |
+| Regenerar dashboard | `python3 scripts/setup-superset-planificacion.py` (hace pull UI antes) |
+
+**Importante:** cambios hechos a mano en la UI de Superset se **pisan** al regenerar.
+Antes de regenerar, el setup hace **pull** a `exports/superset-dashboard/latest/` y avisa si hay
+divergencia vs el snapshot previous. Ver [`exports/superset-dashboard/README.md`](exports/superset-dashboard/README.md).
 
 ## Estructura
 
@@ -47,7 +52,9 @@ cp env.example .env
 │   ├── start.sh                # Arranque + vistas BI + dashboard
 │   ├── apply-bi-views.sh       # Vistas SQL en PostgreSQL
 │   ├── setup-superset-planificacion.py
+│   ├── pull-superset-dashboard.py   # Trae estado UI antes de regenerar
 │   └── sql/bi_dashboard_planificacion_views.sql
+├── exports/superset-dashboard/      # Snapshots UI (latest/previous gitignored)
 └── data/superset-home/         # Metadatos Superset (local)
 ```
 
