@@ -75,7 +75,7 @@ Réplica del panel **Resumen** de Power BI (slug estable `planificacion-ps-analy
 
 **Datos:**
 - Objetivos → `bc_objectives_by_department`
-- Planificación (P/R híbrido en KPIs) → `bi_v_planificacion_kpi`
+- Planificación Actual (tipo P, paridad Resumen PBI) → `bi_v_planificacion_kpi`
 - Tabla Resumen / Tipo P|R → `bi_v_evolucion_mensual` (`v_se_resumen_mensual`)
 
 ## Seguimiento Económico (PBI)

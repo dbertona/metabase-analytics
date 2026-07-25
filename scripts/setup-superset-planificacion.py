@@ -29,6 +29,7 @@ SUPERSET_URL = os.environ.get("SUPERSET_URL", "http://localhost:8088").rstrip("/
 SUPERSET_USER = os.environ.get("SUPERSET_USER", "admin")
 SUPERSET_PASSWORD = os.environ.get("SUPERSET_PASSWORD", "PsSuperset#2026xK9!")
 CURRENT_YEAR = datetime.date.today().year
+DEFAULT_EMPRESA = "Power Solution Iberia SL"  # paridad panel Resumen PBI (PSI)
 DASHBOARD_TITLE = "Seguimiento Económico — Resumen"
 DASHBOARD_SLUG = "planificacion-ps-analytics"  # URL estable (Fase 3)
 
@@ -381,7 +382,14 @@ def persist_dashboard_config(
                 "filterType": "filter_select",
                 "type": "NATIVE_FILTER",
                 "targets": [{"datasetId": detail_ds, "column": {"name": "empresa"}}],
-                "defaultDataMask": {"filterState": {"value": None}},
+                "defaultDataMask": {
+                    "filterState": {"value": [DEFAULT_EMPRESA]},
+                    "extraFormData": {
+                        "filters": [
+                            {"col": "empresa", "op": "IN", "val": [DEFAULT_EMPRESA]}
+                        ]
+                    },
+                },
                 "controlValues": {
                     "multiSelect": True,
                     "enableEmptyFilter": False,
