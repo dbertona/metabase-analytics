@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-26ar] — Fuente más grande en Facturación por Probabilidad
+
+### Changed
+
+- Título del chart: 20px (antes 16px).
+- Ejes y valores ECharts: 15px vía `tail_js` (`setOption`).
+
 ## [2026-07-26aq] — Proyectos: sin scroll horizontal fantasma
 
 ### Fixed

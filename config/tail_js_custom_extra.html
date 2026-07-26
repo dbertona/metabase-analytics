@@ -516,7 +516,58 @@
     fixAgGridHeight();
     autoSizeAgGridColumns();
     hideResumenHeaderChrome();
+    bumpProbabilidadChartFonts();
   }, 800);
+
+  /**
+   * Facturación por Probabilidad (ECharts): ejes y valores más legibles.
+   * El texto del gráfico va en canvas → hay que tocar setOption, no CSS.
+   */
+  var PROB_FONT = 15;
+  function bumpProbabilidadChartFonts() {
+    if (!window.echarts || typeof window.echarts.getInstanceByDom !== "function") {
+      return;
+    }
+    var roots = document.querySelectorAll(
+      '[data-test-chart-name*="Facturación por Probabilidad"]'
+    );
+    Array.prototype.forEach.call(roots, function (root) {
+      var hosts = root.querySelectorAll("div");
+      for (var i = 0; i < hosts.length; i++) {
+        var inst = null;
+        try {
+          inst = window.echarts.getInstanceByDom(hosts[i]);
+        } catch (e) {
+          inst = null;
+        }
+        if (!inst || typeof inst.getOption !== "function") continue;
+        var opt = inst.getOption() || {};
+        var y0 = (opt.yAxis && opt.yAxis[0]) || {};
+        var yLabel = (y0.axisLabel && y0.axisLabel.fontSize) || 0;
+        if (yLabel >= PROB_FONT) return;
+        try {
+          inst.setOption(
+            {
+              textStyle: { fontSize: PROB_FONT },
+              xAxis: {
+                axisLabel: { fontSize: PROB_FONT },
+                nameTextStyle: { fontSize: PROB_FONT },
+              },
+              yAxis: {
+                axisLabel: { fontSize: PROB_FONT },
+                nameTextStyle: { fontSize: PROB_FONT },
+              },
+              series: [{ label: { fontSize: PROB_FONT } }],
+            },
+            false
+          );
+        } catch (err) {
+          /* chart remounting */
+        }
+        return;
+      }
+    });
+  }
 
   /**
    * Localiza el chart «Resumen mensual» por atributo o por título del slice.
