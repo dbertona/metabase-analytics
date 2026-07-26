@@ -33,6 +33,19 @@ LANGUAGES = {
     "en": {"flag": "us", "name": "English"},
 }
 
+
+def COMMON_BOOTSTRAP_OVERRIDES_FUNC(bootstrap_data: dict[str, Any]) -> dict[str, Any]:
+    """Inyecta language_pack ES en el bootstrap (Superset 6 solo lo sirve con login)."""
+    from flask_babel import get_locale
+    from superset.translations.utils import get_language_pack
+
+    locale = bootstrap_data.get("locale") or str(get_locale() or "es")
+    if hasattr(locale, "language"):
+        locale = locale.language  # type: ignore[assignment]
+    locale = str(locale or "es")
+    pack = get_language_pack(locale) or get_language_pack("es")
+    return {"language_pack": pack or {}}
+
 # Publicación bajo https://apps.powersolution.es/analytics/
 # create_app(superset_app_root=...) monta AppRootMiddleware y fija
 # APPLICATION_ROOT / STATIC_ASSETS_PREFIX = /analytics.
