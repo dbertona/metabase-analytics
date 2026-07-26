@@ -286,7 +286,8 @@ def resumen_mensual_params() -> dict[str, Any]:
     return {
         "adhoc_filters": dim_adhoc_filters("tipo"),
         "query_mode": "aggregate",
-        "groupby": ["ano_mes"],
+        # year+month en groupby: orden cronológico real (ano_mes es MM/YYYY y no ordena bien)
+        "groupby": ["year", "month", "ano_mes"],
         "metrics": [
             metric_sum("facturacion", "Fact."),
             metric_sum("coste", "Coste"),
@@ -296,7 +297,7 @@ def resumen_mensual_params() -> dict[str, Any]:
             ),
         ],
         "percent_metrics": [],
-        "order_by_cols": ['["ano_mes", true]'],
+        "order_by_cols": ['["year", true]', '["month", true]'],
         "row_limit": 1000,
         # Sin page_length: evita el selector "Show N entries per page" (pocas filas/mes)
         "server_pagination": False,
@@ -307,6 +308,8 @@ def resumen_mensual_params() -> dict[str, Any]:
         "align_pn": False,
         "table_timestamp_format": "smart_date",
         "column_config": {
+            "year": {"visible": False},
+            "month": {"visible": False},
             "ano_mes": {
                 "customColumnName": "Año/Mes",
             },
@@ -766,6 +769,21 @@ def persist_dashboard_config(
         "[data-test-chart-name*='Resumen mensual'] .ag-floating-bottom .anticon,\n"
         "[data-test-chart-name*='Proyectos'] .ag-floating-bottom .anticon {\n"
         "  display: none !important;\n"
+        "}\n"
+        "/* Resumen mensual: ocultar year/month (solo sirven para orden cronológico) */\n"
+        ".chart-slice[data-test-chart-name*='Resumen mensual'] .ag-header-cell[col-id='year'],\n"
+        ".chart-slice[data-test-chart-name*='Resumen mensual'] .ag-cell[col-id='year'],\n"
+        ".chart-slice[data-test-chart-name*='Resumen mensual'] .ag-header-cell[col-id='month'],\n"
+        ".chart-slice[data-test-chart-name*='Resumen mensual'] .ag-cell[col-id='month'],\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-header-cell[col-id='year'],\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-cell[col-id='year'],\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-header-cell[col-id='month'],\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-cell[col-id='month'] {\n"
+        "  display: none !important;\n"
+        "  width: 0 !important;\n"
+        "  max-width: 0 !important;\n"
+        "  padding: 0 !important;\n"
+        "  border: none !important;\n"
         "}\n"
         "/* Resumen mensual: ocultar filtro de cabecera + asa de resize (línea) */\n"
         ".chart-slice[data-test-chart-name*='Resumen mensual'] .custom-header ~ *,\n"

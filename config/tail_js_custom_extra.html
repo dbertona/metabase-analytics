@@ -238,6 +238,11 @@
     return /Fact|Coste|Margen|facturacion|coste|margen/i.test(id);
   }
 
+  function isHiddenSortColId(colId) {
+    var id = String(colId || "");
+    return id === "year" || id === "month";
+  }
+
   function getViewportWidth(chart) {
     var vp =
       chart.querySelector(".ag-center-cols-viewport") ||
@@ -272,6 +277,7 @@
     Array.prototype.forEach.call(headerCells, function (hc) {
       var colId = hc.getAttribute("col-id");
       if (!colId || colId.charAt(0) === "_") return;
+      if (isHiddenSortColId(colId)) return;
       var headerEl =
         hc.querySelector(".custom-header") ||
         hc.querySelector(".ag-header-cell-text") ||
@@ -526,6 +532,17 @@
       '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-header-cell svg[viewBox="0 0 24 24"],',
       '[data-test-chart-name*="Resumen mensual"] .ag-header-cell svg[viewBox="0 0 24 24"] {',
       "  display: none !important;",
+      "}",
+      /* year/month ocultos (orden cronológico) */
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-header-cell[col-id="year"],',
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-cell[col-id="year"],',
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-header-cell[col-id="month"],',
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-cell[col-id="month"] {',
+      "  display: none !important;",
+      "  width: 0 !important;",
+      "  max-width: 0 !important;",
+      "  padding: 0 !important;",
+      "  border: none !important;",
       "}",
     ].join("\n");
     if (!style) {

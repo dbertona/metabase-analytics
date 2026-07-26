@@ -47,7 +47,8 @@ def mi_tabla_mensual_params() -> dict:
     return {
         "adhoc_filters": dim_adhoc_filters("tipo"),   # filtros cross-filter
         "query_mode": "aggregate",
-        "groupby": ["ano_mes"],
+        # year+month: orden cronológico (ano_mes MM/YYYY no ordena bien como texto)
+        "groupby": ["year", "month", "ano_mes"],
         "metrics": [
             metric_sum("facturacion", "Fact."),
             metric_sum("coste", "Coste"),
@@ -57,7 +58,7 @@ def mi_tabla_mensual_params() -> dict:
             ),
         ],
         "percent_metrics": [],
-        "order_by_cols": ['["ano_mes", true]'],
+        "order_by_cols": ['["year", true]', '["month", true]'],
         "row_limit": 1000,
         "server_pagination": False,
         "show_totals": True,
@@ -67,6 +68,8 @@ def mi_tabla_mensual_params() -> dict:
         "align_pn": False,
         "table_timestamp_format": "smart_date",
         "column_config": {
+            "year": {"visible": False},
+            "month": {"visible": False},
             "ano_mes": {"customColumnName": "Año/Mes"},
             "Fact.": {
                 "d3NumberFormat": ",.0f",

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-26ap] — Resumen mensual: orden cronológico mes/año
+
+### Fixed
+
+- Tabla Resumen: `groupby` year+month+ano_mes y `ORDER BY year, month ASC` (ano_mes `MM/YYYY` no ordenaba bien como texto). Columnas year/month ocultas.
+
 ## [2026-07-26b] — Table V2 AG Grid, fuente, búsqueda junto al título, altura completa
 
 ### Added
