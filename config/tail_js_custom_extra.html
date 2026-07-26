@@ -369,6 +369,13 @@
         var sorted = rows.slice().sort(function (a, b) {
           return sortKey(a) - sortKey(b);
         });
+        var isAscending = true;
+        for (var ai = 1; ai < sorted.length; ai++) {
+          if (sortKey(sorted[ai - 1]) > sortKey(sorted[ai])) {
+            isAscending = false;
+            break;
+          }
+        }
         var isDifferent = false;
         for (var ri = 0; ri < rows.length; ri++) {
           if (keyOf(rows[ri]) !== keyOf(sorted[ri])) {
@@ -377,10 +384,36 @@
           }
         }
         if (isDifferent) {
+          // Clonar para evitar que AG Grid optimice "sin cambios" por referencia.
+          var cloned = sorted.map(function (r) {
+            return Object.assign({}, r);
+          });
           if (typeof api.setGridOption === "function") {
-            api.setGridOption("rowData", sorted);
+            api.setGridOption("rowData", cloned);
           } else if (typeof api.setRowData === "function") {
-            api.setRowData(sorted);
+            api.setRowData(cloned);
+          } else if (typeof api.applyTransaction === "function") {
+            try {
+              api.applyTransaction({ remove: rows });
+              api.applyTransaction({ add: cloned, addIndex: 0 });
+            } catch (e3) {
+              /* ignore */
+            }
+          }
+
+          // Reintento: reafirmar sort model tras reset de rowData.
+          if (typeof api.setSortModel === "function") {
+            if (hasYearMonth) {
+              api.setSortModel([
+                { colId: "year", sort: "asc" },
+                { colId: "month", sort: "asc" },
+              ]);
+            } else {
+              api.setSortModel([{ colId: dateColId, sort: "asc" }]);
+            }
+          }
+          if (typeof api.refreshClientSideRowModel === "function") {
+            api.refreshClientSideRowModel("sort");
           }
         }
       }
