@@ -767,6 +767,12 @@ def persist_dashboard_config(
         "[data-test-chart-name*='Proyectos'] .ag-floating-bottom .anticon {\n"
         "  display: none !important;\n"
         "}\n"
+        "/* Resumen mensual: ocultar filtro de cabecera + asa de resize (línea) */\n"
+        "[data-test-chart-name*='Resumen mensual'] .header-filter,\n"
+        "[data-test-chart-name*='Resumen mensual'] .three-dots-menu,\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-header-cell-resize {\n"
+        "  display: none !important;\n"
+        "}\n"
     )
 
     # Superset 6.1: IDs DEBEN empezar por NATIVE_FILTER- (isFilterId en FiltersConfigModal).
