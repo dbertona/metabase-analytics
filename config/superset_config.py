@@ -204,8 +204,9 @@ AZURE_CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET", "").strip()
 if AZURE_CLIENT_SECRET:
     AUTH_TYPE = AUTH_OAUTH
     AUTH_USER_REGISTRATION = True
-    # Solo lectura por defecto; Admin se asigna a mano en Settings → Users
-    AUTH_USER_REGISTRATION_ROLE = "Gamma"
+    # Solo lectura (sin Edit chart). Admin/Alpha se asignan a mano.
+    # Rol custom PS_Viewer en metadata DB (sin can_explore / can_write Chart).
+    AUTH_USER_REGISTRATION_ROLE = "PS_Viewer"
     AUTH_ROLES_SYNC_AT_LOGIN = False
 
     OAUTH_PROVIDERS = [

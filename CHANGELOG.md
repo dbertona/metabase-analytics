@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-26ac] — PS_Viewer solo lectura (sin Edit chart)
+
+### Fixed
+
+- Rol `PS_Viewer` sin `can_explore` / `can_slice` / writes (el menú “Edit chart”
+  se muestra si hay `can_explore` en Superset, no solo `can_write` Chart).
+- Altas Azure nuevas: `AUTH_USER_REGISTRATION_ROLE = PS_Viewer`.
+
 ## [2026-07-26ab] — Fix logout 404 por doble /analytics
 
 ### Fixed
