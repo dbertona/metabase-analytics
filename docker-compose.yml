@@ -24,6 +24,9 @@ services:
     volumes:
       - ./config/superset_config.py:/app/pythonpath/superset_config.py:ro
       - ./config/tail_js_custom_extra.html:/app/superset/templates/tail_js_custom_extra.html:ro
+      # i18n ES (la imagen lean 6.1 no incluye messages.json/.mo compilados)
+      - ./config/translations/es/LC_MESSAGES/messages.json:/app/superset/translations/es/LC_MESSAGES/messages.json:ro
+      - ./config/translations/es/LC_MESSAGES/messages.mo:/app/superset/translations/es/LC_MESSAGES/messages.mo:ro
       - ./data/superset-home:/app/superset_home
     command: >
       /bin/sh -c "

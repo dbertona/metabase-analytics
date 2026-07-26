@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-26ad] — Interfaz Superset en español
+
+### Changed
+
+- `BABEL_DEFAULT_LOCALE=es` + `LANGUAGES` (es/en) y locale de sesión forzado a `es`.
+- Pack `messages.json` / `messages.mo` montados (imagen lean no los trae compilados).
+
 ## [2026-07-26ac] — PS_Viewer solo lectura (sin Edit chart)
 
 ### Fixed

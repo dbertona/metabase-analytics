@@ -25,6 +25,14 @@ FEATURE_FLAGS = {
 
 WTF_CSRF_ENABLED = True
 
+# Interfaz en español (pack montado en docker-compose; imagen lean no lo trae)
+BABEL_DEFAULT_LOCALE = "es"
+BABEL_DEFAULT_FOLDER = "superset/translations"
+LANGUAGES = {
+    "es": {"flag": "es", "name": "Español"},
+    "en": {"flag": "us", "name": "English"},
+}
+
 # Publicación bajo https://apps.powersolution.es/analytics/
 # create_app(superset_app_root=...) monta AppRootMiddleware y fija
 # APPLICATION_ROOT / STATIC_ASSETS_PREFIX = /analytics.
@@ -98,18 +106,24 @@ class PsAppInitializer(SupersetAppInitializer):
 
     def post_init(self) -> None:
         super().post_init()
+        app = self.superset_app
         app_root = self._app_root()
-        if not app_root or app_root == "/":
-            return
-        self.superset_app.wsgi_app = _CollapseDoubleAppRootMiddleware(
-            self.superset_app.wsgi_app, app_root
-        )
-        logger.info(
-            "PS: middleware anti doble APP_ROOT activo (%s%s → %s)",
-            app_root,
-            app_root,
-            app_root,
-        )
+        if app_root and app_root != "/":
+            app.wsgi_app = _CollapseDoubleAppRootMiddleware(app.wsgi_app, app_root)
+            logger.info(
+                "PS: middleware anti doble APP_ROOT activo (%s%s → %s)",
+                app_root,
+                app_root,
+                app_root,
+            )
+
+        # Forzar locale español en sesión (usuarios con cookie en "en")
+        from flask import session
+
+        @app.before_request
+        def _ps_force_locale_es() -> None:
+            if session.get("locale") != "es":
+                session["locale"] = "es"
 
 
 APP_INITIALIZER = PsAppInitializer

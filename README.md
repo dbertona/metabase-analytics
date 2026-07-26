@@ -30,6 +30,7 @@ cp env.example .env
 - **Login:** Microsoft (Azure AD) — misma App Registration que Timesheet  
   Redirect: `https://apps.powersolution.es/analytics/oauth-authorized/azure`
 - **Usuario local (fallback sin `AZURE_CLIENT_SECRET`):** `admin`
+- **Idioma UI:** español (`BABEL_DEFAULT_LOCALE=es`; packs en `config/translations/es/`)
 
 ## Gestión
 
