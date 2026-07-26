@@ -69,6 +69,7 @@ def mi_tabla_mensual_params() -> dict:
         "column_config": {
             "ano_mes": {"customColumnName": "Año/Mes"},
             "Facturación": {
+                "customColumnName": "Fact.",
                 "d3NumberFormat": ",.0f",
                 "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
                 "showCellBars": False,

@@ -311,6 +311,7 @@ def resumen_mensual_params() -> dict[str, Any]:
                 "customColumnName": "Año/Mes",
             },
             "Facturación": {
+                "customColumnName": "Fact.",
                 "d3NumberFormat": ",.0f",
                 "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
                 "showCellBars": False,
