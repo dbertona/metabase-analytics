@@ -23,6 +23,7 @@ services:
       - .env
     volumes:
       - ./config/superset_config.py:/app/pythonpath/superset_config.py:ro
+      - ./config/tail_js_custom_extra.html:/app/superset/templates/tail_js_custom_extra.html:ro
       - ./data/superset-home:/app/superset_home
     command: >
       /bin/sh -c "

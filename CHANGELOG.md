@@ -6,9 +6,9 @@
 
 ### Changed
 
-- Patch frontend inyectado via `tail_js_custom_extra.html` (desde
-  `PsAppInitializer`) para que la barra del dashboard muestre el usuario
-  autenticado en sesión en vez del propietario del dashboard.
+- Patch frontend inyectado via `config/tail_js_custom_extra.html` montado en
+  `tail_js_custom_extra.html` para que la barra del dashboard muestre el
+  usuario autenticado en sesión en vez del propietario del dashboard.
 
 ## [2026-07-25aj] — Azure OAuth: metadata OIDC v2.0 (fix iss)
 
