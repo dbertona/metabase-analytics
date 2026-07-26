@@ -4,6 +4,54 @@
     return window.location.pathname.indexOf("/analytics/") === 0 ? "/analytics" : "";
   }
 
+  // Bug APP_ROOT: ensureAppRoot() duplica /analytics en logout (y otros links).
+  // Bootstrap ya trae /analytics/logout/ → el menú navega a /analytics/analytics/logout/.
+  function collapseDoubleAppRoot(url) {
+    if (!url) return url;
+    return String(url).replace(/\/analytics\/analytics(\/|$)/g, "/analytics$1");
+  }
+
+  function fixDoubleAppRootAnchors(rootEl) {
+    var scope = rootEl || document;
+    var nodes = scope.querySelectorAll
+      ? scope.querySelectorAll('a[href*="/analytics/analytics"]')
+      : [];
+    Array.prototype.forEach.call(nodes, function (a) {
+      var href = a.getAttribute("href");
+      var fixed = collapseDoubleAppRoot(href);
+      if (fixed && fixed !== href) a.setAttribute("href", fixed);
+    });
+  }
+
+  document.addEventListener(
+    "click",
+    function (ev) {
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      var a = t.closest("a[href]");
+      if (!a) return;
+      var href = a.getAttribute("href") || "";
+      if (href.indexOf("/analytics/analytics") === -1) return;
+      var fixed = collapseDoubleAppRoot(href);
+      if (fixed === href) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      window.location.assign(fixed);
+    },
+    true
+  );
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () {
+      fixDoubleAppRootAnchors(document);
+    });
+  } else {
+    fixDoubleAppRootAnchors(document);
+  }
+  setInterval(function () {
+    fixDoubleAppRootAnchors(document);
+  }, 1500);
+
   function isDashboardPage() {
     return (
       window.location.pathname.indexOf("/superset/dashboard/") !== -1 ||

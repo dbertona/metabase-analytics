@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [2026-07-26ab] — Fix logout 404 por doble /analytics
+
+### Fixed
+
+- Logout del menú iba a `/analytics/analytics/logout/` (404 Superset): el JS
+  `ensureAppRoot()` antepone APP_ROOT a `user_logout_url` que ya lo incluye.
+- Middleware WSGI colapsa `/analytics/analytics/*` → `/analytics/*`.
+- Patch en `tail_js_custom_extra.html` corrige hrefs/clicks con doble prefijo.
+
 ## [2026-07-26aa] — Dashboard header: usuario logado en lugar de owner
 
 ### Changed

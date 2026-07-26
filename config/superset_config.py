@@ -33,23 +33,45 @@ WTF_CSRF_ENABLED = True
 # brandLogoUrl / APP_ICON, pero el frontend vuelve a anteponer
 # static_assets_prefix → /analytics/analytics/... (404) o, si se fuerza
 # STATIC_ASSETS_PREFIX="/", el HTML genera //static/... (host inventado).
-# Solución: dejar prefijos normales y deshacer el doble prefijo del theme
-# en APP_INITIALIZER (abajo).
+# Mismo bug en menú Logout: bootstrap ya trae user_logout_url=/analytics/logout/
+# y ensureAppRoot() antepone otra vez → /analytics/analytics/logout/ (404).
+# Solución: deshacer doble prefijo del theme + middleware que colapsa
+# /analytics/analytics/* → /analytics/*.
+
+
+class _CollapseDoubleAppRootMiddleware:
+    """Colapsa PATH_INFO con APP_ROOT duplicado (logout/menu/links)."""
+
+    def __init__(self, wsgi_app: Any, app_root: str) -> None:
+        self.wsgi_app = wsgi_app
+        self.app_root = (app_root or "").rstrip("/")
+        self.double = f"{self.app_root}{self.app_root}" if self.app_root else ""
+
+    def __call__(self, environ: dict[str, Any], start_response: Any) -> Any:
+        if self.double:
+            path = environ.get("PATH_INFO") or ""
+            if path == self.double or path.startswith(f"{self.double}/"):
+                environ = dict(environ)
+                environ["PATH_INFO"] = path[len(self.app_root) :] or "/"
+        return self.wsgi_app(environ, start_response)
 
 
 class PsAppInitializer(SupersetAppInitializer):
-    """Corrige URLs de theme duplicadas por create_app + APP_ROOT."""
+    """Corrige URLs de theme duplicadas y doble APP_ROOT en rutas."""
 
     def __init__(self, app: Flask) -> None:
         super().__init__(app)
         self._unprefix_app_root_theme_urls()
 
-    def _unprefix_app_root_theme_urls(self) -> None:
-        app_root = (
+    def _app_root(self) -> str:
+        return (
             os.environ.get("SUPERSET_APP_ROOT")
             or self.superset_app.config.get("APPLICATION_ROOT")
             or ""
         ).rstrip("/")
+
+    def _unprefix_app_root_theme_urls(self) -> None:
+        app_root = self._app_root()
         if not app_root or app_root == "/":
             return
 
@@ -74,6 +96,20 @@ class PsAppInitializer(SupersetAppInitializer):
             if href == app_root or href == f"{app_root}/":
                 token["brandLogoHref"] = "/"
 
+    def post_init(self) -> None:
+        super().post_init()
+        app_root = self._app_root()
+        if not app_root or app_root == "/":
+            return
+        self.superset_app.wsgi_app = _CollapseDoubleAppRootMiddleware(
+            self.superset_app.wsgi_app, app_root
+        )
+        logger.info(
+            "PS: middleware anti doble APP_ROOT activo (%s%s → %s)",
+            app_root,
+            app_root,
+            app_root,
+        )
 
 
 APP_INITIALIZER = PsAppInitializer
