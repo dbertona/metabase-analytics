@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-26aw] — Resumen: solo ano_mes + sort JS + 4 columnas visibles
+
+### Fixed
+
+- Eliminados `year`/`month` del groupby (ocupaban ancho y cortaban Coste/Margen).
+- Orden cronológico de `MM/YYYY` con comparator en `tail_js`.
+- Autosize encoge las 4 columnas para que quepan a la izquierda sin scroll.
+
 ## [2026-07-26av] — Probabilidad: números = tamaño tablas (fix real)
 
 ### Fixed

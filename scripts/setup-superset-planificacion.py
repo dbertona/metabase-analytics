@@ -286,8 +286,9 @@ def resumen_mensual_params() -> dict[str, Any]:
     return {
         "adhoc_filters": dim_adhoc_filters("tipo"),
         "query_mode": "aggregate",
-        # year+month en groupby: orden cronológico real (ano_mes es MM/YYYY y no ordena bien)
-        "groupby": ["year", "month", "ano_mes"],
+        # Solo ano_mes visible. Orden cronológico MM/YYYY lo aplica tail_js
+        # (year/month en groupby dejaban hueco y cortaban Coste/Margen).
+        "groupby": ["ano_mes"],
         "metrics": [
             metric_sum("facturacion", "Fact."),
             metric_sum("coste", "Coste"),
@@ -297,7 +298,7 @@ def resumen_mensual_params() -> dict[str, Any]:
             ),
         ],
         "percent_metrics": [],
-        "order_by_cols": ['["year", true]', '["month", true]'],
+        "order_by_cols": [],
         "row_limit": 1000,
         # Sin page_length: evita el selector "Show N entries per page" (pocas filas/mes)
         "server_pagination": False,
@@ -308,8 +309,6 @@ def resumen_mensual_params() -> dict[str, Any]:
         "align_pn": False,
         "table_timestamp_format": "smart_date",
         "column_config": {
-            "year": {"visible": False},
-            "month": {"visible": False},
             "ano_mes": {
                 "customColumnName": "Año/Mes",
             },

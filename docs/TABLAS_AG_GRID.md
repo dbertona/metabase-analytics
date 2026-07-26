@@ -47,8 +47,8 @@ def mi_tabla_mensual_params() -> dict:
     return {
         "adhoc_filters": dim_adhoc_filters("tipo"),   # filtros cross-filter
         "query_mode": "aggregate",
-        # year+month: orden cronológico (ano_mes MM/YYYY no ordena bien como texto)
-        "groupby": ["year", "month", "ano_mes"],
+        # Solo ano_mes (year/month en groupby rompían el layout). Orden cronológico vía JS.
+        "groupby": ["ano_mes"],
         "metrics": [
             metric_sum("facturacion", "Fact."),
             metric_sum("coste", "Coste"),
@@ -58,7 +58,7 @@ def mi_tabla_mensual_params() -> dict:
             ),
         ],
         "percent_metrics": [],
-        "order_by_cols": ['["year", true]', '["month", true]'],
+        "order_by_cols": [],
         "row_limit": 1000,
         "server_pagination": False,
         "show_totals": True,
@@ -68,8 +68,6 @@ def mi_tabla_mensual_params() -> dict:
         "align_pn": False,
         "table_timestamp_format": "smart_date",
         "column_config": {
-            "year": {"visible": False},
-            "month": {"visible": False},
             "ano_mes": {"customColumnName": "Año/Mes"},
             "Fact.": {
                 "d3NumberFormat": ",.0f",
@@ -88,6 +86,8 @@ def mi_tabla_mensual_params() -> dict:
         },
     }
 ```
+
+> **Orden cronológico:** `ano_mes` es texto `MM/YYYY` y no ordena bien. El `tail_js` aplica un `comparator` que ordena por año/mes. No uses `year`/`month` en `groupby` (ocupan ancho aunque estén ocultas).
 
 ### Tabla de proyectos (con buscador)
 

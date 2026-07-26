@@ -238,9 +238,37 @@
     return /Fact|Coste|Margen|facturacion|coste|margen/i.test(id);
   }
 
-  function isHiddenSortColId(colId) {
-    var id = String(colId || "");
-    return id === "year" || id === "month";
+  /** Orden cronológico de ano_mes (MM/YYYY) en cliente — sin columnas year/month. */
+  function anoMesSortKey(value) {
+    var m = String(value || "").match(/(\d{1,2})\s*\/\s*(\d{4})/);
+    if (!m) return 0;
+    return parseInt(m[2], 10) * 100 + parseInt(m[1], 10);
+  }
+
+  function sortResumenByAnoMes(api) {
+    if (!api) return;
+    try {
+      var colDef =
+        typeof api.getColumnDef === "function" ? api.getColumnDef("ano_mes") : null;
+      if (colDef) {
+        colDef.comparator = function (a, b) {
+          return anoMesSortKey(a) - anoMesSortKey(b);
+        };
+      }
+      if (typeof api.applyColumnState === "function") {
+        api.applyColumnState({
+          state: [{ colId: "ano_mes", sort: "asc", sortIndex: 0 }],
+          defaultState: { sort: null },
+        });
+      }
+      if (typeof api.refreshClientSideRowModel === "function") {
+        api.refreshClientSideRowModel("sort");
+      } else if (typeof api.onSortChanged === "function") {
+        api.onSortChanged();
+      }
+    } catch (e) {
+      /* grid montando */
+    }
   }
 
   /** year/month: ordenan pero no deben ocupar píxeles (hueco a la izquierda). */
@@ -463,11 +491,16 @@
       }
     } else if (opts.fitViewport && avail > 80) {
       var total = 0;
-      for (var ti = 0; ti < state.length; ti++) total += state[ti].width;
+      for (var ti = 0; ti < state.length; ti++) {
+        if (isHiddenSortColId(state[ti].colId)) continue;
+        total += state[ti].width;
+      }
+      // Encoger SIEMPRE si no cabe (pantallas estrechas / card chica)
       if (total > avail) {
         var scale = (avail - 2) / total;
         for (var si = 0; si < state.length; si++) {
-          var nw = Math.max(40, Math.floor(state[si].width * scale));
+          if (isHiddenSortColId(state[si].colId)) continue;
+          var nw = Math.max(48, Math.floor(state[si].width * scale));
           state[si].width = nw;
           if (opts.lock || (opts.lockMetrics && isMetricColId(state[si].colId))) {
             state[si].minWidth = nw;
@@ -532,12 +565,15 @@
         try {
           var resumen = isResumenMensualChart(chart);
           var proyectos = isProyectosChart(chart);
-          if (resumen) collapseHiddenSortColumns(api);
+          if (resumen) {
+            collapseHiddenSortColumns(api);
+            sortResumenByAnoMes(api);
+          }
           var ok = fitColumnsByDomMeasure(chart, api, {
-            pad: resumen || proyectos ? 16 : 24,
+            pad: resumen || proyectos ? 14 : 24,
             lock: !!resumen,
             lockMetrics: !!proyectos,
-            // Resumen: solo encoger si hay overflow (NO expandir → queda a la izquierda)
+            // Resumen: encoger para que quepan las 4 cols a la izquierda
             fitViewport: !!resumen,
             flexTextColumn: !!proyectos,
             collapseSortCols: !!resumen,
@@ -555,9 +591,10 @@
           }
           if (resumen) {
             collapseHiddenSortColumns(api);
+            sortResumenByAnoMes(api);
             if (hasHorizontalScroll(chart)) {
               fitColumnsByDomMeasure(chart, api, {
-                pad: 12,
+                pad: 10,
                 lock: true,
                 fitViewport: true,
                 flexTextColumn: false,
