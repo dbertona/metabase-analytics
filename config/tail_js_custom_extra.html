@@ -31,6 +31,16 @@
       var a = t.closest("a[href]");
       if (!a) return;
       var href = a.getAttribute("href") || "";
+      // FAB Users sin APP_ROOT → Timesheet; forzar /analytics/users/...
+      if (/^\/users(\/|$)/.test(href) || href.indexOf("://apps.powersolution.es/users/") !== -1) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        var path = href.replace(/^https?:\/\/[^/]+/, "");
+        if (path.indexOf("/analytics/") !== 0) path = "/analytics" + path;
+        path = collapseDoubleAppRoot(path);
+        window.location.assign(path);
+        return;
+      }
       if (href.indexOf("/analytics/analytics") === -1) return;
       var fixed = collapseDoubleAppRoot(href);
       if (fixed === href) return;
@@ -41,15 +51,28 @@
     true
   );
 
+  function fixUsersAnchors(rootEl) {
+    var scope = rootEl || document;
+    var nodes = scope.querySelectorAll ? scope.querySelectorAll('a[href]') : [];
+    Array.prototype.forEach.call(nodes, function (a) {
+      var href = a.getAttribute("href") || "";
+      if (!/^\/users(\/|$)/.test(href)) return;
+      a.setAttribute("href", "/analytics" + href);
+    });
+  }
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () {
       fixDoubleAppRootAnchors(document);
+      fixUsersAnchors(document);
     });
   } else {
     fixDoubleAppRootAnchors(document);
+    fixUsersAnchors(document);
   }
   setInterval(function () {
     fixDoubleAppRootAnchors(document);
+    fixUsersAnchors(document);
   }, 1500);
 
   function isDashboardPage() {
