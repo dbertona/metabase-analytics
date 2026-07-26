@@ -253,6 +253,11 @@
   function sortResumenByAnoMes(api) {
     if (!api) return;
     try {
+      var hasYearMonth = false;
+      if (typeof api.getColumn === "function") {
+        hasYearMonth = !!(api.getColumn("year") && api.getColumn("month"));
+      }
+
       // Resolver colId real de "Año/Mes" (según versión puede variar)
       var dateColId = "ano_mes";
       var colsForDate =
@@ -308,7 +313,12 @@
           return anoMesSortKey(a) - anoMesSortKey(b);
         };
       }
-      state.push({ colId: dateColId, sort: "asc", sortIndex: 0 });
+      if (hasYearMonth) {
+        state.push({ colId: "year", sort: "asc", sortIndex: 0 });
+        state.push({ colId: "month", sort: "asc", sortIndex: 1 });
+      } else {
+        state.push({ colId: dateColId, sort: "asc", sortIndex: 0 });
+      }
       if (typeof api.applyColumnState === "function") {
         api.applyColumnState({
           state: state,
@@ -316,7 +326,14 @@
         });
       }
       if (typeof api.setSortModel === "function") {
-        api.setSortModel([{ colId: dateColId, sort: "asc" }]);
+        if (hasYearMonth) {
+          api.setSortModel([
+            { colId: "year", sort: "asc" },
+            { colId: "month", sort: "asc" },
+          ]);
+        } else {
+          api.setSortModel([{ colId: dateColId, sort: "asc" }]);
+        }
       }
       if (typeof api.refreshClientSideRowModel === "function") {
         api.refreshClientSideRowModel("sort");
@@ -331,6 +348,14 @@
         });
       }
       if (rows.length > 1) {
+        var sortKey = function (r) {
+          if (hasYearMonth && r && r.year != null && r.month != null) {
+            return parseInt(r.year, 10) * 100 + parseInt(r.month, 10);
+          }
+          return anoMesSortKey(
+            r[dateColId] || r.ano_mes || r["Año/Mes"] || r["Ano/Mes"] || r["AñoMes"] || ""
+          );
+        };
         var keyOf = function (r) {
           return (
             r[dateColId] ||
@@ -342,7 +367,7 @@
           );
         };
         var sorted = rows.slice().sort(function (a, b) {
-          return anoMesSortKey(keyOf(a)) - anoMesSortKey(keyOf(b));
+          return sortKey(a) - sortKey(b);
         });
         var isDifferent = false;
         for (var ri = 0; ri < rows.length; ri++) {

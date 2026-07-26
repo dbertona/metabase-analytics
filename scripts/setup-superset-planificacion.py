@@ -283,23 +283,11 @@ def probabilidad_bar_params() -> dict[str, Any]:
 
 def resumen_mensual_params() -> dict[str, Any]:
     """Tabla PBI Resumen: AñoMes | Fact. | Coste | Margen % (agregada)."""
-    # Orden SQL real: ano_mes es texto MM/YYYY (ordenar por string falla entre años).
-    # Sin order_by, Superset ordena por la 1ª métrica (Fact. DESC) — incorrecto.
-    order_cronologico = json.dumps(
-        [
-            {
-                "expressionType": "SQL",
-                "sqlExpression": "to_date(ano_mes, 'MM/YYYY')",
-                "label": "orden_mes",
-            },
-            True,
-        ],
-        ensure_ascii=False,
-    )
+    # Orden backend robusto: year+month ASC (evita orden erróneo por Fact. DESC).
     return {
         "adhoc_filters": dim_adhoc_filters("tipo"),
         "query_mode": "aggregate",
-        "groupby": ["ano_mes"],
+        "groupby": ["year", "month", "ano_mes"],
         "metrics": [
             metric_sum("facturacion", "Fact."),
             metric_sum("coste", "Coste"),
@@ -309,7 +297,7 @@ def resumen_mensual_params() -> dict[str, Any]:
             ),
         ],
         "percent_metrics": [],
-        "order_by_cols": [order_cronologico],
+        "order_by_cols": ['["year", true]', '["month", true]'],
         "row_limit": 1000,
         # Sin page_length: evita el selector "Show N entries per page" (pocas filas/mes)
         "server_pagination": False,
@@ -320,6 +308,8 @@ def resumen_mensual_params() -> dict[str, Any]:
         "align_pn": False,
         "table_timestamp_format": "smart_date",
         "column_config": {
+            "year": {"visible": False},
+            "month": {"visible": False},
             "ano_mes": {
                 "customColumnName": "Año/Mes",
             },
