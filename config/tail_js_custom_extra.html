@@ -67,7 +67,11 @@
     moveProyectosSearchBesideTitle();
   }, 1500);
 
-  /** Mueve el Buscar de AG Grid al slice-header, pegado al título Proyectos. */
+  /**
+   * Crea un input proxy junto al título «Proyectos» que reenvía al input
+   * real de AG Grid (filter-text-box). No mueve nodos React (se resetearían).
+   * Oculta el contenedor original con el search.
+   */
   function moveProyectosSearchBesideTitle() {
     var charts = document.querySelectorAll(
       "[data-test-chart-name*='Proyectos']"
@@ -75,32 +79,72 @@
     Array.prototype.forEach.call(charts, function (chart) {
       var header = chart.querySelector("[data-test='slice-header']");
       if (!header) return;
-      var search =
-        chart.querySelector(".search-container") ||
-        header.querySelector(".search-container");
-      if (!search) return;
+
+      var realInput = chart.querySelector("#filter-text-box");
+      if (!realInput) return;
+
+      // Si el proxy ya existe y está vivo, nada que hacer
+      var existing = header.querySelector(".ps-search-proxy");
+      if (existing) {
+        // sincronizar placeholder por si cambió el idioma
+        existing.placeholder = realInput.placeholder;
+        return;
+      }
+
+      // Crear input proxy (no es un nodo React; React no lo toca)
+      var proxy = document.createElement("input");
+      proxy.type = "text";
+      proxy.placeholder = realInput.placeholder || "Buscar";
+      proxy.className = "ps-search-proxy";
+      proxy.setAttribute("aria-label", "Buscar proyectos");
+      proxy.style.cssText = [
+        "border:1px solid #d9d9d9",
+        "border-radius:6px",
+        "padding:3px 10px 3px 8px",
+        "font-size:14px",
+        "height:28px",
+        "margin-left:10px",
+        "outline:none",
+        "background:#fff",
+        "color:#333",
+        "flex:0 0 auto",
+        "min-width:160px",
+        "vertical-align:middle",
+        "cursor:text",
+      ].join(";");
+
+      // Reenviar escritura al AG Grid input real y disparar su evento
+      proxy.addEventListener("input", function () {
+        var nativeInputDescriptor = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype,
+          "value"
+        );
+        nativeInputDescriptor.set.call(realInput, proxy.value);
+        realInput.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      proxy.addEventListener("focus", function () {
+        proxy.style.borderColor = "#007c89";
+      });
+      proxy.addEventListener("blur", function () {
+        proxy.style.borderColor = "#d9d9d9";
+      });
+
+      // Insertar justo después del div.header-title
       var title =
         header.querySelector(".header-title") ||
         header.querySelector(".editable-title");
-      if (!title) return;
-      // Pegar inmediatamente después del título (aunque ya esté en el header)
-      if (search.previousElementSibling !== title) {
-        if (title.nextSibling) {
-          header.insertBefore(search, title.nextSibling);
-        } else {
-          header.appendChild(search);
-        }
+      if (title && title.nextSibling) {
+        header.insertBefore(proxy, title.nextSibling);
+      } else if (title) {
+        header.appendChild(proxy);
+      } else {
+        header.insertBefore(proxy, header.firstChild);
       }
-      // Forzar estilos: sin margin-left:auto del AG Grid
-      search.style.setProperty("margin", "0", "important");
-      search.style.setProperty("margin-left", "0", "important");
-      search.style.setProperty("flex", "0 0 auto", "important");
-      search.style.setProperty("width", "auto", "important");
-      search.style.setProperty("justify-content", "flex-start", "important");
-      var inputWrap = search.querySelector(".input-container, .input-wrapper");
-      if (inputWrap) {
-        inputWrap.style.setProperty("margin-left", "0", "important");
-        inputWrap.style.setProperty("margin", "0", "important");
+
+      // Ocultar el contenedor original del search (debajo del header)
+      var origContainer = chart.querySelector(".dropdown-controls-container");
+      if (origContainer) {
+        origContainer.style.setProperty("display", "none", "important");
       }
     });
   }
