@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-26an] — Menos margen derecho en tablas
+
+### Changed
+
+- Resumen mensual / Proyectos: padding derecho reducido para equilibrar la card.
+
 ## [2026-07-26am] — Misma altura Resumen mensual / Proyectos
 
 ### Changed
