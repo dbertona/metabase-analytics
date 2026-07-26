@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-26ao] — Tablas: quitar ⋮ que recortaba el ancho
+
+### Fixed
+
+- Resumen/Proyectos: menú ⋮ oculto; padding uniforme; tabla a ancho completo.
+
 ## [2026-07-26an] — Menos margen derecho en tablas
 
 ### Changed
