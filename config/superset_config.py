@@ -43,6 +43,7 @@ class PsAppInitializer(SupersetAppInitializer):
     def __init__(self, app: Flask) -> None:
         super().__init__(app)
         self._unprefix_app_root_theme_urls()
+        self._install_logged_user_header_patch()
 
     def _unprefix_app_root_theme_urls(self) -> None:
         app_root = (
@@ -73,6 +74,96 @@ class PsAppInitializer(SupersetAppInitializer):
             href = token.get("brandLogoHref") or ""
             if href == app_root or href == f"{app_root}/":
                 token["brandLogoHref"] = "/"
+
+    def _install_logged_user_header_patch(self) -> None:
+        """
+        Reemplaza en UI el owner del dashboard por el usuario logado.
+
+        Superset muestra "owner + last edited" en la barra del dashboard.
+        Este patch front-end conserva la fecha pero sustituye el nombre
+        mostrado por el usuario autenticado actual.
+        """
+        custom_tail_path = "/app/superset/templates/tail_js_custom_extra.html"
+        script = r"""
+<script>
+(function () {
+  function appRoot() {
+    return window.location.pathname.indexOf("/analytics/") === 0 ? "/analytics" : "";
+  }
+
+  function isDashboardPage() {
+    return window.location.pathname.indexOf("/superset/dashboard/") !== -1 ||
+      window.location.pathname.indexOf("/dashboard/") !== -1;
+  }
+
+  async function fetchLoggedUserName() {
+    try {
+      var res = await fetch(appRoot() + "/api/v1/me/", { credentials: "include" });
+      if (!res.ok) return null;
+      var payload = await res.json();
+      var me = payload && payload.result ? payload.result : payload;
+      if (!me) return null;
+      var full = [me.first_name || "", me.last_name || ""].join(" ").trim();
+      return full || me.username || me.email || null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function replaceOwnerWithLoggedUser(displayName) {
+    if (!displayName || !isDashboardPage()) return false;
+    var nodes = Array.prototype.slice.call(document.querySelectorAll("span,div,a"));
+    var agoNode = nodes.find(function (el) {
+      var t = (el.textContent || "").trim().toLowerCase();
+      if (!t || t.length > 40) return false;
+      return /(\bago\b|\bhace\b)/.test(t);
+    });
+    if (!agoNode || !agoNode.parentElement) return false;
+
+    var container = agoNode.parentElement;
+    var candidates = Array.prototype.slice
+      .call(container.querySelectorAll("span,div,a"))
+      .filter(function (el) {
+        if (el === agoNode) return false;
+        var t = (el.textContent || "").trim();
+        if (!t || t.length > 80) return false;
+        if (/(\bago\b|\bhace\b)/i.test(t)) return false;
+        return true;
+      });
+    if (!candidates.length) return false;
+
+    var ownerEl = candidates[candidates.length - 1];
+    if ((ownerEl.textContent || "").trim() === displayName) return true;
+    ownerEl.textContent = displayName;
+    return true;
+  }
+
+  async function runPatch() {
+    var name = await fetchLoggedUserName();
+    if (!name) return;
+    var tries = 0;
+    var timer = setInterval(function () {
+      tries += 1;
+      if (replaceOwnerWithLoggedUser(name) || tries > 25) {
+        clearInterval(timer);
+      }
+    }, 400);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", runPatch);
+  } else {
+    runPatch();
+  }
+})();
+</script>
+"""
+        try:
+            with open(custom_tail_path, "w", encoding="utf-8") as handler:
+                handler.write(script.strip() + "\n")
+            logger.info("Custom tail_js patch installed at %s", custom_tail_path)
+        except Exception:
+            logger.exception("No se pudo escribir %s", custom_tail_path)
 
 
 APP_INITIALIZER = PsAppInitializer

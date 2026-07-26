@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-26aa] — Dashboard header: usuario logado en lugar de owner
+
+### Changed
+
+- Patch frontend inyectado via `tail_js_custom_extra.html` (desde
+  `PsAppInitializer`) para que la barra del dashboard muestre el usuario
+  autenticado en sesión en vez del propietario del dashboard.
+
 ## [2026-07-25aj] — Azure OAuth: metadata OIDC v2.0 (fix iss)
 
 ### Fixed
