@@ -282,13 +282,13 @@ def probabilidad_bar_params() -> dict[str, Any]:
 
 
 def resumen_mensual_params() -> dict[str, Any]:
-    """Tabla PBI Resumen: AñoMes | Facturación | Coste | Margen % (agregada)."""
+    """Tabla PBI Resumen: AñoMes | Fact. | Coste | Margen % (agregada)."""
     return {
         "adhoc_filters": dim_adhoc_filters("tipo"),
         "query_mode": "aggregate",
         "groupby": ["ano_mes"],
         "metrics": [
-            metric_sum("facturacion", "Facturación"),
+            metric_sum("facturacion", "Fact."),
             metric_sum("coste", "Coste"),
             metric_sql(
                 "(SUM(facturacion) - SUM(coste)) / NULLIF(SUM(facturacion), 0) * 100",
@@ -310,8 +310,7 @@ def resumen_mensual_params() -> dict[str, Any]:
             "ano_mes": {
                 "customColumnName": "Año/Mes",
             },
-            "Facturación": {
-                "customColumnName": "Fact.",
+            "Fact.": {
                 "d3NumberFormat": ",.0f",
                 "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
                 "showCellBars": False,

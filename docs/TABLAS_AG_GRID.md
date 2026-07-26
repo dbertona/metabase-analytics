@@ -49,7 +49,7 @@ def mi_tabla_mensual_params() -> dict:
         "query_mode": "aggregate",
         "groupby": ["ano_mes"],
         "metrics": [
-            metric_sum("facturacion", "Facturación"),
+            metric_sum("facturacion", "Fact."),
             metric_sum("coste", "Coste"),
             metric_sql(
                 "(SUM(facturacion) - SUM(coste)) / NULLIF(SUM(facturacion), 0) * 100",
@@ -68,8 +68,7 @@ def mi_tabla_mensual_params() -> dict:
         "table_timestamp_format": "smart_date",
         "column_config": {
             "ano_mes": {"customColumnName": "Año/Mes"},
-            "Facturación": {
-                "customColumnName": "Fact.",
+            "Fact.": {
                 "d3NumberFormat": ",.0f",
                 "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
                 "showCellBars": False,
@@ -233,8 +232,9 @@ Ambas funciones usan el array compartido `AG_GRID_CHART_SELECTORS`.
 3. Guarda una huella del contenido (`data-ps-autosize-fp`) para no re-autosize
    en cada tick si los datos no han cambiado (filtros / refresh sí la invalidan).
 
-**No** fijar `columnWidth` en `column_config` si quieres auto-size: el ancho fijo
-de Superset pelearía con la API.
+**Nota AG Grid:** el encabezado de métricas sale del **label** de la métrica
+(`metric_sum(..., "Fact.")`). `customColumnName` en `column_config` **no**
+cambia el header en agregados normales (solo aplica en time comparison).
 
 **Añadir una tabla nueva:**
 ```javascript
