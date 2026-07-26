@@ -229,8 +229,27 @@
 
   /**
    * Mide cabecera + celdas y aplica anchos.
-   * opts.pad / opts.lock / opts.fitViewport
+   * opts.pad / opts.lock / opts.fitViewport / opts.flexTextColumn
+   * flexTextColumn: la columna de texto (proyecto / ano_mes) usa el resto del viewport;
+   * las métricas (Fact., Coste, Margen %) quedan justas al contenido.
    */
+  function isMetricColId(colId) {
+    var id = String(colId || "");
+    return /Fact|Coste|Margen|facturacion|coste|margen/i.test(id);
+  }
+
+  function getViewportWidth(chart) {
+    var vp =
+      chart.querySelector(".ag-center-cols-viewport") ||
+      chart.querySelector(".ag-body-viewport");
+    var avail = vp ? Math.floor(vp.clientWidth) : 0;
+    if (avail < 80) {
+      var root = chart.querySelector(".ag-root-wrapper") || chart;
+      avail = Math.floor(root.getBoundingClientRect().width) - 8;
+    }
+    return avail;
+  }
+
   function fitColumnsByDomMeasure(chart, api, opts) {
     opts = opts || {};
     if (!api || typeof api.applyColumnState !== "function") return false;
@@ -258,6 +277,17 @@
         hc.querySelector(".ag-header-cell-text") ||
         hc.querySelector(".ag-header-cell-label");
       var headerText = headerEl ? (headerEl.textContent || "").trim() : "";
+      // Cabeceras de métricas: no usar texto truncado con ellipsis del DOM
+      if (isMetricColId(colId)) {
+        if (/margen/i.test(colId)) headerText = "Margen %";
+        else if (/coste/i.test(colId)) headerText = "Coste";
+        else if (/fact/i.test(colId)) {
+          headerText =
+            headerText.indexOf("Fact.") === 0 && headerText.length <= 6
+              ? "Fact."
+              : "Facturación";
+        }
+      }
       var maxPx = headerText
         ? Math.ceil(ctx.measureText(headerText).width) + pad
         : pad + 40;
@@ -282,8 +312,10 @@
         if (w > maxPx) maxPx = w;
       });
       if (maxPx < 44) maxPx = 44;
+      // Tope a métricas: no hace falta más de ~140px salvo totales largos
+      if (isMetricColId(colId) && maxPx > 160) maxPx = 160;
       var colState = { colId: colId, width: maxPx, flex: null };
-      if (opts.lock) {
+      if (opts.lock || (opts.lockMetrics && isMetricColId(colId))) {
         colState.minWidth = maxPx;
         colState.maxWidth = maxPx;
       }
@@ -291,23 +323,36 @@
     });
     if (!state.length) return false;
 
-    if (opts.fitViewport) {
-      var vp =
-        chart.querySelector(".ag-center-cols-viewport") ||
-        chart.querySelector(".ag-body-viewport");
-      var avail = vp ? Math.floor(vp.clientWidth) : 0;
-      if (avail < 80) {
-        var root = chart.querySelector(".ag-root-wrapper") || chart;
-        avail = Math.floor(root.getBoundingClientRect().width) - 8;
+    var avail = getViewportWidth(chart);
+
+    if (opts.flexTextColumn && avail > 80) {
+      var metricsTotal = 0;
+      var textIdx = -1;
+      for (var fi = 0; fi < state.length; fi++) {
+        if (isMetricColId(state[fi].colId)) {
+          metricsTotal += state[fi].width;
+        } else if (textIdx === -1) {
+          textIdx = fi;
+        } else {
+          metricsTotal += state[fi].width;
+        }
       }
+      if (textIdx >= 0) {
+        var textW = Math.max(120, avail - metricsTotal - 4);
+        state[textIdx].width = textW;
+        state[textIdx].minWidth = 100;
+        state[textIdx].maxWidth = textW;
+        state[textIdx].flex = null;
+      }
+    } else if (opts.fitViewport && avail > 80) {
       var total = 0;
       for (var ti = 0; ti < state.length; ti++) total += state[ti].width;
-      if (avail > 80 && total > avail) {
+      if (total > avail) {
         var scale = (avail - 2) / total;
         for (var si = 0; si < state.length; si++) {
           var nw = Math.max(40, Math.floor(state[si].width * scale));
           state[si].width = nw;
-          if (opts.lock) {
+          if (opts.lock || (opts.lockMetrics && isMetricColId(state[si].colId))) {
             state[si].minWidth = nw;
             state[si].maxWidth = nw;
           }
@@ -329,6 +374,16 @@
     return t.indexOf("Resumen mensual") !== -1;
   }
 
+  function isProyectosChart(chart) {
+    var name = chart.getAttribute("data-test-chart-name") || "";
+    if (name.indexOf("Proyectos") !== -1) return true;
+    var title = chart.querySelector(
+      '[data-test="slice-header"] .header-title, [data-test="slice-header"] .editable-title'
+    );
+    var t = title ? (title.textContent || "").replace(/\s+/g, " ").trim() : "";
+    return t === "Proyectos" || t.indexOf("Proyectos") === 0;
+  }
+
   function hasHorizontalScroll(chart) {
     var vp =
       chart.querySelector(".ag-center-cols-viewport") ||
@@ -339,7 +394,8 @@
   }
 
   /**
-   * Resumen: pad bajo + lock min/max + escalar al viewport (sin scroll).
+   * Resumen: métricas+dims justas + escala viewport.
+   * Proyectos: métricas justas (incl. Margen %); columna texto = resto (sin scroll).
    */
   function autoSizeAgGridColumns() {
     AG_GRID_CHART_SELECTORS.forEach(function (sel) {
@@ -356,10 +412,13 @@
         patchSizeColumnsToFit(api);
         try {
           var resumen = isResumenMensualChart(chart);
+          var proyectos = isProyectosChart(chart);
           var ok = fitColumnsByDomMeasure(chart, api, {
-            pad: resumen ? 16 : 24,
+            pad: resumen || proyectos ? 16 : 24,
             lock: !!resumen,
+            lockMetrics: !!proyectos,
             fitViewport: !!resumen,
+            flexTextColumn: !!proyectos,
           });
           if (!ok && typeof api.autoSizeAllColumns === "function") {
             try {
@@ -377,6 +436,13 @@
               pad: 12,
               lock: true,
               fitViewport: true,
+            });
+          }
+          if (proyectos && hasHorizontalScroll(chart)) {
+            fitColumnsByDomMeasure(chart, api, {
+              pad: 12,
+              lockMetrics: true,
+              flexTextColumn: true,
             });
           }
         } catch (err) {
