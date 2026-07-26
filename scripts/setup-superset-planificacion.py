@@ -307,6 +307,9 @@ def resumen_mensual_params() -> dict[str, Any]:
         "align_pn": False,
         "table_timestamp_format": "smart_date",
         "column_config": {
+            "ano_mes": {
+                "customColumnName": "Año/Mes",
+            },
             "Facturación": {
                 "d3NumberFormat": ",.0f",
                 "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},

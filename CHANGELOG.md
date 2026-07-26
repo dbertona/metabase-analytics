@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-26aj] — Columna ano_mes → «Año/Mes»
+
+### Changed
+
+- Tabla Resumen mensual: `customColumnName` / verbose `Año/Mes` (antes `ano_mes`).
+
 ## [2026-07-26ai] — Tablas Resumen/Proyectos estilo rejilla Timesheet
 
 ### Changed
