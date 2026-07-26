@@ -136,8 +136,9 @@ var AG_GRID_CHART_SELECTORS = [
 
 - **`fixAgGridHeight`:** `alturaCard − alturaHeader − 8px` → inline en
   `.slice_container` y `[class*="ag-theme"]`.
-- **`autoSizeAgGridColumns`:** localiza `GridApi` (React fiber) y llama
-  `autoSizeAllColumns(false)`. No fijar `columnWidth` en `column_config`.
+- **`autoSizeAgGridColumns`:** mide cabecera/celdas (canvas) y aplica anchos
+  exactos vía `applyColumnState`. Parchea `sizeColumnsToFit` de Superset
+  (que ensanchaba al card y generaba holgura/scroll). Sin `columnWidth` fijo.
 
 ---
 
