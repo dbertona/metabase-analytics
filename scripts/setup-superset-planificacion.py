@@ -332,13 +332,13 @@ def resumen_mensual_params() -> dict[str, Any]:
 
 
 def resumen_proyectos_params() -> dict[str, Any]:
-    """Tabla PBI Resumen Proyectos: Proyecto | Facturación | Coste | Margen %."""
+    """Tabla PBI Resumen Proyectos: Proyecto | Fact. | Coste | Margen %."""
     return {
         "adhoc_filters": dim_adhoc_filters("tipo"),
         "query_mode": "aggregate",
         "groupby": ["proyecto"],
         "metrics": [
-            metric_sum("facturacion", "Facturación"),
+            metric_sum("facturacion", "Fact."),
             metric_sum("coste", "Coste"),
             metric_sql(
                 "(SUM(facturacion) - SUM(coste)) / NULLIF(SUM(facturacion), 0) * 100",
@@ -346,7 +346,7 @@ def resumen_proyectos_params() -> dict[str, Any]:
             ),
         ],
         "percent_metrics": [],
-        "order_by_cols": ['["Facturación", false]'],
+        "order_by_cols": ['["Fact.", false]'],
         "row_limit": 5000,
         # Sin page_length: evita el selector "Show N entries per page"
         "server_pagination": False,
@@ -361,7 +361,7 @@ def resumen_proyectos_params() -> dict[str, Any]:
                 "customColumnName": "Proyectos",
                 # Sin columnWidth fijo: auto-size al contenido vía tail_js (autoSizeAllColumns)
             },
-            "Facturación": {
+            "Fact.": {
                 "d3NumberFormat": ",.0f",
                 "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
                 "showCellBars": False,
@@ -769,6 +769,23 @@ def persist_dashboard_config(
         "[data-test-chart-name*='Resumen mensual'] .ag-floating-bottom .anticon,\n"
         "[data-test-chart-name*='Proyectos'] .ag-floating-bottom .anticon {\n"
         "  display: none !important;\n"
+        "}\n"
+        "/* Sin scroll horizontal fantasma (anchos se ajustan por JS) */\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-body-horizontal-scroll,\n"
+        "[data-test-chart-name*='Proyectos'] .ag-body-horizontal-scroll,\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-body-horizontal-scroll-viewport,\n"
+        "[data-test-chart-name*='Proyectos'] .ag-body-horizontal-scroll-viewport {\n"
+        "  display: none !important;\n"
+        "  height: 0 !important;\n"
+        "  min-height: 0 !important;\n"
+        "  max-height: 0 !important;\n"
+        "  overflow: hidden !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-center-cols-viewport,\n"
+        "[data-test-chart-name*='Proyectos'] .ag-center-cols-viewport,\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-header-viewport,\n"
+        "[data-test-chart-name*='Proyectos'] .ag-header-viewport {\n"
+        "  overflow-x: hidden !important;\n"
         "}\n"
         "/* Resumen mensual: ocultar year/month (solo sirven para orden cronológico) */\n"
         ".chart-slice[data-test-chart-name*='Resumen mensual'] .ag-header-cell[col-id='year'],\n"

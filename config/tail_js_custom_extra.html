@@ -244,7 +244,9 @@
   }
 
   function getViewportWidth(chart) {
+    // Preferir cabecera: refleja el ancho útil real (sin gutter del scroll vertical).
     var vp =
+      chart.querySelector(".ag-header-viewport") ||
       chart.querySelector(".ag-center-cols-viewport") ||
       chart.querySelector(".ag-body-viewport");
     var avail = vp ? Math.floor(vp.clientWidth) : 0;
@@ -252,7 +254,49 @@
       var root = chart.querySelector(".ag-root-wrapper") || chart;
       avail = Math.floor(root.getBoundingClientRect().width) - 8;
     }
-    return avail;
+    // Margen anti-scroll fantasma (bordes, subpixel, scrollbar vertical).
+    return Math.max(0, avail - 20);
+  }
+
+  function getHorizontalOverflow(chart) {
+    var vp =
+      chart.querySelector(".ag-center-cols-viewport") ||
+      chart.querySelector(".ag-body-horizontal-scroll-viewport");
+    if (!vp) return 0;
+    return Math.max(0, vp.scrollWidth - vp.clientWidth);
+  }
+
+  /** Reduce la columna de texto hasta eliminar el scroll horizontal. */
+  function shrinkTextColumnToClearScroll(chart, api) {
+    if (!api || typeof api.getColumnState !== "function") return false;
+    var overflow = getHorizontalOverflow(chart);
+    if (overflow <= 1) return false;
+    var cols = api.getColumnState() || [];
+    var textCol = null;
+    for (var i = 0; i < cols.length; i++) {
+      var id = cols[i].colId;
+      if (!id || id.charAt(0) === "_") continue;
+      if (isHiddenSortColId(id) || isMetricColId(id)) continue;
+      textCol = cols[i];
+      break;
+    }
+    if (!textCol) return false;
+    var cur = textCol.width || 200;
+    var nw = Math.max(100, Math.floor(cur - overflow - 8));
+    if (nw >= cur) return false;
+    api.applyColumnState({
+      state: [
+        {
+          colId: textCol.colId,
+          width: nw,
+          minWidth: Math.min(100, nw),
+          maxWidth: nw,
+          flex: null,
+        },
+      ],
+      defaultState: { flex: null },
+    });
+    return true;
   }
 
   function fitColumnsByDomMeasure(chart, api, opts) {
@@ -335,6 +379,7 @@
       var metricsTotal = 0;
       var textIdx = -1;
       for (var fi = 0; fi < state.length; fi++) {
+        if (isHiddenSortColId(state[fi].colId)) continue;
         if (isMetricColId(state[fi].colId)) {
           metricsTotal += state[fi].width;
         } else if (textIdx === -1) {
@@ -344,7 +389,8 @@
         }
       }
       if (textIdx >= 0) {
-        var textW = Math.max(120, avail - metricsTotal - 4);
+        // avail ya trae margen; no sumar más holgura aquí
+        var textW = Math.max(120, avail - metricsTotal);
         state[textIdx].width = textW;
         state[textIdx].minWidth = 100;
         state[textIdx].maxWidth = textW;
@@ -450,6 +496,11 @@
               lockMetrics: true,
               flexTextColumn: true,
             });
+            // Segundo pase: restar el overflow exacto a la columna Proyectos
+            shrinkTextColumnToClearScroll(chart, api);
+            if (hasHorizontalScroll(chart)) {
+              shrinkTextColumnToClearScroll(chart, api);
+            }
           }
         } catch (err) {
           /* grid aún montando */
