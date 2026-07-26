@@ -61,19 +61,52 @@
     });
   }
 
+  setInterval(function () {
+    fixDoubleAppRootAnchors(document);
+    fixUsersAnchors(document);
+    moveProyectosSearchBesideTitle();
+  }, 1500);
+
+  /** Mueve el Buscar de AG Grid al slice-header, al lado del título del chart Proyectos. */
+  function moveProyectosSearchBesideTitle() {
+    var charts = document.querySelectorAll(
+      "[data-test-chart-name*='Proyectos']"
+    );
+    Array.prototype.forEach.call(charts, function (chart) {
+      var header = chart.querySelector("[data-test='slice-header']");
+      if (!header) return;
+      var search =
+        chart.querySelector(".search-container") ||
+        header.querySelector(".search-container");
+      if (!search) return;
+      if (search.parentElement === header) return;
+      var title =
+        header.querySelector(".header-title") ||
+        header.querySelector(".editable-title") ||
+        header.firstElementChild;
+      if (title && title.parentElement === header) {
+        if (title.nextSibling) {
+          header.insertBefore(search, title.nextSibling);
+        } else {
+          header.appendChild(search);
+        }
+      } else {
+        header.insertBefore(search, header.firstChild);
+      }
+    });
+  }
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () {
       fixDoubleAppRootAnchors(document);
       fixUsersAnchors(document);
+      moveProyectosSearchBesideTitle();
     });
   } else {
     fixDoubleAppRootAnchors(document);
     fixUsersAnchors(document);
+    moveProyectosSearchBesideTitle();
   }
-  setInterval(function () {
-    fixDoubleAppRootAnchors(document);
-    fixUsersAnchors(document);
-  }, 1500);
 
   function isDashboardPage() {
     return (
