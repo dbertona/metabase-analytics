@@ -354,7 +354,10 @@ def resumen_proyectos_params() -> dict[str, Any]:
         "align_pn": False,
         "table_timestamp_format": "smart_date",
         "column_config": {
-            "proyecto": {"columnWidth": 220},
+            "proyecto": {
+                "customColumnName": "Proyectos",
+                "columnWidth": 220,
+            },
             "Facturación": {
                 "d3NumberFormat": ",.0f",
                 "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-26ak] — Columna proyecto → «Proyectos»
+
+### Changed
+
+- Tabla Proyectos: cabecera `Proyectos` (antes `proyecto`).
+
 ## [2026-07-26aj] — Columna ano_mes → «Año/Mes»
 
 ### Changed
