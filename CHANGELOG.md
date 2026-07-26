@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-26al] — Separadores verticales en tablas
+
+### Changed
+
+- Tablas Resumen/Proyectos: `border-left/right` explícitos + `border-collapse: separate`.
+
 ## [2026-07-26ak] — Columna proyecto → «Proyectos»
 
 ### Changed
