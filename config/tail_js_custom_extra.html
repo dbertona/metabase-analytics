@@ -67,7 +67,7 @@
     moveProyectosSearchBesideTitle();
   }, 1500);
 
-  /** Mueve el Buscar de AG Grid al slice-header, al lado del título del chart Proyectos. */
+  /** Mueve el Buscar de AG Grid al slice-header, pegado al título Proyectos. */
   function moveProyectosSearchBesideTitle() {
     var charts = document.querySelectorAll(
       "[data-test-chart-name*='Proyectos']"
@@ -79,19 +79,28 @@
         chart.querySelector(".search-container") ||
         header.querySelector(".search-container");
       if (!search) return;
-      if (search.parentElement === header) return;
       var title =
         header.querySelector(".header-title") ||
-        header.querySelector(".editable-title") ||
-        header.firstElementChild;
-      if (title && title.parentElement === header) {
+        header.querySelector(".editable-title");
+      if (!title) return;
+      // Pegar inmediatamente después del título (aunque ya esté en el header)
+      if (search.previousElementSibling !== title) {
         if (title.nextSibling) {
           header.insertBefore(search, title.nextSibling);
         } else {
           header.appendChild(search);
         }
-      } else {
-        header.insertBefore(search, header.firstChild);
+      }
+      // Forzar estilos: sin margin-left:auto del AG Grid
+      search.style.setProperty("margin", "0", "important");
+      search.style.setProperty("margin-left", "0", "important");
+      search.style.setProperty("flex", "0 0 auto", "important");
+      search.style.setProperty("width", "auto", "important");
+      search.style.setProperty("justify-content", "flex-start", "important");
+      var inputWrap = search.querySelector(".input-container, .input-wrapper");
+      if (inputWrap) {
+        inputWrap.style.setProperty("margin-left", "0", "important");
+        inputWrap.style.setProperty("margin", "0", "important");
       }
     });
   }
