@@ -98,7 +98,7 @@ def mi_tabla_proyectos_params() -> dict:
         "query_mode": "aggregate",
         "groupby": ["proyecto"],
         "metrics": [
-            metric_sum("facturacion", "Facturación"),
+            metric_sum("facturacion", "Fact."),
             metric_sum("coste", "Coste"),
             metric_sql(
                 "(SUM(facturacion) - SUM(coste)) / NULLIF(SUM(facturacion), 0) * 100",
@@ -106,7 +106,7 @@ def mi_tabla_proyectos_params() -> dict:
             ),
         ],
         "percent_metrics": [],
-        "order_by_cols": ['["Facturación", false]'],
+        "order_by_cols": ['["Fact.", false]'],
         "row_limit": 5000,
         "server_pagination": False,
         "show_totals": True,
@@ -120,7 +120,7 @@ def mi_tabla_proyectos_params() -> dict:
                 "customColumnName": "Proyectos",
                 # Sin columnWidth: auto-size al contenido (tail_js autoSizeAgGridColumns)
             },
-            "Facturación": {
+            "Fact.": {
                 "d3NumberFormat": ",.0f",
                 "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
                 "showCellBars": False,
