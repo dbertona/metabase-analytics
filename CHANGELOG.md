@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-26af] — Bordes en cada chart del Resumen
+
+### Changed
+
+- CSS: borde `1px #c5d0d3` + `border-radius: 6px` en
+  `.dashboard-component-chart-holder` (KPI, tablas y gráficos).
+
 ## [2026-07-26ae] — Ocultar botón de filtro en todos los charts
 
 ### Changed
