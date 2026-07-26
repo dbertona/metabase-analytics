@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-26am] — Misma altura Resumen mensual / Proyectos
+
+### Changed
+
+- Layout: altura de Proyectos = Resumen mensual (53 unidades de grid).
+
 ## [2026-07-26al] — Separadores verticales en tablas
 
 ### Changed

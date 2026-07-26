@@ -992,11 +992,11 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         },
     }
     sizes = {
-        # Alturas desde UI: KPI 10, tablas 45, Probabilidad/charts 36.
+        # Alturas UI: KPI 10; tablas Resumen/Proyectos misma altura; charts 36.
         "obj": (1, 10),
         "plan": (1, 10),
-        "table": (4, 45),
-        "projects": (8, 45),
+        "table": (4, 53),
+        "projects": (8, 53),
         "prob": (6, 36),
         "chart": (6, 36),
     }
