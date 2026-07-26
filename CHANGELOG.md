@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-26as] — Resumen: métricas a la derecha en pantallas anchas
+
+### Fixed
+
+- Columnas `year`/`month` a ancho 0 (ya no dejan hueco a la izquierda).
+- `Año/Mes` absorbe el ancho restante → Fact./Coste/Margen % alineadas a la derecha.
+- Sort ASC forzado en year+month vía AG Grid.
+
 ## [2026-07-26ar] — Fuente más grande en Facturación por Probabilidad
 
 ### Changed
