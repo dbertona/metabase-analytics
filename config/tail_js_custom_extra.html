@@ -228,14 +228,17 @@
   }
 
   /**
-   * Mide cabecera + celdas y aplica anchos exactos (sin holgura de sizeColumnsToFit).
+   * Mide cabecera + celdas y aplica anchos.
+   * opts.pad / opts.lock / opts.fitViewport
    */
-  function fitColumnsByDomMeasure(chart, api) {
+  function fitColumnsByDomMeasure(chart, api, opts) {
+    opts = opts || {};
     if (!api || typeof api.applyColumnState !== "function") return false;
     var headerCells = chart.querySelectorAll(".ag-header-viewport .ag-header-cell");
     if (!headerCells.length) return false;
     var sampleCell =
       chart.querySelector(".ag-center-cols-container .ag-cell") ||
+      chart.querySelector(".custom-header") ||
       chart.querySelector(".ag-header-cell-text") ||
       chart.querySelector(".ag-header-cell");
     var font = sampleCell
@@ -245,18 +248,23 @@
     var ctx = canvas.getContext("2d");
     if (!ctx) return false;
     ctx.font = font;
-    var pad = 36; // padding celda + icono sort
+    var pad = typeof opts.pad === "number" ? opts.pad : 24;
     var state = [];
     Array.prototype.forEach.call(headerCells, function (hc) {
       var colId = hc.getAttribute("col-id");
       if (!colId || colId.charAt(0) === "_") return;
-      var headerEl = hc.querySelector(".ag-header-cell-text") || hc;
-      var headerText = (headerEl.textContent || "").trim();
-      var maxPx = Math.ceil(ctx.measureText(headerText).width) + pad;
+      var headerEl =
+        hc.querySelector(".custom-header") ||
+        hc.querySelector(".ag-header-cell-text") ||
+        hc.querySelector(".ag-header-cell-label");
+      var headerText = headerEl ? (headerEl.textContent || "").trim() : "";
+      var maxPx = headerText
+        ? Math.ceil(ctx.measureText(headerText).width) + pad
+        : pad + 40;
       var bodyCells = chart.querySelectorAll(
         '.ag-center-cols-container .ag-cell[col-id="' + colId + '"]'
       );
-      var limit = Math.min(bodyCells.length, 60);
+      var limit = Math.min(bodyCells.length, 80);
       for (var i = 0; i < limit; i++) {
         var t = (bodyCells[i].textContent || "").trim();
         if (!t) continue;
@@ -267,24 +275,71 @@
         '.ag-floating-bottom .ag-cell[col-id="' + colId + '"]'
       );
       Array.prototype.forEach.call(pinCells, function (pc) {
-        // celda dimensión de totales oculta (Resumen) — no ensanchar
         if (window.getComputedStyle(pc).visibility === "hidden") return;
         var t = (pc.textContent || "").trim();
         if (!t) return;
         var w = Math.ceil(ctx.measureText(t).width) + pad;
         if (w > maxPx) maxPx = w;
       });
-      if (maxPx < 48) maxPx = 48;
-      state.push({ colId: colId, width: maxPx, flex: null });
+      if (maxPx < 44) maxPx = 44;
+      var colState = { colId: colId, width: maxPx, flex: null };
+      if (opts.lock) {
+        colState.minWidth = maxPx;
+        colState.maxWidth = maxPx;
+      }
+      state.push(colState);
     });
     if (!state.length) return false;
+
+    if (opts.fitViewport) {
+      var vp =
+        chart.querySelector(".ag-center-cols-viewport") ||
+        chart.querySelector(".ag-body-viewport");
+      var avail = vp ? Math.floor(vp.clientWidth) : 0;
+      if (avail < 80) {
+        var root = chart.querySelector(".ag-root-wrapper") || chart;
+        avail = Math.floor(root.getBoundingClientRect().width) - 8;
+      }
+      var total = 0;
+      for (var ti = 0; ti < state.length; ti++) total += state[ti].width;
+      if (avail > 80 && total > avail) {
+        var scale = (avail - 2) / total;
+        for (var si = 0; si < state.length; si++) {
+          var nw = Math.max(40, Math.floor(state[si].width * scale));
+          state[si].width = nw;
+          if (opts.lock) {
+            state[si].minWidth = nw;
+            state[si].maxWidth = nw;
+          }
+        }
+      }
+    }
+
     api.applyColumnState({ state: state, defaultState: { flex: null } });
     return true;
   }
 
+  function isResumenMensualChart(chart) {
+    var name = chart.getAttribute("data-test-chart-name") || "";
+    if (name.indexOf("Resumen mensual") !== -1) return true;
+    var title = chart.querySelector(
+      '[data-test="slice-header"] .header-title, [data-test="slice-header"] .editable-title'
+    );
+    var t = title ? (title.textContent || "").replace(/\s+/g, " ").trim() : "";
+    return t.indexOf("Resumen mensual") !== -1;
+  }
+
+  function hasHorizontalScroll(chart) {
+    var vp =
+      chart.querySelector(".ag-center-cols-viewport") ||
+      chart.querySelector(".ag-body-horizontal-scroll-viewport") ||
+      chart.querySelector(".ag-body-viewport");
+    if (!vp) return false;
+    return vp.scrollWidth > vp.clientWidth + 2;
+  }
+
   /**
-   * Ajuste exacto al contenido. Reaplica siempre: Superset reensancha con
-   * sizeColumnsToFit y dejaba columnas más anchas + scroll horizontal.
+   * Resumen: pad bajo + lock min/max + escalar al viewport (sin scroll).
    */
   function autoSizeAgGridColumns() {
     AG_GRID_CHART_SELECTORS.forEach(function (sel) {
@@ -300,8 +355,13 @@
 
         patchSizeColumnsToFit(api);
         try {
-          // Preferir medida DOM (exacta). autoSizeAllColumns deja holgura.
-          if (!fitColumnsByDomMeasure(chart, api) && typeof api.autoSizeAllColumns === "function") {
+          var resumen = isResumenMensualChart(chart);
+          var ok = fitColumnsByDomMeasure(chart, api, {
+            pad: resumen ? 16 : 24,
+            lock: !!resumen,
+            fitViewport: !!resumen,
+          });
+          if (!ok && typeof api.autoSizeAllColumns === "function") {
             try {
               api.autoSizeAllColumns(false);
             } catch (e1) {
@@ -311,6 +371,13 @@
                 /* ignore */
               }
             }
+          }
+          if (resumen && hasHorizontalScroll(chart)) {
+            fitColumnsByDomMeasure(chart, api, {
+              pad: 12,
+              lock: true,
+              fitViewport: true,
+            });
           }
         } catch (err) {
           /* grid aún montando */
