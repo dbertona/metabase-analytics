@@ -115,7 +115,7 @@ def mi_tabla_proyectos_params() -> dict:
         "column_config": {
             "proyecto": {
                 "customColumnName": "Proyectos",
-                "columnWidth": 220,
+                # Sin columnWidth: auto-size al contenido (tail_js autoSizeAgGridColumns)
             },
             "Facturación": {
                 "d3NumberFormat": ",.0f",
@@ -212,26 +212,36 @@ El bloque canónico para cualquier tabla AG Grid:
 
 ---
 
-## 4. JavaScript — `fixAgGridHeight`
+## 4. JavaScript — `fixAgGridHeight` + `autoSizeAgGridColumns`
 
 Ubicado en `config/tail_js_custom_extra.html`. Se ejecuta cada 1.5 s.
 
-**Lógica:**
-1. Para cada selector registrado en el array, localiza el chart holder.
+Ambas funciones usan el array compartido `AG_GRID_CHART_SELECTORS`.
+
+### Altura (`fixAgGridHeight`)
+
+1. Para cada selector, localiza el chart holder.
 2. Calcula `alturaDisponible = alturaHolder − alturaHeader − 8px`.
 3. Si el valor cambió >4px, aplica `style.setProperty("height", Npx, "important")`
    en `.slice_container` y en el div `[class*="ag-theme"]`.
 
+### Ancho de columnas (`autoSizeAgGridColumns`)
+
+1. Localiza el `GridApi` de AG Grid caminando el árbol React (fiber).
+2. Llama a `api.autoSizeAllColumns(false)` (incluye cabecera en el cálculo).
+3. Guarda una huella del contenido (`data-ps-autosize-fp`) para no re-autosize
+   en cada tick si los datos no han cambiado (filtros / refresh sí la invalidan).
+
+**No** fijar `columnWidth` en `column_config` si quieres auto-size: el ancho fijo
+de Superset pelearía con la API.
+
 **Añadir una tabla nueva:**
 ```javascript
-function fixAgGridHeight() {
-  var selectors = [
-    "[data-test-chart-name*='Resumen mensual']",
-    "[data-test-chart-name*='Proyectos']",
-    "[data-test-chart-name*='Nueva Tabla']",  // ← añadir aquí
-  ];
-  // ...resto sin cambios
-}
+var AG_GRID_CHART_SELECTORS = [
+  "[data-test-chart-name*='Resumen mensual']",
+  "[data-test-chart-name*='Proyectos']",
+  "[data-test-chart-name*='Nueva Tabla']",  // ← añadir aquí
+];
 ```
 
 ---

@@ -61,6 +61,11 @@
     });
   }
 
+  var AG_GRID_CHART_SELECTORS = [
+    "[data-test-chart-name*='Resumen mensual']",
+    "[data-test-chart-name*='Proyectos']",
+  ];
+
   /**
    * Fuerza que el AG Grid llene todo el espacio disponible dentro del card.
    * Calcula en píxeles: altura del holder − altura del header − 8px margen.
@@ -68,11 +73,7 @@
    * cualquier inline style que React pueda estar poniendo.
    */
   function fixAgGridHeight() {
-    var selectors = [
-      "[data-test-chart-name*='Resumen mensual']",
-      "[data-test-chart-name*='Proyectos']",
-    ];
-    selectors.forEach(function (sel) {
+    AG_GRID_CHART_SELECTORS.forEach(function (sel) {
       var charts = document.querySelectorAll(sel);
       Array.prototype.forEach.call(charts, function (chart) {
         var header = chart.querySelector("[data-test='slice-header']");
@@ -95,11 +96,123 @@
     });
   }
 
+  /**
+   * Localiza GridApi de AG Grid caminando el árbol React (fiber) desde el tema.
+   * Superset no expone autoSize nativo en params; hay que llamar a la API.
+   */
+  function walkFiberForAgApi(fiber) {
+    var f = fiber;
+    var depth = 0;
+    while (f && depth < 100) {
+      var state = f.memoizedState;
+      var sdepth = 0;
+      while (state && sdepth < 50) {
+        var ms = state.memoizedState;
+        if (ms) {
+          if (typeof ms.autoSizeAllColumns === "function") return ms;
+          if (ms.current && typeof ms.current.autoSizeAllColumns === "function") {
+            return ms.current;
+          }
+          if (ms.api && typeof ms.api.autoSizeAllColumns === "function") {
+            return ms.api;
+          }
+        }
+        state = state.next;
+        sdepth += 1;
+      }
+      var props = f.memoizedProps || f.pendingProps;
+      if (props) {
+        if (props.api && typeof props.api.autoSizeAllColumns === "function") {
+          return props.api;
+        }
+        if (props.gridApi && typeof props.gridApi.autoSizeAllColumns === "function") {
+          return props.gridApi;
+        }
+      }
+      if (f.stateNode) {
+        var sn = f.stateNode;
+        if (sn.api && typeof sn.api.autoSizeAllColumns === "function") return sn.api;
+        if (sn.gridApi && typeof sn.gridApi.autoSizeAllColumns === "function") {
+          return sn.gridApi;
+        }
+      }
+      f = f.return;
+      depth += 1;
+    }
+    return null;
+  }
+
+  function findAgGridApi(rootEl) {
+    if (!rootEl) return null;
+    var stack = [rootEl];
+    var seen = 0;
+    while (stack.length && seen < 400) {
+      var el = stack.pop();
+      seen += 1;
+      if (!el || el.nodeType !== 1) continue;
+      var keys = Object.keys(el);
+      for (var i = 0; i < keys.length; i++) {
+        var key = keys[i];
+        if (
+          key.indexOf("__reactFiber") === 0 ||
+          key.indexOf("__reactInternalInstance") === 0
+        ) {
+          var api = walkFiberForAgApi(el[key]);
+          if (api) return api;
+        }
+      }
+      for (var c = el.firstChild; c; c = c.nextSibling) stack.push(c);
+    }
+    return null;
+  }
+
+  /** Huella ligera del contenido visible: re-autosize solo si cambian datos/filtros. */
+  function agGridContentFingerprint(chart) {
+    var cells = chart.querySelectorAll(".ag-cell, .ag-header-cell-text");
+    var parts = [String(cells.length)];
+    var limit = Math.min(cells.length, 24);
+    for (var i = 0; i < limit; i++) {
+      parts.push((cells[i].textContent || "").trim().slice(0, 40));
+    }
+    return parts.join("|");
+  }
+
+  /**
+   * Auto-size de columnas al contenido (opción A): api.autoSizeAllColumns().
+   * No reescribe si la huella de datos no cambió (respeta resize manual entre cargas).
+   */
+  function autoSizeAgGridColumns() {
+    AG_GRID_CHART_SELECTORS.forEach(function (sel) {
+      var charts = document.querySelectorAll(sel);
+      Array.prototype.forEach.call(charts, function (chart) {
+        var agTheme = chart.querySelector('[class*="ag-theme"]');
+        if (!agTheme) return;
+        var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
+        if (!rows.length) return;
+
+        var fp = agGridContentFingerprint(chart);
+        if (chart.getAttribute("data-ps-autosize-fp") === fp) return;
+
+        var api = findAgGridApi(agTheme);
+        if (!api || typeof api.autoSizeAllColumns !== "function") return;
+
+        try {
+          // false = incluir cabecera en el cálculo de ancho
+          api.autoSizeAllColumns(false);
+          chart.setAttribute("data-ps-autosize-fp", fp);
+        } catch (err) {
+          /* grid aún montando */
+        }
+      });
+    });
+  }
+
   setInterval(function () {
     fixDoubleAppRootAnchors(document);
     fixUsersAnchors(document);
     moveProyectosSearchBesideTitle();
     fixAgGridHeight();
+    autoSizeAgGridColumns();
   }, 1500);
 
   /**

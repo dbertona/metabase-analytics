@@ -35,7 +35,7 @@ def mi_tabla_params() -> dict:
         "column_config": {
             "campo_dimension": {
                 "customColumnName": "Nombre visible",
-                "columnWidth": 220,          # px (opcional)
+                # Evitar columnWidth fijo si se usa autoSizeAgGridColumns (tail_js)
             },
             "Etiqueta": {
                 "d3NumberFormat": ",.0f",
@@ -112,24 +112,23 @@ Añadir siempre estos bloques para las tablas AG Grid:
 
 ---
 
-## JS en `tail_js_custom_extra.html` — `fixAgGridHeight`
+## JS en `tail_js_custom_extra.html` — altura + auto-size columnas
 
-La función ya está implementada en el archivo y se ejecuta cada 1.5 s.
-Para añadir una nueva tabla basta con añadir su selector al array `selectors`:
+Ambas funciones usan `AG_GRID_CHART_SELECTORS` y se ejecutan cada 1.5 s.
+Para añadir una tabla nueva, añadir el selector a ese array:
 
 ```javascript
-function fixAgGridHeight() {
-  var selectors = [
-    "[data-test-chart-name*='Resumen mensual']",
-    "[data-test-chart-name*='Proyectos']",
-    "[data-test-chart-name*='Mi Tabla']",   // ← añadir aquí
-  ];
-  // ... (resto del código sin cambios)
-}
+var AG_GRID_CHART_SELECTORS = [
+  "[data-test-chart-name*='Resumen mensual']",
+  "[data-test-chart-name*='Proyectos']",
+  "[data-test-chart-name*='Mi Tabla']",   // ← añadir aquí
+];
 ```
 
-La función calcula: `alturaCard − alturaHeader − 8px` y lo aplica
-inline a `.slice_container` y `[class*="ag-theme"]`.
+- **`fixAgGridHeight`:** `alturaCard − alturaHeader − 8px` → inline en
+  `.slice_container` y `[class*="ag-theme"]`.
+- **`autoSizeAgGridColumns`:** localiza `GridApi` (React fiber) y llama
+  `autoSizeAllColumns(false)`. No fijar `columnWidth` en `column_config`.
 
 ---
 
@@ -155,8 +154,9 @@ debajo del header. Para moverlo junto al título del chart:
 - [ ] `AG_GRID_TABLE_ENABLED: True` en `superset_config.py`
 - [ ] `viz_type = "ag-grid-table"` en el script Python
 - [ ] `show_cell_bars: False` + `server_pagination: False` (salvo >10k filas)
+- [ ] Sin `columnWidth` fijo si se usa auto-size al contenido
 - [ ] CSS del bloque «Altura completa» añadido al `dashboard_css`
-- [ ] Selector añadido en `fixAgGridHeight` en `tail_js_custom_extra.html`
+- [ ] Selector añadido en `AG_GRID_CHART_SELECTORS` en `tail_js_custom_extra.html`
 - [ ] Si usa buscador: selector añadido en `moveProyectosSearchBesideTitle`
 - [ ] Aplicar cambios: `python3 scripts/setup-superset-planificacion.py`
 

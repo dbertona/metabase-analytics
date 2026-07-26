@@ -356,7 +356,7 @@ def resumen_proyectos_params() -> dict[str, Any]:
         "column_config": {
             "proyecto": {
                 "customColumnName": "Proyectos",
-                "columnWidth": 220,
+                # Sin columnWidth fijo: auto-size al contenido vía tail_js (autoSizeAllColumns)
             },
             "Facturación": {
                 "d3NumberFormat": ",.0f",
