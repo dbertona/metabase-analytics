@@ -1,0 +1,266 @@
+<script>
+(function () {
+  function appRoot() {
+    return window.location.pathname.indexOf("/analytics/") === 0 ? "/analytics" : "";
+  }
+
+  // Bug APP_ROOT: ensureAppRoot() duplica /analytics en logout (y otros links).
+  // Bootstrap ya trae /analytics/logout/ → el menú navega a /analytics/analytics/logout/.
+  function collapseDoubleAppRoot(url) {
+    if (!url) return url;
+    return String(url).replace(/\/analytics\/analytics(\/|$)/g, "/analytics$1");
+  }
+
+  function fixDoubleAppRootAnchors(rootEl) {
+    var scope = rootEl || document;
+    var nodes = scope.querySelectorAll
+      ? scope.querySelectorAll('a[href*="/analytics/analytics"]')
+      : [];
+    Array.prototype.forEach.call(nodes, function (a) {
+      var href = a.getAttribute("href");
+      var fixed = collapseDoubleAppRoot(href);
+      if (fixed && fixed !== href) a.setAttribute("href", fixed);
+    });
+  }
+
+  document.addEventListener(
+    "click",
+    function (ev) {
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      var a = t.closest("a[href]");
+      if (!a) return;
+      var href = a.getAttribute("href") || "";
+      // FAB Users sin APP_ROOT → Timesheet; forzar /analytics/users/...
+      if (/^\/users(\/|$)/.test(href) || href.indexOf("://apps.powersolution.es/users/") !== -1) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        var path = href.replace(/^https?:\/\/[^/]+/, "");
+        if (path.indexOf("/analytics/") !== 0) path = "/analytics" + path;
+        path = collapseDoubleAppRoot(path);
+        window.location.assign(path);
+        return;
+      }
+      if (href.indexOf("/analytics/analytics") === -1) return;
+      var fixed = collapseDoubleAppRoot(href);
+      if (fixed === href) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      window.location.assign(fixed);
+    },
+    true
+  );
+
+  function fixUsersAnchors(rootEl) {
+    var scope = rootEl || document;
+    var nodes = scope.querySelectorAll ? scope.querySelectorAll('a[href]') : [];
+    Array.prototype.forEach.call(nodes, function (a) {
+      var href = a.getAttribute("href") || "";
+      if (!/^\/users(\/|$)/.test(href)) return;
+      a.setAttribute("href", "/analytics" + href);
+    });
+  }
+
+  /**
+   * Fuerza que el AG Grid llene todo el espacio disponible dentro del card.
+   * Calcula en píxeles: altura del holder − altura del header − 8px margen.
+   * Aplica inline style a .slice_container y al div ag-theme-* para bypasear
+   * cualquier inline style que React pueda estar poniendo.
+   */
+  function fixAgGridHeight() {
+    var selectors = [
+      "[data-test-chart-name*='Resumen mensual']",
+      "[data-test-chart-name*='Proyectos']",
+    ];
+    selectors.forEach(function (sel) {
+      var charts = document.querySelectorAll(sel);
+      Array.prototype.forEach.call(charts, function (chart) {
+        var header = chart.querySelector("[data-test='slice-header']");
+        var sliceContainer = chart.querySelector(".slice_container");
+        var agTheme = chart.querySelector('[class*="ag-theme"]');
+        if (!sliceContainer || !agTheme) return;
+
+        var holderH = chart.getBoundingClientRect().height;
+        var headerH = header ? header.getBoundingClientRect().height : 0;
+        var available = Math.floor(holderH - headerH - 8);
+        if (available < 80) return; // aún no renderizado
+
+        var current = parseInt(sliceContainer.style.height, 10);
+        if (Math.abs(current - available) < 4) return; // ya correcto, no reasignar
+
+        sliceContainer.style.setProperty("height", available + "px", "important");
+        sliceContainer.style.setProperty("overflow", "hidden", "important");
+        agTheme.style.setProperty("height", available + "px", "important");
+      });
+    });
+  }
+
+  setInterval(function () {
+    fixDoubleAppRootAnchors(document);
+    fixUsersAnchors(document);
+    moveProyectosSearchBesideTitle();
+    fixAgGridHeight();
+  }, 1500);
+
+  /**
+   * Crea un input proxy junto al título «Proyectos» que reenvía al input
+   * real de AG Grid (filter-text-box). No mueve nodos React (se resetearían).
+   * Oculta el contenedor original con el search.
+   */
+  function moveProyectosSearchBesideTitle() {
+    var charts = document.querySelectorAll(
+      "[data-test-chart-name*='Proyectos']"
+    );
+    Array.prototype.forEach.call(charts, function (chart) {
+      var header = chart.querySelector("[data-test='slice-header']");
+      if (!header) return;
+
+      var realInput = chart.querySelector("#filter-text-box");
+      if (!realInput) return;
+
+      // Si el proxy ya existe y está vivo, nada que hacer
+      var existing = header.querySelector(".ps-search-proxy");
+      if (existing) {
+        // sincronizar placeholder por si cambió el idioma
+        existing.placeholder = realInput.placeholder;
+        return;
+      }
+
+      // Crear input proxy (no es un nodo React; React no lo toca)
+      var proxy = document.createElement("input");
+      proxy.type = "text";
+      proxy.placeholder = realInput.placeholder || "Buscar";
+      proxy.className = "ps-search-proxy";
+      proxy.setAttribute("aria-label", "Buscar proyectos");
+      proxy.style.cssText = [
+        "border:1px solid #d9d9d9",
+        "border-radius:6px",
+        "padding:3px 10px 3px 8px",
+        "font-size:14px",
+        "height:28px",
+        "margin-left:10px",
+        "outline:none",
+        "background:#fff",
+        "color:#333",
+        "flex:0 0 auto",
+        "min-width:160px",
+        "vertical-align:middle",
+        "cursor:text",
+      ].join(";");
+
+      // Reenviar escritura al AG Grid input real y disparar su evento
+      proxy.addEventListener("input", function () {
+        var nativeInputDescriptor = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype,
+          "value"
+        );
+        nativeInputDescriptor.set.call(realInput, proxy.value);
+        realInput.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      proxy.addEventListener("focus", function () {
+        proxy.style.borderColor = "#007c89";
+      });
+      proxy.addEventListener("blur", function () {
+        proxy.style.borderColor = "#d9d9d9";
+      });
+
+      // Insertar justo después del div.header-title
+      var title =
+        header.querySelector(".header-title") ||
+        header.querySelector(".editable-title");
+      if (title && title.nextSibling) {
+        header.insertBefore(proxy, title.nextSibling);
+      } else if (title) {
+        header.appendChild(proxy);
+      } else {
+        header.insertBefore(proxy, header.firstChild);
+      }
+
+      // Ocultar el contenedor original del search (debajo del header)
+      var origContainer = chart.querySelector(".dropdown-controls-container");
+      if (origContainer) {
+        origContainer.style.setProperty("display", "none", "important");
+      }
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () {
+      fixDoubleAppRootAnchors(document);
+      fixUsersAnchors(document);
+      moveProyectosSearchBesideTitle();
+    });
+  } else {
+    fixDoubleAppRootAnchors(document);
+    fixUsersAnchors(document);
+    moveProyectosSearchBesideTitle();
+  }
+
+  function isDashboardPage() {
+    return (
+      window.location.pathname.indexOf("/superset/dashboard/") !== -1 ||
+      window.location.pathname.indexOf("/dashboard/") !== -1
+    );
+  }
+
+  async function fetchLoggedUserName() {
+    try {
+      var res = await fetch(appRoot() + "/api/v1/me/", { credentials: "include" });
+      if (!res.ok) return null;
+      var payload = await res.json();
+      var me = payload && payload.result ? payload.result : payload;
+      if (!me) return null;
+      var full = [me.first_name || "", me.last_name || ""].join(" ").trim();
+      return full || me.username || me.email || null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function replaceOwnerWithLoggedUser(displayName) {
+    if (!displayName || !isDashboardPage()) return false;
+    var nodes = Array.prototype.slice.call(document.querySelectorAll("span,div,a"));
+    var agoNode = nodes.find(function (el) {
+      var t = (el.textContent || "").trim().toLowerCase();
+      if (!t || t.length > 40) return false;
+      return /(\bago\b|\bhace\b)/.test(t);
+    });
+    if (!agoNode || !agoNode.parentElement) return false;
+
+    var container = agoNode.parentElement;
+    var candidates = Array.prototype.slice
+      .call(container.querySelectorAll("span,div,a"))
+      .filter(function (el) {
+        if (el === agoNode) return false;
+        var t = (el.textContent || "").trim();
+        if (!t || t.length > 80) return false;
+        if (/(\bago\b|\bhace\b)/i.test(t)) return false;
+        return true;
+      });
+    if (!candidates.length) return false;
+
+    var ownerEl = candidates[candidates.length - 1];
+    if ((ownerEl.textContent || "").trim() === displayName) return true;
+    ownerEl.textContent = displayName;
+    return true;
+  }
+
+  async function runPatch() {
+    var name = await fetchLoggedUserName();
+    if (!name) return;
+    var tries = 0;
+    var timer = setInterval(function () {
+      tries += 1;
+      if (replaceOwnerWithLoggedUser(name) || tries > 25) {
+        clearInterval(timer);
+      }
+    }, 400);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", runPatch);
+  } else {
+    runPatch();
+  }
+})();
+</script>

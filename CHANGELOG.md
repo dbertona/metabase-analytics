@@ -2,6 +2,171 @@
 
 ## [Unreleased]
 
+## [2026-07-26b] — Table V2 AG Grid, fuente, búsqueda junto al título, altura completa
+
+### Added
+- Table V2 (AG Grid) activado para «Resumen mensual» y «Proyectos» — permite redimensionar columnas con el ratón.
+- Campo de búsqueda «Buscar» de Proyectos movido al lado del título mediante input proxy nativo (bypasea re-renders de React).
+
+### Changed
+- Fuente de tablas ajustada a 1.33em (base 1.56em −15%).
+- Tablas ocupan toda la altura del card: CSS `chart-slice` flexbox + fix JS `fixAgGridHeight` que calcula píxeles disponibles y los aplica inline.
+- CSS propaga `height: 100%` por toda la cadena: `.slice_container` → `.chart-container` → `ag-theme-*` → `.ag-root-wrapper` → `.ag-root`.
+
+### Fixed
+- Permisos de `dbertona@powersolution.es`: rol Admin añadido (antes solo PS_Viewer).
+
+## [2026-07-26ao] — Tablas: quitar ⋮ que recortaba el ancho
+
+### Fixed
+
+- Resumen/Proyectos: menú ⋮ oculto; padding uniforme; tabla a ancho completo.
+
+## [2026-07-26an] — Menos margen derecho en tablas
+
+### Changed
+
+- Resumen mensual / Proyectos: padding derecho reducido para equilibrar la card.
+
+## [2026-07-26am] — Misma altura Resumen mensual / Proyectos
+
+### Changed
+
+- Layout: altura de Proyectos = Resumen mensual (53 unidades de grid).
+
+## [2026-07-26al] — Separadores verticales en tablas
+
+### Changed
+
+- Tablas Resumen/Proyectos: `border-left/right` explícitos + `border-collapse: separate`.
+
+## [2026-07-26ak] — Columna proyecto → «Proyectos»
+
+### Changed
+
+- Tabla Proyectos: cabecera `Proyectos` (antes `proyecto`).
+
+## [2026-07-26aj] — Columna ano_mes → «Año/Mes»
+
+### Changed
+
+- Tabla Resumen mensual: `customColumnName` / verbose `Año/Mes` (antes `ano_mes`).
+
+## [2026-07-26ai] — Tablas Resumen/Proyectos estilo rejilla Timesheet
+
+### Changed
+
+- CSS tablas: bordes de celda, cabecera gris `#f3f4f6`, padding 10–12px,
+  hover suave (look similar a Lista de Notas; sin pastillas de estado).
+
+## [2026-07-26ah] — Títulos teal estilo Timesheet
+
+### Changed
+
+- Títulos de charts/tablas y cabeceras de sección en `#007c89` bold
+  (mismo teal que «Lista de Notas» en Timesheet).
+
+## [2026-07-26ag] — Estilo tarjetas tipo Timesheet en Resumen
+
+### Changed
+
+- Fondo dashboard `#eef2f4`, cards blancas con radio 12px y sombra suave.
+- KPI con barra lateral de color (Facturación/Margen/Δ/Beneficio).
+- Tipografía de etiquetas KPI en mayúsculas; títulos de sección más marcados.
+
+## [2026-07-26af] — Bordes en cada chart del Resumen
+
+### Changed
+
+- CSS: borde `1px #c5d0d3` + `border-radius: 6px` en
+  `.dashboard-component-chart-holder` (KPI, tablas y gráficos).
+
+## [2026-07-26ae] — Ocultar botón de filtro en todos los charts
+
+### Changed
+
+- CSS del dashboard Resumen: oculta badge/botón de filtros de cada chart
+  (`.filter-counts` / `.filters-badge`); la barra de filtros nativos se mantiene.
+
+## [2026-07-26ad] — Interfaz Superset en español
+
+### Changed
+
+- `BABEL_DEFAULT_LOCALE=es` + `LANGUAGES` (es/en) y locale de sesión forzado a `es`.
+- Pack `messages.json` / `messages.mo` montados (imagen lean no los trae compilados).
+- `COMMON_BOOTSTRAP_OVERRIDES_FUNC` inyecta el `language_pack` (si no, locale=es
+  pero la UI React seguía en inglés hasta pedir el pack con sesión).
+
+## [2026-07-26ac] — PS_Viewer solo lectura (sin Edit chart)
+
+### Fixed
+
+- Rol `PS_Viewer` sin `can_explore` / `can_slice` / writes (el menú “Edit chart”
+  se muestra si hay `can_explore` en Superset, no solo `can_write` Chart).
+- Altas Azure nuevas: `AUTH_USER_REGISTRATION_ROLE = PS_Viewer`.
+
+## [2026-07-26ab] — Fix logout 404 por doble /analytics
+
+### Fixed
+
+- Logout del menú iba a `/analytics/analytics/logout/` (404 Superset): el JS
+  `ensureAppRoot()` antepone APP_ROOT a `user_logout_url` que ya lo incluye.
+- Middleware WSGI colapsa `/analytics/analytics/*` → `/analytics/*`.
+- Patch en `tail_js_custom_extra.html` corrige hrefs/clicks con doble prefijo.
+
+## [2026-07-26aa] — Dashboard header: usuario logado en lugar de owner
+
+### Changed
+
+- Patch frontend inyectado via `config/tail_js_custom_extra.html` montado en
+  `tail_js_custom_extra.html` para que la barra del dashboard muestre el
+  usuario autenticado en sesión en vez del propietario del dashboard.
+
+## [2026-07-25aj] — Azure OAuth: metadata OIDC v2.0 (fix iss)
+
+### Fixed
+
+- `server_metadata_url` apunta a `/v2.0/.well-known/...` para alinear el
+  claim `iss` del id_token (evita quedarse en login tras Azure).
+
+## [2026-07-25ai] — OAuth Azure: redirect_uri absoluto bajo /analytics
+
+### Fixed
+
+- `redirect_uri` fijo a `/analytics/oauth-authorized/azure` para que el
+  callback no caiga en el catch-all de Timesheet (AppError 404 + early-init).
+
+## [2026-07-25ah] — Fix 404 logo / blank screen APP_ROOT
+
+### Fixed
+
+- Bug APP_ROOT (Superset 6.1): `PsAppInitializer` deshace el doble prefijo en
+  `brandLogoUrl`/`APP_ICON` (el JS ya antepone `static_assets_prefix`).
+- Revertido workaround `STATIC_ASSETS_PREFIX=/` que generaba `//static/...`
+  (pantalla en blanco + CSP).
+
+## [2026-07-25ag] — Fix OAuth state CSRF detrás de /analytics/
+
+### Fixed
+
+- Cookies de sesión `Path=/` + `Secure` para que Azure OAuth no falle con
+  `mismatching_state` (dejaba al usuario colgado como `admin`).
+
+## [2026-07-25af] — Nombre de recurso en barra (bc_resource)
+
+### Added
+
+- Al login Azure, lookup `bc_resource.name` por email y actualiza `first_name`/`last_name`
+  (visible en la barra superior, estilo Timesheet).
+
+## [2026-07-25ae] — SSO Microsoft (Azure AD) en Superset
+
+### Added
+
+- OAuth Entra ID (`AUTH_OAUTH`) con misma App Registration que Timesheet.
+- Rol por defecto `Gamma` (lectura); Admin se asigna a mano.
+- Secret vía `.env` (`AZURE_CLIENT_SECRET`) — no versionado.
+
 ## [2026-07-25] — Merge `feat/dashboard-resumen-fase3`
 
 Cierre de rama: dashboard Resumen (tabs KPI/tablas + Gráficos), tabla Proyectos,
