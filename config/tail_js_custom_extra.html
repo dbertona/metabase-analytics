@@ -245,7 +245,17 @@
 
   /** year/month: ordenan pero no deben ocupar píxeles (hueco a la izquierda). */
   function collapseHiddenSortColumns(api) {
-    if (!api || typeof api.applyColumnState !== "function") return;
+    if (!api) return;
+    ["year", "month"].forEach(function (id) {
+      try {
+        if (typeof api.setColumnVisible === "function") {
+          api.setColumnVisible(id, false);
+        }
+      } catch (e) {
+        /* col aún no montada */
+      }
+    });
+    if (typeof api.applyColumnState !== "function") return;
     api.applyColumnState({
       state: [
         {
@@ -402,6 +412,32 @@
     });
     if (!state.length) return false;
 
+    // Incluir year/month a 0 en el mismo apply (evita hueco izquierdo)
+    if (opts.collapseSortCols) {
+      state.push(
+        {
+          colId: "year",
+          hide: true,
+          width: 0,
+          minWidth: 0,
+          maxWidth: 0,
+          flex: null,
+          sort: "asc",
+          sortIndex: 0,
+        },
+        {
+          colId: "month",
+          hide: true,
+          width: 0,
+          minWidth: 0,
+          maxWidth: 0,
+          flex: null,
+          sort: "asc",
+          sortIndex: 1,
+        }
+      );
+    }
+
     var avail = getViewportWidth(chart);
 
     if (opts.flexTextColumn && avail > 80) {
@@ -477,7 +513,7 @@
   }
 
   /**
-   * Resumen: Año/Mes flex → métricas pegadas a la derecha (pantallas anchas).
+   * Resumen: columnas al contenido, alineadas a la IZQUIERDA (sin flex).
    * Proyectos: métricas justas; columna texto = resto (sin scroll).
    */
   function autoSizeAgGridColumns() {
@@ -499,11 +535,12 @@
           if (resumen) collapseHiddenSortColumns(api);
           var ok = fitColumnsByDomMeasure(chart, api, {
             pad: resumen || proyectos ? 16 : 24,
-            lock: false,
-            lockMetrics: !!(resumen || proyectos),
-            // Resumen y Proyectos: col. texto absorbe el resto → métricas a la derecha
-            fitViewport: false,
-            flexTextColumn: !!(resumen || proyectos),
+            lock: !!resumen,
+            lockMetrics: !!proyectos,
+            // Resumen: solo encoger si hay overflow (NO expandir → queda a la izquierda)
+            fitViewport: !!resumen,
+            flexTextColumn: !!proyectos,
+            collapseSortCols: !!resumen,
           });
           if (!ok && typeof api.autoSizeAllColumns === "function") {
             try {
@@ -521,11 +558,12 @@
             if (hasHorizontalScroll(chart)) {
               fitColumnsByDomMeasure(chart, api, {
                 pad: 12,
-                lockMetrics: true,
-                flexTextColumn: true,
+                lock: true,
+                fitViewport: true,
+                flexTextColumn: false,
+                collapseSortCols: true,
               });
               collapseHiddenSortColumns(api);
-              shrinkTextColumnToClearScroll(chart, api);
             }
           }
           if (proyectos && hasHorizontalScroll(chart)) {

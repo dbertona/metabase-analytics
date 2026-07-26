@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-26au] — Resumen alineado a la izquierda
+
+### Fixed
+
+- Sin flex en Resumen (el flex empujaba el bloque a la derecha).
+- `year`/`month` a ancho 0 + `setColumnVisible(false)` para quitar el hueco izquierdo.
+
 ## [2026-07-26at] — Probabilidad: título = otros; números = tablas
 
 ### Changed
