@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-26ah] — Títulos teal estilo Timesheet
+
+### Changed
+
+- Títulos de charts/tablas y cabeceras de sección en `#007c89` bold
+  (mismo teal que «Lista de Notas» en Timesheet).
+
 ## [2026-07-26ag] — Estilo tarjetas tipo Timesheet en Resumen
 
 ### Changed
