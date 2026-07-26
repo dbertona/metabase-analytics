@@ -326,7 +326,6 @@
     fixAgGridHeight();
     autoSizeAgGridColumns();
     hideResumenHeaderChrome();
-    hideDashboardEditChrome();
   }, 1200);
 
   /**
@@ -353,15 +352,6 @@
       "  margin: 0 !important;",
       "  pointer-events: none !important;",
       "}",
-      /* Chrome de edición del dashboard (vista consumo) */
-      'button[data-test="edit-dashboard"],',
-      'button[data-test="dashboard-edit-button"],',
-      '[data-test="dashboard-header"] button[aria-label*="Edit"],',
-      '[data-test="dashboard-header"] button[aria-label*="Editar"],',
-      ".dashboard-header .ant-dropdown-trigger.ant-btn-icon-only,",
-      '[data-test="slice-header"] .header-controls {',
-      "  display: none !important;",
-      "}",
     ].join("\n");
     document.head.appendChild(style);
   }
@@ -380,37 +370,6 @@
         el.style.setProperty("visibility", "hidden", "important");
         el.setAttribute("aria-hidden", "true");
       });
-    });
-  }
-
-  /** Oculta botones de editar dashboard / controles de chart (sin tocar roles DB). */
-  function hideDashboardEditChrome() {
-    if (!isDashboardPage()) return;
-    ensurePsTableStyle();
-    var selectors = [
-      'button[data-test="edit-dashboard"]',
-      'button[data-test="dashboard-edit-button"]',
-      '[data-test="dashboard-header"] button[aria-label*="Edit"]',
-      '[data-test="dashboard-header"] button[aria-label*="Editar"]',
-    ];
-    selectors.forEach(function (sel) {
-      var nodes = document.querySelectorAll(sel);
-      Array.prototype.forEach.call(nodes, function (el) {
-        el.style.setProperty("display", "none", "important");
-      });
-    });
-    // Botón con texto «Edit dashboard» / «Editar dashboard»
-    var buttons = document.querySelectorAll("button, a.ant-btn");
-    Array.prototype.forEach.call(buttons, function (btn) {
-      var t = (btn.textContent || "").trim().toLowerCase();
-      if (
-        t === "edit dashboard" ||
-        t === "editar dashboard" ||
-        t.indexOf("edit dashboard") !== -1 ||
-        t.indexOf("editar dashboard") !== -1
-      ) {
-        btn.style.setProperty("display", "none", "important");
-      }
     });
   }
 
@@ -503,7 +462,6 @@
       moveProyectosSearchBesideTitle();
       ensurePsTableStyle();
       hideResumenHeaderChrome();
-      hideDashboardEditChrome();
     });
   } else {
     fixDoubleAppRootAnchors(document);
@@ -511,7 +469,6 @@
     moveProyectosSearchBesideTitle();
     ensurePsTableStyle();
     hideResumenHeaderChrome();
-    hideDashboardEditChrome();
   }
 
   function isDashboardPage() {
