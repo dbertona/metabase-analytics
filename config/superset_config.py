@@ -21,6 +21,8 @@ SECRET_KEY = os.environ.get("SUPERSET_SECRET_KEY", "PsSupersetSecretKey2026Chang
 FEATURE_FLAGS = {
     "DASHBOARD_CROSS_FILTERS": True,
     "ENABLE_TEMPLATE_PROCESSING": True,
+    # Table V2 (AG Grid): resize de columnas con el ratón, pin, autosize, etc.
+    "AG_GRID_TABLE_ENABLED": True,
 }
 
 WTF_CSRF_ENABLED = True

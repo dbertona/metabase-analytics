@@ -1034,9 +1034,10 @@ def main() -> int:
              ".2%")),
         ("Plan · Beneficio", "plan", kpi_ds, "big_number_total",
          big_number_params(metric_sum("plan_beneficio", "Beneficio"), ",.0f", currency=True)),
-        ("Resumen mensual", "table", evo_ds, "table", resumen_mensual_params()),
+        # Table V2 (AG Grid): resize de columnas nativo en dashboard
+        ("Resumen mensual", "table", evo_ds, "ag-grid-table", resumen_mensual_params()),
         # PBI Resumen Proyectos: Operational + estado Completed/Open/Planning
-        ("Proyectos", "projects", proy_ds, "table", resumen_proyectos_params()),
+        ("Proyectos", "projects", proy_ds, "ag-grid-table", resumen_proyectos_params()),
         ("Facturación por Probabilidad", "prob", prob_ds, "echarts_timeseries_bar",
          probabilidad_bar_params()),
         ("Evolución mensual", "chart", evo_ds, "echarts_timeseries_line",
