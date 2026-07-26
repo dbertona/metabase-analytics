@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-26ag] — Estilo tarjetas tipo Timesheet en Resumen
+
+### Changed
+
+- Fondo dashboard `#eef2f4`, cards blancas con radio 12px y sombra suave.
+- KPI con barra lateral de color (Facturación/Margen/Δ/Beneficio).
+- Tipografía de etiquetas KPI en mayúsculas; títulos de sección más marcados.
+
 ## [2026-07-26af] — Bordes en cada chart del Resumen
 
 ### Changed
