@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-26aq] — Proyectos: sin scroll horizontal fantasma
+
+### Fixed
+
+- Autosize Proyectos: margen viewport + shrink de columna texto al overflow exacto.
+- CSS: ocultar barra horizontal AG Grid en Resumen/Proyectos.
+- Cabecera Proyectos: métrica `Fact.` (antes `Facturación` truncada).
+
 ## [2026-07-26ap] — Resumen mensual: orden cronológico mes/año
 
 ### Fixed
