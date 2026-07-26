@@ -1,0 +1,165 @@
+# Tablas AG Grid en Superset — patrón canónico
+
+> **Referencia completa:** `docs/TABLAS_AG_GRID.md`
+> **Última actualización:** 2026-07-26
+
+## Requisito previo
+
+`superset_config.py` debe tener:
+```python
+FEATURE_FLAGS = {
+    "AG_GRID_TABLE_ENABLED": True,
+}
+```
+Sin este flag, el tipo `ag-grid-table` no está disponible.
+
+---
+
+## Parámetros mínimos en el script Python
+
+```python
+def mi_tabla_params() -> dict:
+    return {
+        "query_mode": "aggregate",           # o "raw"
+        "groupby": ["campo_dimension"],
+        "metrics": [
+            metric_sum("campo", "Etiqueta"),
+        ],
+        "row_limit": 5000,
+        "server_pagination": False,          # True solo si >10k filas
+        "show_totals": True,                 # fila Resumen al final
+        "include_search": True,              # buscador en la cabecera
+        "show_cell_bars": False,             # sin barras de progreso
+        "color_pn": False,
+        "align_pn": False,
+        "column_config": {
+            "campo_dimension": {
+                "customColumnName": "Nombre visible",
+                "columnWidth": 220,          # px (opcional)
+            },
+            "Etiqueta": {
+                "d3NumberFormat": ",.0f",
+                "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
+                "showCellBars": False,
+            },
+        },
+    }
+```
+
+En `charts_config` usar `"ag-grid-table"` como `viz_type`:
+```python
+("Nombre chart", "slug", dataset_id, "ag-grid-table", mi_tabla_params()),
+```
+
+---
+
+## CSS de dashboard (en `dashboard_css`)
+
+Añadir siempre estos bloques para las tablas AG Grid:
+
+```css
+/* ── Fuente y cabeceras ── */
+[data-test-chart-name*='Mi Tabla'] thead th,
+[data-test-chart-name*='Mi Tabla'] .ag-header-cell {
+  white-space: nowrap !important;
+  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;
+  font-size: 1.33em !important;
+  border-bottom: 2px solid #d1d5db !important;
+  box-shadow: none !important;
+}
+[data-test-chart-name*='Mi Tabla'] td,
+[data-test-chart-name*='Mi Tabla'] .ag-cell {
+  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;
+  font-size: 1.33em !important;
+}
+
+/* ── Ocultar paginación y barras ── */
+[data-test-chart-name*='Mi Tabla'] .dt-length,
+[data-test-chart-name*='Mi Tabla'] .ant-pagination,
+[data-test-chart-name*='Mi Tabla'] .row-count-container,
+[data-test-chart-name*='Mi Tabla'] .cell-bar,
+[data-test-chart-name*='Mi Tabla'] .cell-bars {
+  display: none !important;
+}
+
+/* ── Altura completa del card ── */
+[data-test-chart-name*='Mi Tabla'] .chart-slice {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+[data-test-chart-name*='Mi Tabla'] .slice_container {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+[data-test-chart-name*='Mi Tabla'] .chart-container,
+[data-test-chart-name*='Mi Tabla'] .slice_container > div {
+  height: 100% !important;
+}
+[data-test-chart-name*='Mi Tabla'] [class*='ag-theme'],
+[data-test-chart-name*='Mi Tabla'] .ag-root-wrapper,
+[data-test-chart-name*='Mi Tabla'] .ag-root-wrapper-body,
+[data-test-chart-name*='Mi Tabla'] .ag-root {
+  height: 100% !important;
+  flex: 1 1 auto !important;
+}
+```
+
+> **Nota:** el CSS solo propaga los contenedores; el ajuste fino de píxeles
+> lo hace el JS `fixAgGridHeight` (ver abajo).
+
+---
+
+## JS en `tail_js_custom_extra.html` — `fixAgGridHeight`
+
+La función ya está implementada en el archivo y se ejecuta cada 1.5 s.
+Para añadir una nueva tabla basta con añadir su selector al array `selectors`:
+
+```javascript
+function fixAgGridHeight() {
+  var selectors = [
+    "[data-test-chart-name*='Resumen mensual']",
+    "[data-test-chart-name*='Proyectos']",
+    "[data-test-chart-name*='Mi Tabla']",   // ← añadir aquí
+  ];
+  // ... (resto del código sin cambios)
+}
+```
+
+La función calcula: `alturaCard − alturaHeader − 8px` y lo aplica
+inline a `.slice_container` y `[class*="ag-theme"]`.
+
+---
+
+## Buscador junto al título (opcional)
+
+Si `include_search: True`, el buscador por defecto aparece a la derecha
+debajo del header. Para moverlo junto al título del chart:
+
+1. En `moveProyectosSearchBesideTitle` (en `tail_js_custom_extra.html`),
+   añadir el selector del nuevo chart:
+   ```javascript
+   var charts = document.querySelectorAll(
+     "[data-test-chart-name*='Proyectos'], [data-test-chart-name*='Mi Tabla']"
+   );
+   ```
+2. La función crea un `<input>` proxy nativo, lo inserta después de
+   `.header-title` y oculta `.dropdown-controls-container` de AG Grid.
+
+---
+
+## Checklist al crear una tabla nueva
+
+- [ ] `AG_GRID_TABLE_ENABLED: True` en `superset_config.py`
+- [ ] `viz_type = "ag-grid-table"` en el script Python
+- [ ] `show_cell_bars: False` + `server_pagination: False` (salvo >10k filas)
+- [ ] CSS del bloque «Altura completa» añadido al `dashboard_css`
+- [ ] Selector añadido en `fixAgGridHeight` en `tail_js_custom_extra.html`
+- [ ] Si usa buscador: selector añadido en `moveProyectosSearchBesideTitle`
+- [ ] Aplicar cambios: `python3 scripts/setup-superset-planificacion.py`
+
+---
+
+**Última actualización:** 2026-07-26
