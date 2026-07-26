@@ -248,6 +248,26 @@
   function sortResumenByAnoMes(api) {
     if (!api) return;
     try {
+      // 1) Quitar sort de métricas (Superset deja Fact. DESC si no hay order_by)
+      var state = [];
+      var cols =
+        typeof api.getColumns === "function"
+          ? api.getColumns()
+          : typeof api.getAllDisplayedColumns === "function"
+            ? api.getAllDisplayedColumns()
+            : [];
+      for (var i = 0; i < cols.length; i++) {
+        var col = cols[i];
+        var id =
+          typeof col.getColId === "function"
+            ? col.getColId()
+            : col.colId || col;
+        if (!id || id.charAt(0) === "_") continue;
+        if (isMetricColId(id)) {
+          state.push({ colId: id, sort: null });
+        }
+      }
+      // 2) Comparator cronológico MM/YYYY
       var colDef =
         typeof api.getColumnDef === "function" ? api.getColumnDef("ano_mes") : null;
       if (colDef) {
@@ -255,16 +275,25 @@
           return anoMesSortKey(a) - anoMesSortKey(b);
         };
       }
+      var colObj =
+        typeof api.getColumn === "function" ? api.getColumn("ano_mes") : null;
+      if (colObj && typeof colObj.getColDef === "function") {
+        colObj.getColDef().comparator = function (a, b) {
+          return anoMesSortKey(a) - anoMesSortKey(b);
+        };
+      }
+      state.push({ colId: "ano_mes", sort: "asc", sortIndex: 0 });
       if (typeof api.applyColumnState === "function") {
         api.applyColumnState({
-          state: [{ colId: "ano_mes", sort: "asc", sortIndex: 0 }],
+          state: state,
           defaultState: { sort: null },
         });
       }
+      if (typeof api.setSortModel === "function") {
+        api.setSortModel([{ colId: "ano_mes", sort: "asc" }]);
+      }
       if (typeof api.refreshClientSideRowModel === "function") {
         api.refreshClientSideRowModel("sort");
-      } else if (typeof api.onSortChanged === "function") {
-        api.onSortChanged();
       }
     } catch (e) {
       /* grid montando */

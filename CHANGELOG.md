@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-26ax] — Resumen: orden cronológico SQL (to_date)
+
+### Fixed
+
+- Sin `order_by`, Superset ordenaba por Fact. DESC.
+- Ahora `ORDER BY to_date(ano_mes, 'MM/YYYY') ASC` + JS limpia sort de métricas.
+
 ## [2026-07-26aw] — Resumen: solo ano_mes + sort JS + 4 columnas visibles
 
 ### Fixed

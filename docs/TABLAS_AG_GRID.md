@@ -58,7 +58,20 @@ def mi_tabla_mensual_params() -> dict:
             ),
         ],
         "percent_metrics": [],
-        "order_by_cols": [],
+        "order_by_cols": [
+            # Cronológico real (MM/YYYY como texto no ordena bien entre años)
+            json.dumps(
+                [
+                    {
+                        "expressionType": "SQL",
+                        "sqlExpression": "to_date(ano_mes, 'MM/YYYY')",
+                        "label": "orden_mes",
+                    },
+                    True,
+                ],
+                ensure_ascii=False,
+            )
+        ],
         "row_limit": 1000,
         "server_pagination": False,
         "show_totals": True,
@@ -87,7 +100,7 @@ def mi_tabla_mensual_params() -> dict:
     }
 ```
 
-> **Orden cronológico:** `ano_mes` es texto `MM/YYYY` y no ordena bien. El `tail_js` aplica un `comparator` que ordena por año/mes. No uses `year`/`month` en `groupby` (ocupan ancho aunque estén ocultas).
+> **Orden:** sin `order_by_cols`, Superset ordena por la 1ª métrica (Fact. DESC). Usar `to_date(ano_mes, 'MM/YYYY')`.
 
 ### Tabla de proyectos (con buscador)
 
