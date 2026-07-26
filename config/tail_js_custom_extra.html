@@ -596,68 +596,237 @@
 
   /**
    * Facturación por Probabilidad (ECharts):
-   * - título = mismo tamaño que otros charts (CSS global 16px; sin override)
-   * - ejes/valores = mismo px que celdas de tablas AG Grid (1.26em)
+   * - título = mismo tamaño que otros charts (CSS global 16px)
+   * - ejes/valores = mismo px que celdas AG Grid (1.26em)
+   * Nota: en Superset 6 no existe window.echarts → hay que hallar la instancia en el DOM.
    */
   function getTableFontPx() {
     var cell = document.querySelector(
-      "[data-test-chart-name*='Resumen mensual'] .ag-cell, " +
-        "[data-test-chart-name*='Proyectos'] .ag-cell, " +
-        "[data-test-chart-name*='Resumen mensual'] .ag-header-cell-text"
+      "[data-test-chart-name*='Proyectos'] .ag-cell, " +
+        "[data-test-chart-name*='Resumen mensual'] .ag-cell"
     );
     if (cell) {
       var fs = parseFloat(window.getComputedStyle(cell).fontSize);
       if (fs && fs >= 10) return Math.round(fs);
     }
-    // 1.26em con base típica Superset ~14px
-    return 18;
+    // Probe 1.26em (misma regla CSS de tablas) dentro del tema AG Grid
+    var host =
+      document.querySelector(
+        "[data-test-chart-name*='Proyectos'] [class*='ag-theme']"
+      ) || document.body;
+    var probe = document.createElement("span");
+    probe.style.cssText =
+      "font-family:'Segoe UI',-apple-system,Roboto,Helvetica,Arial,sans-serif;" +
+      "font-size:1.26em;position:absolute;left:-9999px;visibility:hidden;";
+    probe.textContent = "Ag";
+    host.appendChild(probe);
+    var px = Math.round(parseFloat(window.getComputedStyle(probe).fontSize) || 0);
+    host.removeChild(probe);
+    return px >= 10 ? px : 20;
+  }
+
+  function findEchartsInstance(root) {
+    if (!root) return null;
+    var nodes = [root].concat(
+      Array.prototype.slice.call(root.querySelectorAll("div"))
+    );
+    var apis = [window.echarts, window.echartsLib].filter(Boolean);
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      for (var a = 0; a < apis.length; a++) {
+        try {
+          if (typeof apis[a].getInstanceByDom === "function") {
+            var byDom = apis[a].getInstanceByDom(el);
+            if (byDom) return byDom;
+          }
+        } catch (e1) {
+          /* ignore */
+        }
+      }
+      // Propiedades propias del nodo (algunas builds cuelgan la instancia aquí)
+      try {
+        var keys = Object.keys(el);
+        for (var k = 0; k < keys.length; k++) {
+          var val = el[keys[k]];
+          if (
+            val &&
+            typeof val === "object" &&
+            typeof val.setOption === "function" &&
+            typeof val.getOption === "function"
+          ) {
+            return val;
+          }
+        }
+        // React fiber → ref con setOption
+        var fiberKey = keys.filter(function (x) {
+          return (
+            x.indexOf("__reactFiber") === 0 ||
+            x.indexOf("__reactInternalInstance") === 0
+          );
+        })[0];
+        if (fiberKey) {
+          var fiber = el[fiberKey];
+          var depth = 0;
+          while (fiber && depth < 50) {
+            var st = fiber.memoizedState;
+            var sDepth = 0;
+            while (st && sDepth < 30) {
+              var memo = st.memoizedState;
+              if (memo && typeof memo.setOption === "function") return memo;
+              if (
+                memo &&
+                memo.current &&
+                typeof memo.current.setOption === "function"
+              ) {
+                return memo.current;
+              }
+              st = st.next;
+              sDepth++;
+            }
+            var props = fiber.memoizedProps || fiber.pendingProps || {};
+            if (props.echartsInstance && props.echartsInstance.setOption) {
+              return props.echartsInstance;
+            }
+            if (props.chartInstance && props.chartInstance.setOption) {
+              return props.chartInstance;
+            }
+            fiber = fiber.return;
+            depth++;
+          }
+        }
+      } catch (e2) {
+        /* ignore */
+      }
+    }
+    return null;
+  }
+
+  function applyProbabilidadFont(inst, fontPx) {
+    if (!inst || typeof inst.setOption !== "function") return;
+    var color = "#0f172a";
+    var labelStyle = {
+      fontSize: fontPx,
+      color: color,
+      fontFamily: "'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif",
+      fontWeight: 400,
+    };
+    try {
+      var opt = inst.getOption() || {};
+      var seriesPatch = [];
+      var series = opt.series || [];
+      for (var s = 0; s < series.length; s++) {
+        seriesPatch.push({
+          label: Object.assign({ show: true }, labelStyle),
+        });
+      }
+      if (!seriesPatch.length) {
+        seriesPatch = [{ label: Object.assign({ show: true }, labelStyle) }];
+      }
+      inst.setOption(
+        {
+          textStyle: labelStyle,
+          xAxis: [
+            {
+              axisLabel: labelStyle,
+              nameTextStyle: labelStyle,
+            },
+          ],
+          yAxis: [
+            {
+              axisLabel: labelStyle,
+              nameTextStyle: labelStyle,
+            },
+          ],
+          series: seriesPatch,
+        },
+        false
+      );
+    } catch (err) {
+      /* remount */
+    }
   }
 
   function bumpProbabilidadChartFonts() {
-    if (!window.echarts || typeof window.echarts.getInstanceByDom !== "function") {
-      return;
-    }
     var fontPx = getTableFontPx();
     var roots = document.querySelectorAll(
       '[data-test-chart-name*="Facturación por Probabilidad"]'
     );
     Array.prototype.forEach.call(roots, function (root) {
-      var hosts = root.querySelectorAll("div");
-      for (var i = 0; i < hosts.length; i++) {
-        var inst = null;
-        try {
-          inst = window.echarts.getInstanceByDom(hosts[i]);
-        } catch (e) {
-          inst = null;
-        }
-        if (!inst || typeof inst.getOption !== "function") continue;
-        var opt = inst.getOption() || {};
-        var y0 = (opt.yAxis && opt.yAxis[0]) || {};
-        var yLabel = (y0.axisLabel && y0.axisLabel.fontSize) || 0;
-        if (yLabel === fontPx) return;
-        try {
-          inst.setOption(
-            {
-              textStyle: { fontSize: fontPx },
-              xAxis: {
-                axisLabel: { fontSize: fontPx },
-                nameTextStyle: { fontSize: fontPx },
-              },
-              yAxis: {
-                axisLabel: { fontSize: fontPx },
-                nameTextStyle: { fontSize: fontPx },
-              },
-              series: [{ label: { fontSize: fontPx } }],
-            },
-            false
-          );
-        } catch (err) {
-          /* chart remounting */
-        }
+      var inst = findEchartsInstance(root);
+      if (!inst) return;
+      var opt = {};
+      try {
+        opt = inst.getOption() || {};
+      } catch (e) {
         return;
       }
+      var y0 = (opt.yAxis && opt.yAxis[0]) || {};
+      var cur = (y0.axisLabel && y0.axisLabel.fontSize) || 0;
+      var s0 = (opt.series && opt.series[0] && opt.series[0].label) || {};
+      var curLabel = s0.fontSize || 0;
+      if (cur === fontPx && curLabel === fontPx) return;
+      applyProbabilidadFont(inst, fontPx);
     });
   }
+
+  /**
+   * Fallback fiable: al dibujar texto en el canvas de Probabilidad,
+   * sustituir el px de la fuente por el de las tablas (Superset no expone echarts global).
+   */
+  function patchProbabilidadCanvasFonts() {
+    if (window.__psProbCanvasFontPatched) return;
+    window.__psProbCanvasFontPatched = true;
+    var proto = CanvasRenderingContext2D.prototype;
+    var origFill = proto.fillText;
+    var origStroke = proto.strokeText;
+    function boost(ctx) {
+      try {
+        var canvas = ctx.canvas;
+        if (!canvas || !canvas.closest) return;
+        if (
+          !canvas.closest(
+            '[data-test-chart-name*="Facturación por Probabilidad"]'
+          )
+        ) {
+          return;
+        }
+        var fontPx = getTableFontPx();
+        var f = String(ctx.font || "");
+        var next = f.replace(/\d+(\.\d+)?px/i, fontPx + "px");
+        if (next === f) {
+          next =
+            "normal " +
+            fontPx +
+            "px 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif";
+        }
+        ctx.font = next;
+        // Números de tabla son casi negros; ECharts usa gris claro
+        if (typeof ctx.fillStyle === "string") {
+          var s = ctx.fillStyle.toLowerCase();
+          if (
+            s.indexOf("rgb") === 0 ||
+            s.charAt(0) === "#" ||
+            s === "gray" ||
+            s === "grey"
+          ) {
+            ctx.fillStyle = "#0f172a";
+          }
+        }
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    proto.fillText = function () {
+      boost(this);
+      return origFill.apply(this, arguments);
+    };
+    proto.strokeText = function () {
+      boost(this);
+      return origStroke.apply(this, arguments);
+    };
+  }
+
+  patchProbabilidadCanvasFonts();
 
   /**
    * Localiza el chart «Resumen mensual» por atributo o por título del slice.

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-26av] — Probabilidad: números = tamaño tablas (fix real)
+
+### Fixed
+
+- Causa: Superset 6 no expone `window.echarts` → el `setOption` no corría.
+- Fallback: patch de `canvas.fillText` en Probabilidad con el px medido de las celdas AG Grid (1.26em) y color `#0f172a`.
+- Tema `THEME_DEFAULT`: `echartsOptionsOverridesByChartType` para `echarts_timeseries_bar` a 20px.
+
 ## [2026-07-26au] — Resumen alineado a la izquierda
 
 ### Fixed
