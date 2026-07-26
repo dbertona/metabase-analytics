@@ -8,6 +8,8 @@
 
 - `BABEL_DEFAULT_LOCALE=es` + `LANGUAGES` (es/en) y locale de sesión forzado a `es`.
 - Pack `messages.json` / `messages.mo` montados (imagen lean no los trae compilados).
+- `COMMON_BOOTSTRAP_OVERRIDES_FUNC` inyecta el `language_pack` (si no, locale=es
+  pero la UI React seguía en inglés hasta pedir el pack con sesión).
 
 ## [2026-07-26ac] — PS_Viewer solo lectura (sin Edit chart)
 
