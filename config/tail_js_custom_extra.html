@@ -61,10 +61,45 @@
     });
   }
 
+  /**
+   * Fuerza que el AG Grid llene todo el espacio disponible dentro del card.
+   * Calcula en píxeles: altura del holder − altura del header − 8px margen.
+   * Aplica inline style a .slice_container y al div ag-theme-* para bypasear
+   * cualquier inline style que React pueda estar poniendo.
+   */
+  function fixAgGridHeight() {
+    var selectors = [
+      "[data-test-chart-name*='Resumen mensual']",
+      "[data-test-chart-name*='Proyectos']",
+    ];
+    selectors.forEach(function (sel) {
+      var charts = document.querySelectorAll(sel);
+      Array.prototype.forEach.call(charts, function (chart) {
+        var header = chart.querySelector("[data-test='slice-header']");
+        var sliceContainer = chart.querySelector(".slice_container");
+        var agTheme = chart.querySelector('[class*="ag-theme"]');
+        if (!sliceContainer || !agTheme) return;
+
+        var holderH = chart.getBoundingClientRect().height;
+        var headerH = header ? header.getBoundingClientRect().height : 0;
+        var available = Math.floor(holderH - headerH - 8);
+        if (available < 80) return; // aún no renderizado
+
+        var current = parseInt(sliceContainer.style.height, 10);
+        if (Math.abs(current - available) < 4) return; // ya correcto, no reasignar
+
+        sliceContainer.style.setProperty("height", available + "px", "important");
+        sliceContainer.style.setProperty("overflow", "hidden", "important");
+        agTheme.style.setProperty("height", available + "px", "important");
+      });
+    });
+  }
+
   setInterval(function () {
     fixDoubleAppRootAnchors(document);
     fixUsersAnchors(document);
     moveProyectosSearchBesideTitle();
+    fixAgGridHeight();
   }, 1500);
 
   /**
