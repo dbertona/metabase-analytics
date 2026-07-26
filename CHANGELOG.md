@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-26ai] — Tablas Resumen/Proyectos estilo rejilla Timesheet
+
+### Changed
+
+- CSS tablas: bordes de celda, cabecera gris `#f3f4f6`, padding 10–12px,
+  hover suave (look similar a Lista de Notas; sin pastillas de estado).
+
 ## [2026-07-26ah] — Títulos teal estilo Timesheet
 
 ### Changed
