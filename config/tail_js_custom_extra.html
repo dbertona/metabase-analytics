@@ -325,7 +325,94 @@
     moveProyectosSearchBesideTitle();
     fixAgGridHeight();
     autoSizeAgGridColumns();
+    hideResumenHeaderChrome();
+    hideDashboardEditChrome();
   }, 1200);
+
+  /**
+   * CSS + ocultación forzada: filtros/menú/resize en Resumen mensual.
+   * El CSS del dashboard a veces no gana a estilos emotion; el style tag + inline sí.
+   */
+  function ensurePsTableStyle() {
+    if (document.getElementById("ps-ag-grid-overrides")) return;
+    var style = document.createElement("style");
+    style.id = "ps-ag-grid-overrides";
+    style.textContent = [
+      /* Filtro / menú / resize solo en Resumen mensual */
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .header-filter,',
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .three-dots-menu,',
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-header-cell-resize,',
+      '[data-test-chart-name*="Resumen mensual"] .header-filter,',
+      '[data-test-chart-name*="Resumen mensual"] .three-dots-menu,',
+      '[data-test-chart-name*="Resumen mensual"] .ag-header-cell-resize {',
+      "  display: none !important;",
+      "  visibility: hidden !important;",
+      "  width: 0 !important;",
+      "  height: 0 !important;",
+      "  padding: 0 !important;",
+      "  margin: 0 !important;",
+      "  pointer-events: none !important;",
+      "}",
+      /* Chrome de edición del dashboard (vista consumo) */
+      'button[data-test="edit-dashboard"],',
+      'button[data-test="dashboard-edit-button"],',
+      '[data-test="dashboard-header"] button[aria-label*="Edit"],',
+      '[data-test="dashboard-header"] button[aria-label*="Editar"],',
+      ".dashboard-header .ant-dropdown-trigger.ant-btn-icon-only,",
+      '[data-test="slice-header"] .header-controls {',
+      "  display: none !important;",
+      "}",
+    ].join("\n");
+    document.head.appendChild(style);
+  }
+
+  function hideResumenHeaderChrome() {
+    ensurePsTableStyle();
+    var charts = document.querySelectorAll(
+      '.chart-slice[data-test-chart-name*="Resumen mensual"], [data-test-chart-name*="Resumen mensual"]'
+    );
+    Array.prototype.forEach.call(charts, function (chart) {
+      var nodes = chart.querySelectorAll(
+        ".header-filter, .three-dots-menu, .ag-header-cell-resize"
+      );
+      Array.prototype.forEach.call(nodes, function (el) {
+        el.style.setProperty("display", "none", "important");
+        el.style.setProperty("visibility", "hidden", "important");
+        el.setAttribute("aria-hidden", "true");
+      });
+    });
+  }
+
+  /** Oculta botones de editar dashboard / controles de chart (sin tocar roles DB). */
+  function hideDashboardEditChrome() {
+    if (!isDashboardPage()) return;
+    ensurePsTableStyle();
+    var selectors = [
+      'button[data-test="edit-dashboard"]',
+      'button[data-test="dashboard-edit-button"]',
+      '[data-test="dashboard-header"] button[aria-label*="Edit"]',
+      '[data-test="dashboard-header"] button[aria-label*="Editar"]',
+    ];
+    selectors.forEach(function (sel) {
+      var nodes = document.querySelectorAll(sel);
+      Array.prototype.forEach.call(nodes, function (el) {
+        el.style.setProperty("display", "none", "important");
+      });
+    });
+    // Botón con texto «Edit dashboard» / «Editar dashboard»
+    var buttons = document.querySelectorAll("button, a.ant-btn");
+    Array.prototype.forEach.call(buttons, function (btn) {
+      var t = (btn.textContent || "").trim().toLowerCase();
+      if (
+        t === "edit dashboard" ||
+        t === "editar dashboard" ||
+        t.indexOf("edit dashboard") !== -1 ||
+        t.indexOf("editar dashboard") !== -1
+      ) {
+        btn.style.setProperty("display", "none", "important");
+      }
+    });
+  }
 
   /**
    * Crea un input proxy junto al título «Proyectos» que reenvía al input
@@ -414,11 +501,17 @@
       fixDoubleAppRootAnchors(document);
       fixUsersAnchors(document);
       moveProyectosSearchBesideTitle();
+      ensurePsTableStyle();
+      hideResumenHeaderChrome();
+      hideDashboardEditChrome();
     });
   } else {
     fixDoubleAppRootAnchors(document);
     fixUsersAnchors(document);
     moveProyectosSearchBesideTitle();
+    ensurePsTableStyle();
+    hideResumenHeaderChrome();
+    hideDashboardEditChrome();
   }
 
   function isDashboardPage() {

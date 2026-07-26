@@ -768,10 +768,15 @@ def persist_dashboard_config(
         "  display: none !important;\n"
         "}\n"
         "/* Resumen mensual: ocultar filtro de cabecera + asa de resize (línea) */\n"
+        ".chart-slice[data-test-chart-name*='Resumen mensual'] .header-filter,\n"
+        ".chart-slice[data-test-chart-name*='Resumen mensual'] .three-dots-menu,\n"
+        ".chart-slice[data-test-chart-name*='Resumen mensual'] .ag-header-cell-resize,\n"
         "[data-test-chart-name*='Resumen mensual'] .header-filter,\n"
         "[data-test-chart-name*='Resumen mensual'] .three-dots-menu,\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-header-cell-resize {\n"
         "  display: none !important;\n"
+        "  visibility: hidden !important;\n"
+        "  pointer-events: none !important;\n"
         "}\n"
     )
 
