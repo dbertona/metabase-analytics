@@ -326,51 +326,127 @@
     fixAgGridHeight();
     autoSizeAgGridColumns();
     hideResumenHeaderChrome();
-  }, 1200);
+  }, 800);
 
   /**
-   * CSS + ocultación forzada: filtros/menú/resize en Resumen mensual.
-   * El CSS del dashboard a veces no gana a estilos emotion; el style tag + inline sí.
+   * Localiza el chart «Resumen mensual» por atributo o por título del slice.
+   */
+  function findResumenMensualCharts() {
+    var found = [];
+    var byAttr = document.querySelectorAll(
+      '.chart-slice[data-test-chart-name*="Resumen mensual"], [data-test-chart-name*="Resumen mensual"]'
+    );
+    Array.prototype.forEach.call(byAttr, function (el) {
+      found.push(el);
+    });
+    var headers = document.querySelectorAll('[data-test="slice-header"]');
+    Array.prototype.forEach.call(headers, function (h) {
+      var titleEl =
+        h.querySelector(".header-title") ||
+        h.querySelector(".editable-title") ||
+        h;
+      var t = (titleEl.textContent || "").replace(/\s+/g, " ").trim();
+      if (t.indexOf("Resumen mensual") === -1) return;
+      var chart =
+        h.closest(".chart-slice") ||
+        h.closest('[data-test="chart-grid-component"]') ||
+        h.closest(".dashboard-component-chart-holder");
+      if (chart && found.indexOf(chart) === -1) found.push(chart);
+    });
+    return found;
+  }
+
+  /**
+   * CSS forzado: oculta filtro/menú/resize en Resumen mensual.
+   * Usa hermanos de .custom-header (estructura CustomHeader de Superset).
    */
   function ensurePsTableStyle() {
-    if (document.getElementById("ps-ag-grid-overrides")) return;
-    var style = document.createElement("style");
-    style.id = "ps-ag-grid-overrides";
-    style.textContent = [
-      /* Filtro / menú / resize solo en Resumen mensual */
+    var style = document.getElementById("ps-ag-grid-overrides");
+    var css = [
+      /* Hermanos del título = filtro + menú ⋮ */
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .custom-header ~ *,',
+      '[data-test-chart-name*="Resumen mensual"] .custom-header ~ *,',
       '.chart-slice[data-test-chart-name*="Resumen mensual"] .header-filter,',
       '.chart-slice[data-test-chart-name*="Resumen mensual"] .three-dots-menu,',
       '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-header-cell-resize,',
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-header-cell-menu-button,',
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-icon-filter,',
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-header-icon,',
       '[data-test-chart-name*="Resumen mensual"] .header-filter,',
       '[data-test-chart-name*="Resumen mensual"] .three-dots-menu,',
-      '[data-test-chart-name*="Resumen mensual"] .ag-header-cell-resize {',
+      '[data-test-chart-name*="Resumen mensual"] .ag-header-cell-resize,',
+      '[data-test-chart-name*="Resumen mensual"] .ag-header-cell-menu-button,',
+      '[data-test-chart-name*="Resumen mensual"] .ag-icon-filter,',
+      '[data-test-chart-name*="Resumen mensual"] .ag-header-icon {',
       "  display: none !important;",
       "  visibility: hidden !important;",
+      "  opacity: 0 !important;",
       "  width: 0 !important;",
+      "  max-width: 0 !important;",
       "  height: 0 !important;",
-      "  padding: 0 !important;",
-      "  margin: 0 !important;",
+      "  overflow: hidden !important;",
       "  pointer-events: none !important;",
+      "  position: absolute !important;",
+      "  left: -9999px !important;",
+      "}",
+      /* SVG del funnel de filtro (viewBox 24x24 con 3 barras) */
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-header-cell svg[viewBox="0 0 24 24"],',
+      '[data-test-chart-name*="Resumen mensual"] .ag-header-cell svg[viewBox="0 0 24 24"] {',
+      "  display: none !important;",
       "}",
     ].join("\n");
-    document.head.appendChild(style);
+    if (!style) {
+      style = document.createElement("style");
+      style.id = "ps-ag-grid-overrides";
+      document.documentElement.appendChild(style);
+    }
+    if (style.textContent !== css) style.textContent = css;
   }
 
   function hideResumenHeaderChrome() {
     ensurePsTableStyle();
-    var charts = document.querySelectorAll(
-      '.chart-slice[data-test-chart-name*="Resumen mensual"], [data-test-chart-name*="Resumen mensual"]'
-    );
+    var charts = findResumenMensualCharts();
     Array.prototype.forEach.call(charts, function (chart) {
       var nodes = chart.querySelectorAll(
-        ".header-filter, .three-dots-menu, .ag-header-cell-resize"
+        [
+          ".header-filter",
+          ".three-dots-menu",
+          ".ag-header-cell-resize",
+          ".ag-header-cell-menu-button",
+          ".ag-icon-filter",
+          ".ag-header-icon",
+          ".custom-header ~ *",
+          '.ag-header-cell svg[viewBox="0 0 24 24"]',
+        ].join(",")
       );
       Array.prototype.forEach.call(nodes, function (el) {
         el.style.setProperty("display", "none", "important");
         el.style.setProperty("visibility", "hidden", "important");
+        el.style.setProperty("opacity", "0", "important");
+        el.style.setProperty("pointer-events", "none", "important");
         el.setAttribute("aria-hidden", "true");
       });
     });
+  }
+
+  // Observa el DOM: React re-monta cabeceras y vuelve a pintar el filtro
+  if (!window.__psResumenFilterObserver) {
+    try {
+      var hideTimer = null;
+      window.__psResumenFilterObserver = new MutationObserver(function () {
+        if (hideTimer) return;
+        hideTimer = setTimeout(function () {
+          hideTimer = null;
+          hideResumenHeaderChrome();
+        }, 200);
+      });
+      window.__psResumenFilterObserver.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+      });
+    } catch (err) {
+      /* ignore */
+    }
   }
 
   /**
