@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-26ay] — Resumen: fallback de orden cronológico forzado
+
+### Fixed
+
+- Reintroducida `isHiddenSortColId` (se había perdido y rompía parte del autosize/sort).
+- `sortResumenByAnoMes` detecta `colId` real de «Año/Mes» y limpia sort de métricas.
+- Fallback duro: si AG Grid ignora sort model, se reasigna `rowData` ordenado por `MM/YYYY`.
+
 ## [2026-07-26ax] — Resumen: orden cronológico SQL (to_date)
 
 ### Fixed

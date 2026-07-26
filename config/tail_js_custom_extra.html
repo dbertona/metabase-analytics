@@ -238,6 +238,11 @@
     return /Fact|Coste|Margen|facturacion|coste|margen/i.test(id);
   }
 
+  function isHiddenSortColId(colId) {
+    var id = String(colId || "");
+    return id === "year" || id === "month";
+  }
+
   /** Orden cronológico de ano_mes (MM/YYYY) en cliente — sin columnas year/month. */
   function anoMesSortKey(value) {
     var m = String(value || "").match(/(\d{1,2})\s*\/\s*(\d{4})/);
@@ -248,6 +253,27 @@
   function sortResumenByAnoMes(api) {
     if (!api) return;
     try {
+      // Resolver colId real de "Año/Mes" (según versión puede variar)
+      var dateColId = "ano_mes";
+      var colsForDate =
+        typeof api.getColumns === "function"
+          ? api.getColumns()
+          : typeof api.getAllDisplayedColumns === "function"
+            ? api.getAllDisplayedColumns()
+            : [];
+      for (var dc = 0; dc < colsForDate.length; dc++) {
+        var c = colsForDate[dc];
+        var cid =
+          typeof c.getColId === "function" ? c.getColId() : c.colId || "";
+        var cdef =
+          typeof c.getColDef === "function" ? c.getColDef() : c.colDef || {};
+        var h = String(cdef.headerName || cdef.field || cid || "");
+        if (/año\s*\/?\s*mes|ano[_\s-]?mes/i.test(h)) {
+          dateColId = cid || "ano_mes";
+          break;
+        }
+      }
+
       // 1) Quitar sort de métricas (Superset deja Fact. DESC si no hay order_by)
       var state = [];
       var cols =
@@ -269,20 +295,20 @@
       }
       // 2) Comparator cronológico MM/YYYY
       var colDef =
-        typeof api.getColumnDef === "function" ? api.getColumnDef("ano_mes") : null;
+        typeof api.getColumnDef === "function" ? api.getColumnDef(dateColId) : null;
       if (colDef) {
         colDef.comparator = function (a, b) {
           return anoMesSortKey(a) - anoMesSortKey(b);
         };
       }
       var colObj =
-        typeof api.getColumn === "function" ? api.getColumn("ano_mes") : null;
+        typeof api.getColumn === "function" ? api.getColumn(dateColId) : null;
       if (colObj && typeof colObj.getColDef === "function") {
         colObj.getColDef().comparator = function (a, b) {
           return anoMesSortKey(a) - anoMesSortKey(b);
         };
       }
-      state.push({ colId: "ano_mes", sort: "asc", sortIndex: 0 });
+      state.push({ colId: dateColId, sort: "asc", sortIndex: 0 });
       if (typeof api.applyColumnState === "function") {
         api.applyColumnState({
           state: state,
@@ -290,10 +316,48 @@
         });
       }
       if (typeof api.setSortModel === "function") {
-        api.setSortModel([{ colId: "ano_mes", sort: "asc" }]);
+        api.setSortModel([{ colId: dateColId, sort: "asc" }]);
       }
       if (typeof api.refreshClientSideRowModel === "function") {
         api.refreshClientSideRowModel("sort");
+      }
+
+      // 3) Fallback duro: reordenar rowData si AG Grid ignora el sort model.
+      var rows = [];
+      if (typeof api.forEachNode === "function") {
+        api.forEachNode(function (node) {
+          if (!node || !node.data) return;
+          rows.push(node.data);
+        });
+      }
+      if (rows.length > 1) {
+        var keyOf = function (r) {
+          return (
+            r[dateColId] ||
+            r.ano_mes ||
+            r["Año/Mes"] ||
+            r["Ano/Mes"] ||
+            r["AñoMes"] ||
+            ""
+          );
+        };
+        var sorted = rows.slice().sort(function (a, b) {
+          return anoMesSortKey(keyOf(a)) - anoMesSortKey(keyOf(b));
+        });
+        var isDifferent = false;
+        for (var ri = 0; ri < rows.length; ri++) {
+          if (keyOf(rows[ri]) !== keyOf(sorted[ri])) {
+            isDifferent = true;
+            break;
+          }
+        }
+        if (isDifferent) {
+          if (typeof api.setGridOption === "function") {
+            api.setGridOption("rowData", sorted);
+          } else if (typeof api.setRowData === "function") {
+            api.setRowData(sorted);
+          }
+        }
       }
     } catch (e) {
       /* grid montando */
