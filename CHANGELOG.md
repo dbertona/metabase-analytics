@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-26at] — Probabilidad: título = otros; números = tablas
+
+### Changed
+
+- Título «Facturación por Probabilidad» vuelve a 16px (igual que el resto).
+- Ejes/valores ECharts toman el `font-size` computado de las tablas AG Grid (1.26em).
+
 ## [2026-07-26as] — Resumen: métricas a la derecha en pantallas anchas
 
 ### Fixed

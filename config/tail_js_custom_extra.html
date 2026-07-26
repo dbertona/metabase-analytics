@@ -557,14 +557,29 @@
   }, 800);
 
   /**
-   * Facturación por Probabilidad (ECharts): ejes y valores más legibles.
-   * El texto del gráfico va en canvas → hay que tocar setOption, no CSS.
+   * Facturación por Probabilidad (ECharts):
+   * - título = mismo tamaño que otros charts (CSS global 16px; sin override)
+   * - ejes/valores = mismo px que celdas de tablas AG Grid (1.26em)
    */
-  var PROB_FONT = 15;
+  function getTableFontPx() {
+    var cell = document.querySelector(
+      "[data-test-chart-name*='Resumen mensual'] .ag-cell, " +
+        "[data-test-chart-name*='Proyectos'] .ag-cell, " +
+        "[data-test-chart-name*='Resumen mensual'] .ag-header-cell-text"
+    );
+    if (cell) {
+      var fs = parseFloat(window.getComputedStyle(cell).fontSize);
+      if (fs && fs >= 10) return Math.round(fs);
+    }
+    // 1.26em con base típica Superset ~14px
+    return 18;
+  }
+
   function bumpProbabilidadChartFonts() {
     if (!window.echarts || typeof window.echarts.getInstanceByDom !== "function") {
       return;
     }
+    var fontPx = getTableFontPx();
     var roots = document.querySelectorAll(
       '[data-test-chart-name*="Facturación por Probabilidad"]'
     );
@@ -581,20 +596,20 @@
         var opt = inst.getOption() || {};
         var y0 = (opt.yAxis && opt.yAxis[0]) || {};
         var yLabel = (y0.axisLabel && y0.axisLabel.fontSize) || 0;
-        if (yLabel >= PROB_FONT) return;
+        if (yLabel === fontPx) return;
         try {
           inst.setOption(
             {
-              textStyle: { fontSize: PROB_FONT },
+              textStyle: { fontSize: fontPx },
               xAxis: {
-                axisLabel: { fontSize: PROB_FONT },
-                nameTextStyle: { fontSize: PROB_FONT },
+                axisLabel: { fontSize: fontPx },
+                nameTextStyle: { fontSize: fontPx },
               },
               yAxis: {
-                axisLabel: { fontSize: PROB_FONT },
-                nameTextStyle: { fontSize: PROB_FONT },
+                axisLabel: { fontSize: fontPx },
+                nameTextStyle: { fontSize: fontPx },
               },
-              series: [{ label: { fontSize: PROB_FONT } }],
+              series: [{ label: { fontSize: fontPx } }],
             },
             false
           );
