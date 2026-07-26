@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [2026-07-26b] — Table V2 AG Grid, fuente, búsqueda junto al título, altura completa
+
+### Added
+- Table V2 (AG Grid) activado para «Resumen mensual» y «Proyectos» — permite redimensionar columnas con el ratón.
+- Campo de búsqueda «Buscar» de Proyectos movido al lado del título mediante input proxy nativo (bypasea re-renders de React).
+
+### Changed
+- Fuente de tablas ajustada a 1.33em (base 1.56em −15%).
+- Tablas ocupan toda la altura del card: CSS `chart-slice` flexbox + fix JS `fixAgGridHeight` que calcula píxeles disponibles y los aplica inline.
+- CSS propaga `height: 100%` por toda la cadena: `.slice_container` → `.chart-container` → `ag-theme-*` → `.ag-root-wrapper` → `.ag-root`.
+
+### Fixed
+- Permisos de `dbertona@powersolution.es`: rol Admin añadido (antes solo PS_Viewer).
+
 ## [2026-07-26ao] — Tablas: quitar ⋮ que recortaba el ancho
 
 ### Fixed
