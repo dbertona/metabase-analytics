@@ -758,6 +758,15 @@ def persist_dashboard_config(
         "[data-test-chart-name*='Proyectos'] .cell-bars {\n"
         "  display: none !important;\n"
         "}\n"
+        "/* Totales AG Grid: ocultar etiqueta Summary/Resumen + icono info */\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-floating-bottom .ag-cell[col-id='ano_mes'],\n"
+        "[data-test-chart-name*='Proyectos'] .ag-floating-bottom .ag-cell[col-id='proyecto'] {\n"
+        "  visibility: hidden !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-floating-bottom .anticon,\n"
+        "[data-test-chart-name*='Proyectos'] .ag-floating-bottom .anticon {\n"
+        "  display: none !important;\n"
+        "}\n"
     )
 
     # Superset 6.1: IDs DEBEN empezar por NATIVE_FILTER- (isFilterId en FiltersConfigModal).

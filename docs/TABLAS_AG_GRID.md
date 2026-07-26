@@ -177,6 +177,15 @@ El bloque canónico para cualquier tabla AG Grid:
   display: none !important;
 }
 
+/* ══ TOTALES: ocultar «Resumen»/Summary + icono info ══ */
+[data-test-chart-name*='Nombre del chart'] .ag-floating-bottom .ag-cell[col-id='ano_mes'],
+[data-test-chart-name*='Nombre del chart'] .ag-floating-bottom .ag-cell[col-id='proyecto'] {
+  visibility: hidden !important;
+}
+[data-test-chart-name*='Nombre del chart'] .ag-floating-bottom .anticon {
+  display: none !important;
+}
+
 /* ══ ALTURA COMPLETA DEL CARD ══
    Paso 1: .chart-slice en flexbox columna para que .slice_container
            tome todo el espacio tras el header.

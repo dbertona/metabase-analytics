@@ -82,6 +82,15 @@ Añadir siempre estos bloques para las tablas AG Grid:
   display: none !important;
 }
 
+/* ── Totales: ocultar Resumen/Summary + icono info ── */
+[data-test-chart-name*='Mi Tabla'] .ag-floating-bottom .ag-cell[col-id='ano_mes'],
+[data-test-chart-name*='Mi Tabla'] .ag-floating-bottom .ag-cell[col-id='proyecto'] {
+  visibility: hidden !important;
+}
+[data-test-chart-name*='Mi Tabla'] .ag-floating-bottom .anticon {
+  display: none !important;
+}
+
 /* ── Altura completa del card ── */
 [data-test-chart-name*='Mi Tabla'] .chart-slice {
   display: flex !important;
