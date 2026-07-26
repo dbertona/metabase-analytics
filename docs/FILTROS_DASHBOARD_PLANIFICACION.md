@@ -60,6 +60,8 @@ Debajo: Resumen mensual (ancho 12) · Evolución + Margen (6+6).
 - Sin `cascadeParentIds` (cascada Empresa→Dept puede dejar validateStatus=error).
 - `cross_filters_enabled: false` (evitar conflicto con filtros nativos).
 - Año por defecto: año calendario actual.
+- Badge/botón de filtros **por chart** oculto vía CSS del dashboard (la barra
+  nativa Año/Empresa/Dept/Tipo se mantiene).
 
 ---
 

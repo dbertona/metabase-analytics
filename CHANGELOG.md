@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-26ae] — Ocultar botón de filtro en todos los charts
+
+### Changed
+
+- CSS del dashboard Resumen: oculta badge/botón de filtros de cada chart
+  (`.filter-counts` / `.filters-badge`); la barra de filtros nativos se mantiene.
+
 ## [2026-07-26ad] — Interfaz Superset en español
 
 ### Changed
