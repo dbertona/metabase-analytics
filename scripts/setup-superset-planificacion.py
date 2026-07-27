@@ -453,7 +453,8 @@ def gastos_unidad_params() -> dict[str, Any]:
         "groupby": ["concepto_analitico"],
         "metrics": metrics,
         "percent_metrics": [],
-        # ASC por concepto (como PBI). true = ascending en order_by_cols de Superset.
+        # ASC por concepto en SQL (order_by → ORDER BY). No ordenar en JS/AG Grid:
+        # el sort client-side provoca un refresh feo al montar la tabla.
         "order_by_cols": [
             json.dumps(["concepto_analitico", True], ensure_ascii=False),
         ],

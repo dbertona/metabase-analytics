@@ -1080,7 +1080,11 @@
     }
   }
 
-  /** Cabecera legible + orden A→Z por concepto (AG Grid ignora a veces customColumnName). */
+  /**
+   * Cabecera «Concepto Analitico».
+   * NO aplicar sort en AG Grid: el orden viene de order_by_cols (SQL).
+   * applyColumnState(sort) provoca un refresh feo (reordenado en cliente).
+   */
   function fixGastosConceptoColumn(api, chart) {
     if (!api) return;
     try {
@@ -1101,7 +1105,6 @@
           api.setColumnDefs(defs);
         }
       }
-      // Fallback: colDef directo
       if (typeof api.getColumn === "function") {
         var col = api.getColumn("concepto_analitico");
         if (col && col.getColDef) {
@@ -1109,15 +1112,8 @@
           if (typeof api.refreshHeader === "function") api.refreshHeader();
         }
       }
-      if (typeof api.applyColumnState === "function") {
-        api.applyColumnState({
-          state: [{ colId: "concepto_analitico", sort: "asc", sortIndex: 0 }],
-          defaultState: { sort: null },
-        });
-      }
     } catch (err) { /* grid aún montando */ }
 
-    // Fallback DOM: sustituye el texto de cabecera si sigue el nombre técnico
     if (chart) {
       var headers = chart.querySelectorAll(".ag-header-cell");
       Array.prototype.forEach.call(headers, function (h) {
@@ -1129,6 +1125,20 @@
         }
       });
     }
+  }
+
+  /** Una sola vez: quitar sort client-side residual sin reordenar en cada modelUpdated. */
+  function clearGastosClientSortOnce(api) {
+    if (!api || api.__psGastosSortCleared) return;
+    api.__psGastosSortCleared = true;
+    try {
+      if (typeof api.applyColumnState === "function") {
+        api.applyColumnState({
+          state: [{ colId: "concepto_analitico", sort: null }],
+          defaultState: { sort: null },
+        });
+      }
+    } catch (e) { /* ignore */ }
   }
 
   function saveGastosWidthsLocal(map) {
@@ -1148,6 +1158,7 @@
 
     function applyFit() {
       applyColWidthMap(api, getDefaultGastosWidths(chart));
+      clearGastosClientSortOnce(api);
       fixGastosConceptoColumn(api, chart);
       blankGastosNA(chart);
     }
