@@ -679,7 +679,7 @@ def persist_dashboard_config(
         " * CSS :has aplica en el mismo frame que Ant activa el tabpane;\n"
         " * no depende del JS tardío. --ps-gastos-h lo afina el JS si hace falta.\n"
         " */\n"
-        ":root { --ps-gastos-h: calc(100dvh - 210px); }\n"
+        ":root { --ps-gastos-h: calc(100dvh - 250px); }\n"
         ".ant-tabs-tabpane-active:has([data-test-chart-name*='Gastos'])\n"
         " .dashboard-component-chart-holder[data-test-chart-name*='Gastos'],\n"
         ".ant-tabs-tabpane-active:has([data-test-chart-name*='Gastos'])\n"

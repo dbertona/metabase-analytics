@@ -203,6 +203,11 @@
         if (br.bottom > er.bottom + 1) {
           var need = Math.ceil(br.bottom - er.bottom) + 6;
           var nextH = Math.ceil(er.height + need);
+          // No empujar el card fuera del viewport (Unidad no tiene scroll).
+          var maxH = Math.floor(
+            window.innerHeight - er.top - 10
+          );
+          if (maxH > 120 && nextH > maxH) nextH = maxH;
           el.style.setProperty("height", nextH + "px", "important");
           el.style.setProperty("max-height", nextH + "px", "important");
           el.style.setProperty("min-height", nextH + "px", "important");
@@ -216,10 +221,34 @@
 
   function computeGastosTargetHeight() {
     var chromeBottom = measureGastosChromeBottom();
-    var bottomPad = 20;
-    var target = Math.floor(window.innerHeight - chromeBottom - bottomPad);
+    // Hueco tabs→card + margen inferior: el pie de totales debe quedar
+    // DENTRO del viewport (en Unidad overflow-y del body está hidden).
+    var gapBelowTabs = 10;
+    var bottomPad = 36;
+    var topAnchor = chromeBottom + gapBelowTabs;
+    var target = Math.floor(window.innerHeight - topAnchor - bottomPad);
     if (target < 280) target = 280;
     return target;
+  }
+
+  /**
+   * Si el card Gastos se sale por abajo del viewport, reduce altura.
+   * Sin esto el pie Total queda fuera y no hay scroll de página en Unidad.
+   */
+  function clampGastosToViewport(chart) {
+    if (!chart) return;
+    var holder =
+      chart.closest('[data-test="dashboard-component-chart-holder"]') || chart;
+    var bottom = chart.querySelector(".ag-floating-bottom");
+    var edge = bottom || holder;
+    var br = edge.getBoundingClientRect();
+    var limit = window.innerHeight - 10;
+    var overflow = br.bottom - limit;
+    if (!(overflow > 2)) return;
+    var curH = holder.getBoundingClientRect().height;
+    var next = Math.max(280, Math.floor(curH - overflow));
+    publishGastosCssHeight(next);
+    applyGastosHeightToChart(chart, next);
   }
 
   /** Publica --ps-gastos-h ANTES del paint del tab (evita flash corto→alto). */
@@ -238,6 +267,7 @@
       if (!isGastosChartVisible(chart)) return;
       anyVisible = true;
       applyGastosHeightToChart(chart, target);
+      clampGastosToViewport(chart);
     });
     document.body.classList.toggle("ps-unidad-gastos-active", anyVisible);
     return anyVisible;
