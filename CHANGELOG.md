@@ -8,6 +8,13 @@
   (concepto analítico × meses 01–12 + Total; métrica coste; `tipo_proyecto=Structure` fijo).
 - Vista `bi_v_unidad` en capa BI; filtros nativos Año/Empresa/Dept/Tipo también en Unidad.
 
+## [2026-07-27d] — Sin scroll vertical de página (panel filtros)
+
+### Fixed
+
+- El panel de filtros izquierdo ensanchaba el documento (~80px); CSS con
+  `overflow-y: auto` en `[data-test=dashboard-filters-panel]`.
+
 ## [2026-07-27c] — Probabilidad: importes en K€
 
 ### Fixed

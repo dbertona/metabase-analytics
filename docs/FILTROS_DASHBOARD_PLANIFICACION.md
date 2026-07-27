@@ -63,6 +63,8 @@ Debajo: Resumen mensual (ancho 12) · Evolución + Margen (6+6).
 - Año por defecto: año calendario actual.
 - Badge/botón de filtros **por chart** oculto vía CSS del dashboard (la barra
   nativa Año/Empresa/Dept/Tipo se mantiene).
+- Panel `[data-test=dashboard-filters-panel]`: `overflow-y: auto` para que el
+  exceso de altura no genere scroll vertical de **página**.
 
 ---
 
