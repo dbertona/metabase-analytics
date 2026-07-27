@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-27b] — Cierre rama `fix/probabilidad-formato-euro-porcentaje`
+
+### Summary
+
+- Formato `%` / `€` en Facturación por Probabilidad + fix CSRF cookies Secure por HTTP.
+
 ## [2026-07-27a] — Facturación por Probabilidad: % y €
 
 ### Changed
