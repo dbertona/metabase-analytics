@@ -133,7 +133,7 @@
     var headerH = header ? header.getBoundingClientRect().height : 28;
     // Padding card + margen para que la fila de totales (floating-bottom) no
     // quede recortada por overflow:hidden del holder (como en Proyectos).
-    var available = Math.max(80, Math.floor(target - headerH - 24));
+    var available = Math.max(80, Math.floor(target - headerH - 40));
 
     [sliceContainer, chartContainer, agTheme].forEach(function (el) {
       if (!el) return;
@@ -171,11 +171,12 @@
         try { agTheme.__psApiResize(); } catch (e) { /* ignore */ }
       }
     }
+    labelAgGridTotalsRow(chart);
   }
 
   function computeGastosTargetHeight() {
     var chromeBottom = measureGastosChromeBottom();
-    var bottomPad = 16;
+    var bottomPad = 20;
     var target = Math.floor(window.innerHeight - chromeBottom - bottomPad);
     if (target < 280) target = 280;
     return target;
@@ -318,7 +319,8 @@
 
     var header = chart.querySelector("[data-test='slice-header']");
     var headerH = header ? header.getBoundingClientRect().height : 28;
-    var available = Math.max(80, Math.floor(target - headerH - 24));
+    // Reservar ~40px para fila de totales + padding del card
+    var available = Math.max(80, Math.floor(target - headerH - 40));
     var sliceContainer = chart.querySelector(".slice_container");
     var chartContainer = chart.querySelector(".chart-container");
     var agTheme = chart.querySelector('[class*="ag-theme"]');
@@ -354,6 +356,68 @@
         }
       }
     }
+    labelAgGridTotalsRow(chart);
+  }
+
+  /**
+   * Sustituye «Resumen»/«Summary» del pie por «Total» (visible y en negrita).
+   */
+  function labelAgGridTotalsRow(chart) {
+    if (!chart) return;
+    var bottom = chart.querySelector(".ag-floating-bottom");
+    if (!bottom) return;
+    var dimIds = [
+      "concepto_analitico",
+      "proyecto",
+      "ano_mes",
+      "year",
+      "month",
+    ];
+    var cells = bottom.querySelectorAll(".ag-cell");
+    for (var i = 0; i < cells.length; i++) {
+      var cell = cells[i];
+      var id = cell.getAttribute("col-id") || "";
+      var isDim = false;
+      for (var d = 0; d < dimIds.length; d++) {
+        if (id === dimIds[d] || id.indexOf(dimIds[d]) === 0) {
+          isDim = true;
+          break;
+        }
+      }
+      if (!isDim && i > 0) continue;
+      if (!isDim && i === 0) isDim = true;
+      if (!isDim) continue;
+      cell.style.setProperty("visibility", "visible", "important");
+      var valEl =
+        cell.querySelector(".ag-cell-value") ||
+        cell.querySelector("[class*='cell']") ||
+        cell;
+      var cur = (valEl.textContent || "").replace(/\s+/g, " ").trim();
+      if (
+        !cur ||
+        cur === "Resumen" ||
+        cur === "Summary" ||
+        cur === "N/A" ||
+        /^total$/i.test(cur)
+      ) {
+        valEl.textContent = "Total";
+      }
+      cell.style.setProperty("font-weight", "700", "important");
+    }
+  }
+
+  function labelAllAgGridTotals() {
+    var sels = [
+      '[data-test-chart-name*="Gastos"]',
+      '[data-test-chart-name*="Proyectos"]',
+      '[data-test-chart-name*="Resumen mensual"]',
+    ];
+    sels.forEach(function (sel) {
+      var charts = document.querySelectorAll(sel);
+      Array.prototype.forEach.call(charts, function (chart) {
+        labelAgGridTotalsRow(chart);
+      });
+    });
   }
 
   /**
@@ -1655,6 +1719,7 @@
       if (api && !api.__psGastosColPersistInit) initGastosColPersist(chart, api);
       else if (api) blankGastosNA(chart);
     });
+    labelAllAgGridTotals();
   }, 800);
 
   /**
