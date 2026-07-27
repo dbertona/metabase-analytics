@@ -2,6 +2,92 @@
 
 ## [Unreleased]
 
+## [2026-07-27] — Cierre rama `feat/ag-grid-autosize-columns`
+
+### Added / Changed
+
+- Patrón canónico de tablas AG Grid (Proyectos): autosize, buscador en cabecera, altura completa del card, persistencia de anchos (localStorage + API compartida), sin scroll horizontal fantasma.
+- Documentación integral en `docs/TABLAS_AG_GRID.md` y regla `.cursor/rules/superset-table-ag-grid.mdc`.
+- Métrica «Fact.» en Resumen/Proyectos; orden cronológico en Resumen mensual; tipografía alineada en Facturación por Probabilidad.
+
+### Fixed
+
+- Snapback de columnas, truncateLongCells, CSRF al recrear chart, permisos de escritura compartida (`dbertona`), altura Proyectos = Resumen.
+
+## [2026-07-26ay] — Resumen: fallback de orden cronológico forzado
+
+### Fixed
+
+- Reintroducida `isHiddenSortColId` (se había perdido y rompía parte del autosize/sort).
+- `sortResumenByAnoMes` detecta `colId` real de «Año/Mes» y limpia sort de métricas.
+- Fallback duro: si AG Grid ignora sort model, se reasigna `rowData` ordenado por `MM/YYYY`.
+
+## [2026-07-26ax] — Resumen: orden cronológico SQL (to_date)
+
+### Fixed
+
+- Sin `order_by`, Superset ordenaba por Fact. DESC.
+- Ahora `ORDER BY to_date(ano_mes, 'MM/YYYY') ASC` + JS limpia sort de métricas.
+
+## [2026-07-26aw] — Resumen: solo ano_mes + sort JS + 4 columnas visibles
+
+### Fixed
+
+- Eliminados `year`/`month` del groupby (ocupaban ancho y cortaban Coste/Margen).
+- Orden cronológico de `MM/YYYY` con comparator en `tail_js`.
+- Autosize encoge las 4 columnas para que quepan a la izquierda sin scroll.
+
+## [2026-07-26av] — Probabilidad: números = tamaño tablas (fix real)
+
+### Fixed
+
+- Causa: Superset 6 no expone `window.echarts` → el `setOption` no corría.
+- Fallback: patch de `canvas.fillText` en Probabilidad con el px medido de las celdas AG Grid (1.26em) y color `#0f172a`.
+- Tema `THEME_DEFAULT`: `echartsOptionsOverridesByChartType` para `echarts_timeseries_bar` a 20px.
+
+## [2026-07-26au] — Resumen alineado a la izquierda
+
+### Fixed
+
+- Sin flex en Resumen (el flex empujaba el bloque a la derecha).
+- `year`/`month` a ancho 0 + `setColumnVisible(false)` para quitar el hueco izquierdo.
+
+## [2026-07-26at] — Probabilidad: título = otros; números = tablas
+
+### Changed
+
+- Título «Facturación por Probabilidad» vuelve a 16px (igual que el resto).
+- Ejes/valores ECharts toman el `font-size` computado de las tablas AG Grid (1.26em).
+
+## [2026-07-26as] — Resumen: métricas a la derecha en pantallas anchas
+
+### Fixed
+
+- Columnas `year`/`month` a ancho 0 (ya no dejan hueco a la izquierda).
+- `Año/Mes` absorbe el ancho restante → Fact./Coste/Margen % alineadas a la derecha.
+- Sort ASC forzado en year+month vía AG Grid.
+
+## [2026-07-26ar] — Fuente más grande en Facturación por Probabilidad
+
+### Changed
+
+- Título del chart: 20px (antes 16px).
+- Ejes y valores ECharts: 15px vía `tail_js` (`setOption`).
+
+## [2026-07-26aq] — Proyectos: sin scroll horizontal fantasma
+
+### Fixed
+
+- Autosize Proyectos: margen viewport + shrink de columna texto al overflow exacto.
+- CSS: ocultar barra horizontal AG Grid en Resumen/Proyectos.
+- Cabecera Proyectos: métrica `Fact.` (antes `Facturación` truncada).
+
+## [2026-07-26ap] — Resumen mensual: orden cronológico mes/año
+
+### Fixed
+
+- Tabla Resumen: `groupby` year+month+ano_mes y `ORDER BY year, month ASC` (ano_mes `MM/YYYY` no ordenaba bien como texto). Columnas year/month ocultas.
+
 ## [2026-07-26b] — Table V2 AG Grid, fuente, búsqueda junto al título, altura completa
 
 ### Added

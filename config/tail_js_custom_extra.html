@@ -61,6 +61,10 @@
     });
   }
 
+  var AG_GRID_CHART_SELECTORS = [
+    "[data-test-chart-name*='Resumen mensual']",
+  ];
+
   /**
    * Fuerza que el AG Grid llene todo el espacio disponible dentro del card.
    * Calcula en píxeles: altura del holder − altura del header − 8px margen.
@@ -68,11 +72,7 @@
    * cualquier inline style que React pueda estar poniendo.
    */
   function fixAgGridHeight() {
-    var selectors = [
-      "[data-test-chart-name*='Resumen mensual']",
-      "[data-test-chart-name*='Proyectos']",
-    ];
-    selectors.forEach(function (sel) {
+    AG_GRID_CHART_SELECTORS.forEach(function (sel) {
       var charts = document.querySelectorAll(sel);
       Array.prototype.forEach.call(charts, function (chart) {
         var header = chart.querySelector("[data-test='slice-header']");
@@ -95,67 +95,738 @@
     });
   }
 
-  setInterval(function () {
-    fixDoubleAppRootAnchors(document);
-    fixUsersAnchors(document);
-    moveProyectosSearchBesideTitle();
-    fixAgGridHeight();
-  }, 1500);
+  /**
+   * Localiza GridApi de AG Grid (fiber React + hooks del root DOM).
+   */
+  function findApiInFiberTree(fiber, maxNodes) {
+    var queue = [fiber];
+    var seen = 0;
+    while (queue.length && seen < maxNodes) {
+      var f = queue.shift();
+      seen += 1;
+      if (!f) continue;
+      var props = f.memoizedProps || f.pendingProps;
+      if (props) {
+        if (props.api && typeof props.api.autoSizeAllColumns === "function") {
+          return props.api;
+        }
+        if (props.gridApi && typeof props.gridApi.autoSizeAllColumns === "function") {
+          return props.gridApi;
+        }
+        if (
+          props.gridRef &&
+          props.gridRef.current &&
+          props.gridRef.current.api &&
+          typeof props.gridRef.current.api.autoSizeAllColumns === "function"
+        ) {
+          return props.gridRef.current.api;
+        }
+      }
+      if (f.stateNode) {
+        var sn = f.stateNode;
+        if (sn.api && typeof sn.api.autoSizeAllColumns === "function") return sn.api;
+        if (sn.gridApi && typeof sn.gridApi.autoSizeAllColumns === "function") {
+          return sn.gridApi;
+        }
+        if (
+          sn.beans &&
+          sn.beans.gridApi &&
+          typeof sn.beans.gridApi.autoSizeAllColumns === "function"
+        ) {
+          return sn.beans.gridApi;
+        }
+      }
+      var state = f.memoizedState;
+      var sd = 0;
+      while (state && sd < 40) {
+        var ms = state.memoizedState;
+        if (ms) {
+          if (typeof ms.autoSizeAllColumns === "function") return ms;
+          if (ms.current && typeof ms.current.autoSizeAllColumns === "function") {
+            return ms.current;
+          }
+          if (ms.api && typeof ms.api.autoSizeAllColumns === "function") return ms.api;
+        }
+        state = state.next;
+        sd += 1;
+      }
+      if (f.child) queue.push(f.child);
+      if (f.sibling) queue.push(f.sibling);
+    }
+    return null;
+  }
+
+  function findAgGridApi(rootEl) {
+    if (!rootEl) return null;
+    var agRoot = rootEl.querySelector(".ag-root") || rootEl;
+    var directKeys = Object.keys(agRoot);
+    for (var di = 0; di < directKeys.length; di++) {
+      var val = agRoot[directKeys[di]];
+      if (val && typeof val === "object") {
+        if (typeof val.autoSizeAllColumns === "function") return val;
+        if (val.api && typeof val.api.autoSizeAllColumns === "function") return val.api;
+        if (
+          val.beans &&
+          val.beans.gridApi &&
+          typeof val.beans.gridApi.autoSizeAllColumns === "function"
+        ) {
+          return val.beans.gridApi;
+        }
+      }
+    }
+    var candidates = [rootEl, agRoot];
+    for (var ci = 0; ci < candidates.length; ci++) {
+      var el = candidates[ci];
+      var keys = Object.keys(el);
+      for (var i = 0; i < keys.length; i++) {
+        var key = keys[i];
+        if (
+          key.indexOf("__reactFiber") === 0 ||
+          key.indexOf("__reactInternalInstance") === 0
+        ) {
+          var api = findApiInFiberTree(el[key], 300);
+          if (api) return api;
+        }
+      }
+    }
+    var nodes = rootEl.querySelectorAll(
+      ".ag-root-wrapper, .ag-root, [class*='ag-theme']"
+    );
+    for (var ni = 0; ni < nodes.length; ni++) {
+      var n = nodes[ni];
+      var nkeys = Object.keys(n);
+      for (var nj = 0; nj < nkeys.length; nj++) {
+        var nk = nkeys[nj];
+        if (
+          nk.indexOf("__reactFiber") === 0 ||
+          nk.indexOf("__reactInternalInstance") === 0
+        ) {
+          var a2 = findApiInFiberTree(n[nk], 200);
+          if (a2) return a2;
+        }
+      }
+    }
+    return null;
+  }
 
   /**
-   * Crea un input proxy junto al título «Proyectos» que reenvía al input
-   * real de AG Grid (filter-text-box). No mueve nodos React (se resetearían).
-   * Oculta el contenedor original con el search.
+   * Superset llama sizeColumnsToFit() y ensancha al card. Lo redirigimos a
+   * ajuste por contenido para evitar holgura y scroll horizontal.
    */
-  function moveProyectosSearchBesideTitle() {
+  function patchSizeColumnsToFit(api) {
+    if (!api || api.__psAutosizePatched) return;
+    if (typeof api.sizeColumnsToFit !== "function") return;
+    api.__psAutosizePatched = true;
+    api.sizeColumnsToFit = function () {
+      try {
+        /* no-op: el ajuste real lo hace fitColumnsByDomMeasure */
+      } catch (err) {
+        /* ignore */
+      }
+    };
+  }
+
+  /**
+   * Mide cabecera + celdas y aplica anchos.
+   * opts.pad / opts.lock / opts.fitViewport / opts.flexTextColumn
+   * flexTextColumn: la columna de texto (proyecto / ano_mes) usa el resto del viewport;
+   * las métricas (Fact., Coste, Margen %) quedan justas al contenido.
+   */
+  function isMetricColId(colId) {
+    var id = String(colId || "");
+    return /Fact|Coste|Margen|facturacion|coste|margen/i.test(id);
+  }
+
+  function isHiddenSortColId(colId) {
+    var id = String(colId || "");
+    return id === "year" || id === "month";
+  }
+
+  /** Orden cronológico de ano_mes (MM/YYYY) en cliente — sin columnas year/month. */
+  function anoMesSortKey(value) {
+    var m = String(value || "").match(/(\d{1,2})\s*\/\s*(\d{4})/);
+    if (!m) return 0;
+    return parseInt(m[2], 10) * 100 + parseInt(m[1], 10);
+  }
+
+  function sortResumenByAnoMes(api) {
+    if (!api || typeof api.getColumnState !== "function") return;
+    if (typeof api.applyColumnState !== "function") return;
+    var state = api.getColumnState() || [];
+    if (!state.length) return;
+
+    var hasYear = false;
+    var hasMonth = false;
+    var yearSort = null;
+    var monthSort = null;
+    var sortedOther = false;
+
+    for (var i = 0; i < state.length; i++) {
+      var col = state[i];
+      var id = String(col.colId || "");
+      if (id === "year") {
+        hasYear = true;
+        yearSort = col.sort || null;
+        continue;
+      }
+      if (id === "month") {
+        hasMonth = true;
+        monthSort = col.sort || null;
+        continue;
+      }
+      if (col.sort) sortedOther = true;
+    }
+
+    // Priorizar columnas hidden year/month: garantizan cronología real.
+    if (!hasYear || !hasMonth) return;
+    if (yearSort === "asc" && monthSort === "asc" && !sortedOther) return;
+
+    api.applyColumnState({
+      defaultState: { sort: null, sortIndex: null },
+      state: [
+        { colId: "year", sort: "asc", sortIndex: 0 },
+        { colId: "month", sort: "asc", sortIndex: 1 },
+      ],
+    });
+  }
+
+  /** year/month: ordenan pero no deben ocupar píxeles (hueco a la izquierda). */
+  function collapseHiddenSortColumns(api) {
+    if (!api) return;
+    ["year", "month"].forEach(function (id) {
+      try {
+        if (typeof api.setColumnVisible === "function") {
+          api.setColumnVisible(id, false);
+        }
+      } catch (e) {
+        /* col aún no montada */
+      }
+    });
+    if (typeof api.applyColumnState !== "function") return;
+    api.applyColumnState({
+      state: [
+        {
+          colId: "year",
+          hide: true,
+          width: 0,
+          minWidth: 0,
+          maxWidth: 0,
+          flex: null,
+        },
+        {
+          colId: "month",
+          hide: true,
+          width: 0,
+          minWidth: 0,
+          maxWidth: 0,
+          flex: null,
+        },
+      ],
+    });
+  }
+
+  function getViewportWidth(chart) {
+    // Preferir cabecera: refleja el ancho útil real (sin gutter del scroll vertical).
+    var vp =
+      chart.querySelector(".ag-header-viewport") ||
+      chart.querySelector(".ag-center-cols-viewport") ||
+      chart.querySelector(".ag-body-viewport");
+    var avail = vp ? Math.floor(vp.clientWidth) : 0;
+    if (avail < 80) {
+      var root = chart.querySelector(".ag-root-wrapper") || chart;
+      avail = Math.floor(root.getBoundingClientRect().width) - 8;
+    }
+    // Margen anti-scroll fantasma (bordes, subpixel, scrollbar vertical).
+    return Math.max(0, avail - 20);
+  }
+
+  function getHorizontalOverflow(chart) {
+    var vp =
+      chart.querySelector(".ag-center-cols-viewport") ||
+      chart.querySelector(".ag-body-horizontal-scroll-viewport");
+    if (!vp) return 0;
+    return Math.max(0, vp.scrollWidth - vp.clientWidth);
+  }
+
+  /** Reduce la columna de texto hasta eliminar el scroll horizontal. */
+  function shrinkTextColumnToClearScroll(chart, api) {
+    if (!api || typeof api.getColumnState !== "function") return false;
+    var overflow = getHorizontalOverflow(chart);
+    if (overflow <= 1) return false;
+    var cols = api.getColumnState() || [];
+    var textCol = null;
+    for (var i = 0; i < cols.length; i++) {
+      var id = cols[i].colId;
+      if (!id || id.charAt(0) === "_") continue;
+      if (isHiddenSortColId(id) || isMetricColId(id)) continue;
+      textCol = cols[i];
+      break;
+    }
+    if (!textCol) return false;
+    var cur = textCol.width || 200;
+    var nw = Math.max(100, Math.floor(cur - overflow - 8));
+    if (nw >= cur) return false;
+    api.applyColumnState({
+      state: [
+        {
+          colId: textCol.colId,
+          width: nw,
+          minWidth: Math.min(100, nw),
+          maxWidth: nw,
+          flex: null,
+        },
+      ],
+      defaultState: { flex: null },
+    });
+    return true;
+  }
+
+  function fitColumnsByDomMeasure(chart, api, opts) {
+    opts = opts || {};
+    if (!api || typeof api.applyColumnState !== "function") return false;
+    var headerCells = chart.querySelectorAll(".ag-header-viewport .ag-header-cell");
+    if (!headerCells.length) return false;
+    var sampleCell =
+      chart.querySelector(".ag-center-cols-container .ag-cell") ||
+      chart.querySelector(".custom-header") ||
+      chart.querySelector(".ag-header-cell-text") ||
+      chart.querySelector(".ag-header-cell");
+    var font = sampleCell
+      ? window.getComputedStyle(sampleCell).font
+      : "14px 'Segoe UI', sans-serif";
+    var canvas = document.createElement("canvas");
+    var ctx = canvas.getContext("2d");
+    if (!ctx) return false;
+    ctx.font = font;
+    var pad = typeof opts.pad === "number" ? opts.pad : 24;
+    var state = [];
+    Array.prototype.forEach.call(headerCells, function (hc) {
+      var colId = hc.getAttribute("col-id");
+      if (!colId || colId.charAt(0) === "_") return;
+      if (isHiddenSortColId(colId)) return;
+      var headerEl =
+        hc.querySelector(".custom-header") ||
+        hc.querySelector(".ag-header-cell-text") ||
+        hc.querySelector(".ag-header-cell-label");
+      var headerText = headerEl ? (headerEl.textContent || "").trim() : "";
+      // Cabeceras de métricas: no usar texto truncado con ellipsis del DOM
+      if (isMetricColId(colId)) {
+        if (/margen/i.test(colId)) headerText = "Margen %";
+        else if (/coste/i.test(colId)) headerText = "Coste";
+        else if (/fact/i.test(colId)) {
+          headerText =
+            headerText.indexOf("Fact.") === 0 && headerText.length <= 6
+              ? "Fact."
+              : "Facturación";
+        }
+      }
+      var maxPx = headerText
+        ? Math.ceil(ctx.measureText(headerText).width) + pad
+        : pad + 40;
+      var bodyCells = chart.querySelectorAll(
+        '.ag-center-cols-container .ag-cell[col-id="' + colId + '"]'
+      );
+      var limit = Math.min(bodyCells.length, 80);
+      for (var i = 0; i < limit; i++) {
+        // Normaliza saltos/espacios: evita medir texto ya envuelto por AG Grid.
+        var t = (bodyCells[i].textContent || "").replace(/\s+/g, " ").trim();
+        if (!t) continue;
+        var w = Math.ceil(ctx.measureText(t).width) + pad;
+        if (w > maxPx) maxPx = w;
+      }
+      var pinCells = chart.querySelectorAll(
+        '.ag-floating-bottom .ag-cell[col-id="' + colId + '"]'
+      );
+      Array.prototype.forEach.call(pinCells, function (pc) {
+        if (window.getComputedStyle(pc).visibility === "hidden") return;
+        var t = (pc.textContent || "").replace(/\s+/g, " ").trim();
+        if (!t) return;
+        var w = Math.ceil(ctx.measureText(t).width) + pad;
+        if (w > maxPx) maxPx = w;
+      });
+      if (maxPx < 44) maxPx = 44;
+      // Tope a métricas: no hace falta más de ~140px salvo totales largos
+      if (isMetricColId(colId) && maxPx > 160) maxPx = 160;
+      var colState = { colId: colId, width: maxPx, flex: null };
+      if (opts.lock || (opts.lockMetrics && isMetricColId(colId))) {
+        colState.minWidth = maxPx;
+        colState.maxWidth = maxPx;
+      }
+      state.push(colState);
+    });
+    if (!state.length) return false;
+
+    // Incluir year/month a 0 en el mismo apply (evita hueco izquierdo)
+    if (opts.collapseSortCols) {
+      state.push(
+        {
+          colId: "year",
+          hide: true,
+          width: 0,
+          minWidth: 0,
+          maxWidth: 0,
+          flex: null,
+        },
+        {
+          colId: "month",
+          hide: true,
+          width: 0,
+          minWidth: 0,
+          maxWidth: 0,
+          flex: null,
+        }
+      );
+    }
+
+    var avail = getViewportWidth(chart);
+
+    if (opts.flexTextColumn && avail > 80) {
+      var metricsTotal = 0;
+      var textIdx = -1;
+      for (var fi = 0; fi < state.length; fi++) {
+        if (isHiddenSortColId(state[fi].colId)) continue;
+        if (isMetricColId(state[fi].colId)) {
+          metricsTotal += state[fi].width;
+        } else if (textIdx === -1) {
+          textIdx = fi;
+        } else {
+          metricsTotal += state[fi].width;
+        }
+      }
+      if (textIdx >= 0) {
+        // Columna texto = mayor de (ancho medido de contenido, espacio restante).
+        // Sin maxWidth: el usuario puede ensanchar manualmente sin que AG Grid lo rechace.
+        var naturalW = state[textIdx].width; // medido del textContent real
+        var textW = Math.max(naturalW, avail - metricsTotal, 120);
+        state[textIdx].width = textW;
+        state[textIdx].minWidth = 100;
+        // maxWidth intencionalmente NO fijado: permite resize manual libre.
+        state[textIdx].flex = null;
+      }
+    } else if (opts.fitViewport && avail > 80) {
+      var total = 0;
+      for (var ti = 0; ti < state.length; ti++) {
+        if (isHiddenSortColId(state[ti].colId)) continue;
+        total += state[ti].width;
+      }
+      // Encoger SIEMPRE si no cabe (pantallas estrechas / card chica)
+      if (total > avail) {
+        var scale = (avail - 2) / total;
+        for (var si = 0; si < state.length; si++) {
+          if (isHiddenSortColId(state[si].colId)) continue;
+          var nw = Math.max(48, Math.floor(state[si].width * scale));
+          state[si].width = nw;
+          if (opts.lock || (opts.lockMetrics && isMetricColId(state[si].colId))) {
+            state[si].minWidth = nw;
+            state[si].maxWidth = nw;
+          }
+        }
+      }
+    }
+
+    api.applyColumnState({ state: state, defaultState: { flex: null } });
+    // Tras medir visibles, forzar year/month a 0 (si no, dejan hueco a la izquierda)
+    collapseHiddenSortColumns(api);
+    return true;
+  }
+
+  function isResumenMensualChart(chart) {
+    var name = chart.getAttribute("data-test-chart-name") || "";
+    if (name.indexOf("Resumen mensual") !== -1) return true;
+    var title = chart.querySelector(
+      '[data-test="slice-header"] .header-title, [data-test="slice-header"] .editable-title'
+    );
+    var t = title ? (title.textContent || "").replace(/\s+/g, " ").trim() : "";
+    return t.indexOf("Resumen mensual") !== -1;
+  }
+
+  function hasHorizontalScroll(chart) {
+    var vp =
+      chart.querySelector(".ag-center-cols-viewport") ||
+      chart.querySelector(".ag-body-horizontal-scroll-viewport") ||
+      chart.querySelector(".ag-body-viewport");
+    if (!vp) return false;
+    return vp.scrollWidth > vp.clientWidth + 2;
+  }
+
+  // ─── Persistencia de anchos de columna — chart Proyectos ────────────────────
+  //
+  // Cuando el usuario termina de redimensionar una columna:
+  //  1. Guarda en localStorage (respuesta inmediata, solo este browser).
+  //  2. Llama a la API de Superset para actualizar column_config en la BD
+  //     → todos los usuarios/dispositivos reciben el nuevo ancho en la próxima carga.
+  //
+  // La API usa la cookie de sesión (HTTPS) + token CSRF: no requiere credenciales
+  // adicionales; funciona para cualquier usuario con rol Alpha/Admin en Superset.
+
+  var PS_COL_STORAGE_KEY = "ps-proyectos-col-widths-v2";
+  var PS_CHART_ID = 21;
+
+  function isProyectosChart(chart) {
+    var name = chart.getAttribute("data-test-chart-name") || "";
+    if (name.indexOf("Proyectos") !== -1) return true;
+    var title = chart.querySelector(
+      '[data-test="slice-header"] .header-title, [data-test="slice-header"] .editable-title'
+    );
+    var t = title ? (title.textContent || "").replace(/\s+/g, " ").trim() : "";
+    return t === "Proyectos" || t.indexOf("Proyectos") === 0;
+  }
+
+  /** Devuelve {colId: width, ...} del estado actual del grid. */
+  function getColWidthMap(api) {
+    var state = api.getColumnState ? api.getColumnState() : null;
+    if (!state) return null;
+    var map = {};
+    state.forEach(function (col) {
+      if (col.colId && col.width && col.width > 0) map[col.colId] = col.width;
+    });
+    return Object.keys(map).length ? map : null;
+  }
+
+  /** Aplica un mapa {colId: width} al grid sin tocar orden ni visibilidad. */
+  function applyColWidthMap(api, map) {
+    if (!map || !api.applyColumnState) return;
+    var state = Object.keys(map).map(function (id) {
+      return { colId: id, width: map[id] };
+    });
+    try { api.applyColumnState({ state: state, applyOrder: false }); } catch (e) { /* ignore */ }
+  }
+
+  /**
+   * Distribución inicial estable: las métricas quedan compactas y Proyectos
+   * recibe todo el ancho restante del viewport.
+   */
+  function getDefaultProyectosWidths(chart) {
+    var viewport =
+      chart.querySelector(".ag-center-cols-viewport") ||
+      chart.querySelector(".ag-body-viewport");
+    var available = viewport ? viewport.clientWidth : chart.clientWidth;
+    var metricTotal = 110 + 110 + 100;
+    return {
+      proyecto: Math.max(280, available - metricTotal),
+      "Fact.": 110,
+      Coste: 110,
+      "Margen %": 100,
+    };
+  }
+
+  /** Guarda en localStorage (fallback inmediato). */
+  function saveWidthsLocal(map) {
+    try { localStorage.setItem(PS_COL_STORAGE_KEY, JSON.stringify(map)); } catch (e) { /* ignore */ }
+  }
+
+  /** Lee de localStorage. */
+  function loadWidthsLocal() {
+    try {
+      var raw = localStorage.getItem(PS_COL_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  /**
+   * Lee los anchos compartidos de la configuración del gráfico.
+   * Solo acepta el estado cuando contiene las cuatro columnas; así, el
+   * columnWidth inicial de Proyectos no se confunde con un ajuste guardado.
+   */
+  function loadWidthsFromSuperset() {
+    var base = window.location.pathname.indexOf("/analytics/") === 0 ? "/analytics" : "";
+    return fetch(base + "/api/v1/chart/" + PS_CHART_ID, {
+      credentials: "same-origin",
+    })
+      .then(function (r) {
+        if (!r.ok) return null;
+        return r.json();
+      })
+      .then(function (chartData) {
+        if (!chartData) return null;
+        var params = JSON.parse((chartData.result || {}).params || "{}");
+        var config = params.column_config || {};
+        var ids = ["proyecto", "Fact.", "Coste", "Margen %"];
+        var map = {};
+        for (var i = 0; i < ids.length; i += 1) {
+          var width = Number((config[ids[i]] || {}).columnWidth);
+          if (!width || width <= 0) return null;
+          map[ids[i]] = width;
+        }
+        return map;
+      })
+      .catch(function () { return null; });
+  }
+
+  /**
+   * Llama a PUT /api/v1/chart/:id para actualizar columnWidth en column_config.
+   * Usa la sesión del usuario logueado (cookie HTTPS + CSRF).
+   * Si el usuario no tiene permisos de escritura, falla silenciosamente.
+   */
+  function saveWidthsToSuperset(map) {
+    var base = window.location.pathname.indexOf("/analytics/") === 0 ? "/analytics" : "";
+    // Paso 1: obtener token CSRF (la sesión ya está en la cookie)
+    fetch(base + "/api/v1/security/csrf_token/", { credentials: "same-origin" })
+      .then(function (r) { return r.json(); })
+      .then(function (csrfData) {
+        var csrf = csrfData.result;
+        if (!csrf) return;
+        // Paso 2: leer params actuales del chart
+        return fetch(base + "/api/v1/chart/" + PS_CHART_ID, {
+          credentials: "same-origin",
+          headers: { "X-CSRFToken": csrf },
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (chartData) {
+            var params = JSON.parse((chartData.result || {}).params || "{}");
+            var cc = params.column_config || {};
+            // Actualizar columnWidth por columna
+            Object.keys(map).forEach(function (colId) {
+              cc[colId] = cc[colId] || {};
+              cc[colId].columnWidth = map[colId];
+            });
+            params.column_config = cc;
+            // Paso 3: guardar
+            return fetch(base + "/api/v1/chart/" + PS_CHART_ID, {
+              method: "PUT",
+              credentials: "same-origin",
+              headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrf,
+                "Referer": window.location.origin + base + "/",
+              },
+              body: JSON.stringify({ params: JSON.stringify(params) }),
+            });
+          })
+          .then(function (r) {
+            if (r && r.ok) {
+              console.log("[PS] Anchos de Proyectos guardados en Superset (todos los usuarios).");
+            }
+          });
+      })
+      .catch(function () { /* fallo silencioso: localStorage es el fallback */ });
+  }
+
+  var _psColSaveTimer = null;
+
+  /**
+   * Registra el listener de resize y blinda los anchos guardados.
+   * Se inicializa una vez por instancia de grid (no por elemento DOM).
+   *
+   * Problema raíz: Superset llama api.sizeColumnsToFit() cuando terminan
+   * de cargar los datos → sobrescribe lo que aplicamos desde localStorage.
+   * Solución: parchar sizeColumnsToFit para que, si hay anchos guardados,
+   * los re-aplique en lugar de igualar columnas. Sin estado guardado, las
+   * métricas quedan compactas y Proyectos usa todo el espacio restante.
+   */
+  function initProyectosColPersist(chart, api) {
+    // Guardia por instancia de API (no por DOM: el DOM puede recrearse)
+    if (api.__psColPersistInit) return;
+    api.__psColPersistInit = true;
+    chart.__psColPersistInit = true;
+
+    // ── 1. Parchear sizeColumnsToFit ──────────────────────────────────────
+    // Cuando Superset llama sizeColumnsToFit() tras cargar datos,
+    // interceptamos y re-aplicamos los anchos guardados.
+    api.sizeColumnsToFit = function () {
+      var saved = loadWidthsLocal();
+      applyColWidthMap(api, saved || getDefaultProyectosWidths(chart));
+    };
+
+    // ── 2. Restaurar anchos guardados ahora ───────────────────────────────
+    var saved = loadWidthsLocal();
+    applyColWidthMap(api, saved || getDefaultProyectosWidths(chart));
+    if (!saved) {
+      // Un navegador nuevo obtiene el último estado compartido del gráfico.
+      loadWidthsFromSuperset().then(function (shared) {
+        if (!shared) return;
+        saveWidthsLocal(shared);
+        applyColWidthMap(api, shared);
+      });
+    }
+    // Re-aplicar tras 500ms por si Superset aún no terminó de renderizar.
+    setTimeout(function () {
+      var s = loadWidthsLocal();
+      applyColWidthMap(api, s || getDefaultProyectosWidths(chart));
+    }, 500);
+
+    // ── 3. Escuchar resize manual ─────────────────────────────────────────
+    try {
+      api.addEventListener("columnResized", function (e) {
+        // Solo persistir un arrastre real del usuario, nunca nuestros ajustes.
+        if (!e || !e.finished || e.source !== "uiColumnResized") return;
+        var map = getColWidthMap(api);
+        if (!map) return;
+        saveWidthsLocal(map);
+        if (_psColSaveTimer) clearTimeout(_psColSaveTimer);
+        _psColSaveTimer = setTimeout(function () {
+          saveWidthsToSuperset(map);
+        }, 1000);
+      });
+    } catch (err) { /* grid aún montando */ }
+  }
+
+  // ─── Fin persistencia Proyectos ─────────────────────────────────────────────
+
+  /**
+   * Coloca un buscador proxy inmediatamente antes del menú de tres puntos.
+   * El input real permanece en AG Grid para conservar su lógica React, pero su
+   * fila se oculta para no consumir una línea adicional.
+   */
+  function placeProyectosSearchInHeader() {
     var charts = document.querySelectorAll(
-      "[data-test-chart-name*='Proyectos']"
+      '[data-test-chart-name*="Proyectos"]'
     );
     Array.prototype.forEach.call(charts, function (chart) {
-      var header = chart.querySelector("[data-test='slice-header']");
-      if (!header) return;
+      var header = chart.querySelector('[data-test="slice-header"]');
+      var realInput = chart.querySelector(
+        ".dropdown-controls-container #filter-text-box"
+      );
+      var originalRow = chart.querySelector(".dropdown-controls-container");
+      if (!header || !realInput || !originalRow) return;
 
-      var realInput = chart.querySelector("#filter-text-box");
-      if (!realInput) return;
+      originalRow.style.setProperty("display", "none", "important");
+      // Superset reserva altura para los controles aunque estén ocultos.
+      // Devolverla al grid hace que Proyectos termine a la altura de Resumen.
+      if (originalRow.parentElement) {
+        originalRow.parentElement.style.setProperty(
+          "height",
+          "100%",
+          "important"
+        );
+      }
 
-      // Si el proxy ya existe y está vivo, nada que hacer
-      var existing = header.querySelector(".ps-search-proxy");
-      if (existing) {
-        // sincronizar placeholder por si cambió el idioma
-        existing.placeholder = realInput.placeholder;
+      var proxy = header.querySelector(".ps-proyectos-search-proxy");
+      if (proxy) {
+        proxy.placeholder = realInput.placeholder || "Buscar";
         return;
       }
 
-      // Crear input proxy (no es un nodo React; React no lo toca)
-      var proxy = document.createElement("input");
+      proxy = document.createElement("input");
       proxy.type = "text";
       proxy.placeholder = realInput.placeholder || "Buscar";
-      proxy.className = "ps-search-proxy";
+      proxy.className = "ps-proyectos-search-proxy";
       proxy.setAttribute("aria-label", "Buscar proyectos");
       proxy.style.cssText = [
         "border:1px solid #d9d9d9",
-        "border-radius:6px",
-        "padding:3px 10px 3px 8px",
+        "border-radius:4px",
+        "padding:3px 9px",
         "font-size:14px",
         "height:28px",
-        "margin-left:10px",
+        "width:175px",
         "outline:none",
         "background:#fff",
         "color:#333",
-        "flex:0 0 auto",
-        "min-width:160px",
-        "vertical-align:middle",
-        "cursor:text",
+        "flex:0 0 175px",
+        "margin-right:8px",
       ].join(";");
 
-      // Reenviar escritura al AG Grid input real y disparar su evento
       proxy.addEventListener("input", function () {
-        var nativeInputDescriptor = Object.getOwnPropertyDescriptor(
+        var currentInput = chart.querySelector(
+          ".dropdown-controls-container #filter-text-box"
+        );
+        if (!currentInput) return;
+        var descriptor = Object.getOwnPropertyDescriptor(
           window.HTMLInputElement.prototype,
           "value"
         );
-        nativeInputDescriptor.set.call(realInput, proxy.value);
-        realInput.dispatchEvent(new Event("input", { bubbles: true }));
+        descriptor.set.call(currentInput, proxy.value);
+        currentInput.dispatchEvent(new Event("input", { bubbles: true }));
       });
       proxy.addEventListener("focus", function () {
         proxy.style.borderColor = "#007c89";
@@ -164,36 +835,465 @@
         proxy.style.borderColor = "#d9d9d9";
       });
 
-      // Insertar justo después del div.header-title
-      var title =
-        header.querySelector(".header-title") ||
-        header.querySelector(".editable-title");
-      if (title && title.nextSibling) {
-        header.insertBefore(proxy, title.nextSibling);
-      } else if (title) {
-        header.appendChild(proxy);
-      } else {
-        header.insertBefore(proxy, header.firstChild);
-      }
-
-      // Ocultar el contenedor original del search (debajo del header)
-      var origContainer = chart.querySelector(".dropdown-controls-container");
-      if (origContainer) {
-        origContainer.style.setProperty("display", "none", "important");
-      }
+      var headerControls = header.querySelector(".header-controls");
+      header.insertBefore(proxy, headerControls || header.lastChild);
     });
+  }
+
+  /**
+   * Resumen mensual: columnas al contenido, alineadas a la izquierda (sin flex).
+   */
+  function autoSizeAgGridColumns() {
+    AG_GRID_CHART_SELECTORS.forEach(function (sel) {
+      var charts = document.querySelectorAll(sel);
+      Array.prototype.forEach.call(charts, function (chart) {
+        var agTheme = chart.querySelector('[class*="ag-theme"]');
+        if (!agTheme) return;
+        var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
+        if (!rows.length) return;
+
+        var api = findAgGridApi(agTheme);
+        if (!api) return;
+
+        patchSizeColumnsToFit(api);
+        try {
+          collapseHiddenSortColumns(api);
+          var ok = fitColumnsByDomMeasure(chart, api, {
+            pad: 14,
+            lock: true,
+            fitViewport: true,
+            flexTextColumn: false,
+            collapseSortCols: true,
+          });
+          if (!ok && typeof api.autoSizeAllColumns === "function") {
+            try {
+              api.autoSizeAllColumns(false);
+            } catch (e1) {
+              try {
+                api.autoSizeAllColumns({ skipHeader: false });
+              } catch (e2) {
+                /* ignore */
+              }
+            }
+          }
+          collapseHiddenSortColumns(api);
+          sortResumenByAnoMes(api);
+          if (hasHorizontalScroll(chart)) {
+            fitColumnsByDomMeasure(chart, api, {
+              pad: 10,
+              lock: true,
+              fitViewport: true,
+              flexTextColumn: false,
+              collapseSortCols: true,
+            });
+            collapseHiddenSortColumns(api);
+          }
+          sortResumenByAnoMes(api);
+        } catch (err) {
+          /* grid aún montando */
+        }
+      });
+    });
+  }
+
+  setInterval(function () {
+    fixDoubleAppRootAnchors(document);
+    fixUsersAnchors(document);
+    fixAgGridHeight();
+    autoSizeAgGridColumns();
+    hideResumenHeaderChrome();
+    bumpProbabilidadChartFonts();
+    placeProyectosSearchInHeader();
+    // Inicializar persistencia de anchos en el chart Proyectos (idempotente)
+    var proyCharts = document.querySelectorAll('[data-test-chart-name*="Proyectos"]');
+    Array.prototype.forEach.call(proyCharts, function (chart) {
+      var agTheme = chart.querySelector('[class*="ag-theme"]');
+      if (!agTheme) return;
+      var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
+      if (!rows.length) return;
+      var api = findAgGridApi(agTheme);
+      // La guardia está en la instancia de API para sobrevivir recreaciones del DOM
+      if (api && !api.__psColPersistInit) initProyectosColPersist(chart, api);
+    });
+  }, 800);
+
+  /**
+   * Facturación por Probabilidad (ECharts):
+   * - título = mismo tamaño que otros charts (CSS global 16px)
+   * - ejes/valores = mismo px que celdas AG Grid (1.26em)
+   * Nota: en Superset 6 no existe window.echarts → hay que hallar la instancia en el DOM.
+   */
+  function getTableFontPx() {
+    var cell = document.querySelector(
+      "[data-test-chart-name*='Resumen mensual'] .ag-cell"
+    );
+    if (cell) {
+      var fs = parseFloat(window.getComputedStyle(cell).fontSize);
+      if (fs && fs >= 10) return Math.round(fs);
+    }
+    // Probe 1.26em (misma regla CSS de tablas) dentro del tema AG Grid
+    var host =
+      document.querySelector(
+        "[data-test-chart-name*='Resumen mensual'] [class*='ag-theme']"
+      ) || document.body;
+    var probe = document.createElement("span");
+    probe.style.cssText =
+      "font-family:'Segoe UI',-apple-system,Roboto,Helvetica,Arial,sans-serif;" +
+      "font-size:1.26em;position:absolute;left:-9999px;visibility:hidden;";
+    probe.textContent = "Ag";
+    host.appendChild(probe);
+    var px = Math.round(parseFloat(window.getComputedStyle(probe).fontSize) || 0);
+    host.removeChild(probe);
+    return px >= 10 ? px : 20;
+  }
+
+  function findEchartsInstance(root) {
+    if (!root) return null;
+    var nodes = [root].concat(
+      Array.prototype.slice.call(root.querySelectorAll("div"))
+    );
+    var apis = [window.echarts, window.echartsLib].filter(Boolean);
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      for (var a = 0; a < apis.length; a++) {
+        try {
+          if (typeof apis[a].getInstanceByDom === "function") {
+            var byDom = apis[a].getInstanceByDom(el);
+            if (byDom) return byDom;
+          }
+        } catch (e1) {
+          /* ignore */
+        }
+      }
+      // Propiedades propias del nodo (algunas builds cuelgan la instancia aquí)
+      try {
+        var keys = Object.keys(el);
+        for (var k = 0; k < keys.length; k++) {
+          var val = el[keys[k]];
+          if (
+            val &&
+            typeof val === "object" &&
+            typeof val.setOption === "function" &&
+            typeof val.getOption === "function"
+          ) {
+            return val;
+          }
+        }
+        // React fiber → ref con setOption
+        var fiberKey = keys.filter(function (x) {
+          return (
+            x.indexOf("__reactFiber") === 0 ||
+            x.indexOf("__reactInternalInstance") === 0
+          );
+        })[0];
+        if (fiberKey) {
+          var fiber = el[fiberKey];
+          var depth = 0;
+          while (fiber && depth < 50) {
+            var st = fiber.memoizedState;
+            var sDepth = 0;
+            while (st && sDepth < 30) {
+              var memo = st.memoizedState;
+              if (memo && typeof memo.setOption === "function") return memo;
+              if (
+                memo &&
+                memo.current &&
+                typeof memo.current.setOption === "function"
+              ) {
+                return memo.current;
+              }
+              st = st.next;
+              sDepth++;
+            }
+            var props = fiber.memoizedProps || fiber.pendingProps || {};
+            if (props.echartsInstance && props.echartsInstance.setOption) {
+              return props.echartsInstance;
+            }
+            if (props.chartInstance && props.chartInstance.setOption) {
+              return props.chartInstance;
+            }
+            fiber = fiber.return;
+            depth++;
+          }
+        }
+      } catch (e2) {
+        /* ignore */
+      }
+    }
+    return null;
+  }
+
+  function applyProbabilidadFont(inst, fontPx) {
+    if (!inst || typeof inst.setOption !== "function") return;
+    var color = "#0f172a";
+    var labelStyle = {
+      fontSize: fontPx,
+      color: color,
+      fontFamily: "'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif",
+      fontWeight: 400,
+    };
+    try {
+      var opt = inst.getOption() || {};
+      var seriesPatch = [];
+      var series = opt.series || [];
+      for (var s = 0; s < series.length; s++) {
+        seriesPatch.push({
+          label: Object.assign({ show: true }, labelStyle),
+        });
+      }
+      if (!seriesPatch.length) {
+        seriesPatch = [{ label: Object.assign({ show: true }, labelStyle) }];
+      }
+      inst.setOption(
+        {
+          textStyle: labelStyle,
+          xAxis: [
+            {
+              axisLabel: labelStyle,
+              nameTextStyle: labelStyle,
+            },
+          ],
+          yAxis: [
+            {
+              axisLabel: labelStyle,
+              nameTextStyle: labelStyle,
+            },
+          ],
+          series: seriesPatch,
+        },
+        false
+      );
+    } catch (err) {
+      /* remount */
+    }
+  }
+
+  function bumpProbabilidadChartFonts() {
+    var fontPx = getTableFontPx();
+    var roots = document.querySelectorAll(
+      '[data-test-chart-name*="Facturación por Probabilidad"]'
+    );
+    Array.prototype.forEach.call(roots, function (root) {
+      var inst = findEchartsInstance(root);
+      if (!inst) return;
+      var opt = {};
+      try {
+        opt = inst.getOption() || {};
+      } catch (e) {
+        return;
+      }
+      var y0 = (opt.yAxis && opt.yAxis[0]) || {};
+      var cur = (y0.axisLabel && y0.axisLabel.fontSize) || 0;
+      var s0 = (opt.series && opt.series[0] && opt.series[0].label) || {};
+      var curLabel = s0.fontSize || 0;
+      if (cur === fontPx && curLabel === fontPx) return;
+      applyProbabilidadFont(inst, fontPx);
+    });
+  }
+
+  /**
+   * Fallback fiable: al dibujar texto en el canvas de Probabilidad,
+   * sustituir el px de la fuente por el de las tablas (Superset no expone echarts global).
+   */
+  function patchProbabilidadCanvasFonts() {
+    if (window.__psProbCanvasFontPatched) return;
+    window.__psProbCanvasFontPatched = true;
+    var proto = CanvasRenderingContext2D.prototype;
+    var origFill = proto.fillText;
+    var origStroke = proto.strokeText;
+    function boost(ctx) {
+      try {
+        var canvas = ctx.canvas;
+        if (!canvas || !canvas.closest) return;
+        if (
+          !canvas.closest(
+            '[data-test-chart-name*="Facturación por Probabilidad"]'
+          )
+        ) {
+          return;
+        }
+        var fontPx = getTableFontPx();
+        var f = String(ctx.font || "");
+        var next = f.replace(/\d+(\.\d+)?px/i, fontPx + "px");
+        if (next === f) {
+          next =
+            "normal " +
+            fontPx +
+            "px 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif";
+        }
+        ctx.font = next;
+        // Números de tabla son casi negros; ECharts usa gris claro
+        if (typeof ctx.fillStyle === "string") {
+          var s = ctx.fillStyle.toLowerCase();
+          if (
+            s.indexOf("rgb") === 0 ||
+            s.charAt(0) === "#" ||
+            s === "gray" ||
+            s === "grey"
+          ) {
+            ctx.fillStyle = "#0f172a";
+          }
+        }
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    proto.fillText = function () {
+      boost(this);
+      return origFill.apply(this, arguments);
+    };
+    proto.strokeText = function () {
+      boost(this);
+      return origStroke.apply(this, arguments);
+    };
+  }
+
+  patchProbabilidadCanvasFonts();
+
+  /**
+   * Localiza el chart «Resumen mensual» por atributo o por título del slice.
+   */
+  function findResumenMensualCharts() {
+    var found = [];
+    var byAttr = document.querySelectorAll(
+      '.chart-slice[data-test-chart-name*="Resumen mensual"], [data-test-chart-name*="Resumen mensual"]'
+    );
+    Array.prototype.forEach.call(byAttr, function (el) {
+      found.push(el);
+    });
+    var headers = document.querySelectorAll('[data-test="slice-header"]');
+    Array.prototype.forEach.call(headers, function (h) {
+      var titleEl =
+        h.querySelector(".header-title") ||
+        h.querySelector(".editable-title") ||
+        h;
+      var t = (titleEl.textContent || "").replace(/\s+/g, " ").trim();
+      if (t.indexOf("Resumen mensual") === -1) return;
+      var chart =
+        h.closest(".chart-slice") ||
+        h.closest('[data-test="chart-grid-component"]') ||
+        h.closest(".dashboard-component-chart-holder");
+      if (chart && found.indexOf(chart) === -1) found.push(chart);
+    });
+    return found;
+  }
+
+  /**
+   * CSS forzado: oculta filtro/menú/resize en Resumen mensual.
+   * Usa hermanos de .custom-header (estructura CustomHeader de Superset).
+   */
+  function ensurePsTableStyle() {
+    var style = document.getElementById("ps-ag-grid-overrides");
+    var css = [
+      /* Hermanos del título = filtro + menú ⋮ */
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .custom-header ~ *,',
+      '[data-test-chart-name*="Resumen mensual"] .custom-header ~ *,',
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .header-filter,',
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .three-dots-menu,',
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-header-cell-resize,',
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-header-cell-menu-button,',
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-icon-filter,',
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-header-icon,',
+      '[data-test-chart-name*="Resumen mensual"] .header-filter,',
+      '[data-test-chart-name*="Resumen mensual"] .three-dots-menu,',
+      '[data-test-chart-name*="Resumen mensual"] .ag-header-cell-resize,',
+      '[data-test-chart-name*="Resumen mensual"] .ag-header-cell-menu-button,',
+      '[data-test-chart-name*="Resumen mensual"] .ag-icon-filter,',
+      '[data-test-chart-name*="Resumen mensual"] .ag-header-icon {',
+      "  display: none !important;",
+      "  visibility: hidden !important;",
+      "  opacity: 0 !important;",
+      "  width: 0 !important;",
+      "  max-width: 0 !important;",
+      "  height: 0 !important;",
+      "  overflow: hidden !important;",
+      "  pointer-events: none !important;",
+      "  position: absolute !important;",
+      "  left: -9999px !important;",
+      "}",
+      /* SVG del funnel de filtro (viewBox 24x24 con 3 barras) */
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-header-cell svg[viewBox="0 0 24 24"],',
+      '[data-test-chart-name*="Resumen mensual"] .ag-header-cell svg[viewBox="0 0 24 24"] {',
+      "  display: none !important;",
+      "}",
+      /* year/month ocultos (orden cronológico) */
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-header-cell[col-id="year"],',
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-cell[col-id="year"],',
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-header-cell[col-id="month"],',
+      '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-cell[col-id="month"] {',
+      "  display: none !important;",
+      "  width: 0 !important;",
+      "  max-width: 0 !important;",
+      "  padding: 0 !important;",
+      "  border: none !important;",
+      "}",
+    ].join("\n");
+    if (!style) {
+      style = document.createElement("style");
+      style.id = "ps-ag-grid-overrides";
+      document.documentElement.appendChild(style);
+    }
+    if (style.textContent !== css) style.textContent = css;
+  }
+
+  function hideResumenHeaderChrome() {
+    ensurePsTableStyle();
+    var charts = findResumenMensualCharts();
+    Array.prototype.forEach.call(charts, function (chart) {
+      var nodes = chart.querySelectorAll(
+        [
+          ".header-filter",
+          ".three-dots-menu",
+          ".ag-header-cell-resize",
+          ".ag-header-cell-menu-button",
+          ".ag-icon-filter",
+          ".ag-header-icon",
+          ".custom-header ~ *",
+          '.ag-header-cell svg[viewBox="0 0 24 24"]',
+        ].join(",")
+      );
+      Array.prototype.forEach.call(nodes, function (el) {
+        el.style.setProperty("display", "none", "important");
+        el.style.setProperty("visibility", "hidden", "important");
+        el.style.setProperty("opacity", "0", "important");
+        el.style.setProperty("pointer-events", "none", "important");
+        el.setAttribute("aria-hidden", "true");
+      });
+    });
+  }
+
+  // Observa el DOM: React re-monta cabeceras y vuelve a pintar el filtro
+  if (!window.__psResumenFilterObserver) {
+    try {
+      var hideTimer = null;
+      window.__psResumenFilterObserver = new MutationObserver(function () {
+        if (hideTimer) return;
+        hideTimer = setTimeout(function () {
+          hideTimer = null;
+          hideResumenHeaderChrome();
+        }, 200);
+      });
+      window.__psResumenFilterObserver.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+      });
+    } catch (err) {
+      /* ignore */
+    }
   }
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () {
       fixDoubleAppRootAnchors(document);
       fixUsersAnchors(document);
-      moveProyectosSearchBesideTitle();
+      ensurePsTableStyle();
+      hideResumenHeaderChrome();
     });
   } else {
     fixDoubleAppRootAnchors(document);
     fixUsersAnchors(document);
-    moveProyectosSearchBesideTitle();
+    ensurePsTableStyle();
+    hideResumenHeaderChrome();
   }
 
   function isDashboardPage() {

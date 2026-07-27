@@ -32,6 +32,8 @@ CURRENT_YEAR = datetime.date.today().year
 DEFAULT_EMPRESA = "Power Solution Iberia SL"  # paridad panel Resumen PBI (PSI)
 DASHBOARD_TITLE = "Seguimiento Económico — Resumen"
 DASHBOARD_SLUG = "planificacion-ps-analytics"  # URL estable (Fase 3)
+# Admin PowerSolution + dbertona: pueden guardar el ancho compartido de Proyectos.
+PROYECTOS_OWNER_IDS = [1, 2]
 
 PS_DB = {
     "database_name": "PS Analytics",
@@ -83,6 +85,13 @@ class SupersetClient:
             raise RuntimeError(f"{method} {path} -> {exc.code}: {exc.read().decode()}") from exc
 
     def login(self) -> None:
+        # Inicializar sesión Flask antes de pedir el CSRF token.
+        # Sin esta llamada, Superset no guarda cookie de sesión y el token CSRF
+        # no puede validarse → todas las PUT/POST/DELETE fallan con 400 CSRF missing.
+        try:
+            self._request("GET", "/", auth=False)
+        except Exception:
+            pass
         res = self._request(
             "POST",
             "/api/v1/security/login",
@@ -103,8 +112,11 @@ class SupersetClient:
         items = res.get("result") or []
         if items:
             db_id = items[0]["id"]
-            self._request("PUT", f"/api/v1/database/{db_id}", PS_DB)
-            print(f"BD actualizada: {PS_DB['database_name']} (id={db_id})")
+            try:
+                self._request("PUT", f"/api/v1/database/{db_id}", PS_DB)
+                print(f"BD actualizada: {PS_DB['database_name']} (id={db_id})")
+            except RuntimeError as e:
+                print(f"BD sin cambios (CSRF/permisos, se usa existente): {PS_DB['database_name']} (id={db_id})")
             return db_id
         db_id = self._request("POST", "/api/v1/database/", PS_DB)["id"]
         print(f"BD creada: {PS_DB['database_name']} (id={db_id})")
@@ -154,6 +166,8 @@ class SupersetClient:
             "datasource_type": "table",
             "params": json.dumps(params),
         }
+        if name == "Proyectos":
+            payload["owners"] = PROYECTOS_OWNER_IDS
         if name in existing_by_name:
             cid = existing_by_name[name]
             self._request("PUT", f"/api/v1/chart/{cid}", payload)
@@ -282,13 +296,14 @@ def probabilidad_bar_params() -> dict[str, Any]:
 
 
 def resumen_mensual_params() -> dict[str, Any]:
-    """Tabla PBI Resumen: AñoMes | Facturación | Coste | Margen % (agregada)."""
+    """Tabla PBI Resumen: AñoMes | Fact. | Coste | Margen % (agregada)."""
+    # Orden backend robusto: year+month ASC (evita orden erróneo por Fact. DESC).
     return {
         "adhoc_filters": dim_adhoc_filters("tipo"),
         "query_mode": "aggregate",
-        "groupby": ["ano_mes"],
+        "groupby": ["year", "month", "ano_mes"],
         "metrics": [
-            metric_sum("facturacion", "Facturación"),
+            metric_sum("facturacion", "Fact."),
             metric_sum("coste", "Coste"),
             metric_sql(
                 "(SUM(facturacion) - SUM(coste)) / NULLIF(SUM(facturacion), 0) * 100",
@@ -296,7 +311,7 @@ def resumen_mensual_params() -> dict[str, Any]:
             ),
         ],
         "percent_metrics": [],
-        "order_by_cols": ['["ano_mes", true]'],
+        "order_by_cols": ['["year", true]', '["month", true]'],
         "row_limit": 1000,
         # Sin page_length: evita el selector "Show N entries per page" (pocas filas/mes)
         "server_pagination": False,
@@ -307,10 +322,12 @@ def resumen_mensual_params() -> dict[str, Any]:
         "align_pn": False,
         "table_timestamp_format": "smart_date",
         "column_config": {
+            "year": {"visible": False},
+            "month": {"visible": False},
             "ano_mes": {
                 "customColumnName": "Año/Mes",
             },
-            "Facturación": {
+            "Fact.": {
                 "d3NumberFormat": ",.0f",
                 "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
                 "showCellBars": False,
@@ -329,13 +346,13 @@ def resumen_mensual_params() -> dict[str, Any]:
 
 
 def resumen_proyectos_params() -> dict[str, Any]:
-    """Tabla PBI Resumen Proyectos: Proyecto | Facturación | Coste | Margen %."""
+    """Tabla PBI Resumen Proyectos: Proyecto | Fact. | Coste | Margen %."""
     return {
         "adhoc_filters": dim_adhoc_filters("tipo"),
         "query_mode": "aggregate",
         "groupby": ["proyecto"],
         "metrics": [
-            metric_sum("facturacion", "Facturación"),
+            metric_sum("facturacion", "Fact."),
             metric_sum("coste", "Coste"),
             metric_sql(
                 "(SUM(facturacion) - SUM(coste)) / NULLIF(SUM(facturacion), 0) * 100",
@@ -343,7 +360,7 @@ def resumen_proyectos_params() -> dict[str, Any]:
             ),
         ],
         "percent_metrics": [],
-        "order_by_cols": ['["Facturación", false]'],
+        "order_by_cols": ['["Fact.", false]'],
         "row_limit": 5000,
         # Sin page_length: evita el selector "Show N entries per page"
         "server_pagination": False,
@@ -356,21 +373,28 @@ def resumen_proyectos_params() -> dict[str, Any]:
         "column_config": {
             "proyecto": {
                 "customColumnName": "Proyectos",
-                "columnWidth": 220,
+                # truncateLongCells → AG Grid: wrapText=false + autoHeight=false (texto en 1 línea).
+                # columnWidth → AG Grid minWidth para la columna (el bundle lee z.columnWidth → minWidth).
+                # Con 280px de minWidth + sizeColumnsToFit, la columna queda ancha sin scroll horizontal.
+                "truncateLongCells": True,
+                "columnWidth": 280,
             },
-            "Facturación": {
+            "Fact.": {
                 "d3NumberFormat": ",.0f",
                 "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
                 "showCellBars": False,
+                "truncateLongCells": True,
             },
             "Coste": {
                 "d3NumberFormat": ",.0f",
                 "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
                 "showCellBars": False,
+                "truncateLongCells": True,
             },
             "Margen %": {
                 "d3NumberFormat": ".2f",
                 "showCellBars": False,
+                "truncateLongCells": True,
             },
         },
     }
@@ -705,7 +729,7 @@ def persist_dashboard_config(
         "[data-test-chart-name*='Proyectos'] .ag-header-cell {\n"
         "  white-space: nowrap !important;\n"
         "  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;\n"
-        "  font-size: 1.33em !important;\n"
+        "  font-size: 1.26em !important;\n"
         "  border-bottom: 2px solid #d1d5db !important;\n"
         "  box-shadow: none !important;\n"
         "}\n"
@@ -715,7 +739,7 @@ def persist_dashboard_config(
         "[data-test-chart-name*='Resumen mensual'] .ag-cell,\n"
         "[data-test-chart-name*='Proyectos'] .ag-cell {\n"
         "  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;\n"
-        "  font-size: 1.33em !important;\n"
+        "  font-size: 1.26em !important;\n"
         "}\n"
         "/* Tablas: altura completa — propagar height por toda la cadena */\n"
         "[data-test-chart-name*='Resumen mensual'] .slice_container,\n"
@@ -757,6 +781,65 @@ def persist_dashboard_config(
         "[data-test-chart-name*='Proyectos'] .cell-bar,\n"
         "[data-test-chart-name*='Proyectos'] .cell-bars {\n"
         "  display: none !important;\n"
+        "}\n"
+        "/* Totales AG Grid: ocultar etiqueta Summary/Resumen + icono info */\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-floating-bottom .ag-cell[col-id='ano_mes'],\n"
+        "[data-test-chart-name*='Proyectos'] .ag-floating-bottom .ag-cell[col-id='proyecto'] {\n"
+        "  visibility: hidden !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-floating-bottom .anticon,\n"
+        "[data-test-chart-name*='Proyectos'] .ag-floating-bottom .anticon {\n"
+        "  display: none !important;\n"
+        "}\n"
+        "/* Sin scroll horizontal fantasma (anchos se ajustan por JS) */\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-body-horizontal-scroll,\n"
+        "[data-test-chart-name*='Proyectos'] .ag-body-horizontal-scroll,\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-body-horizontal-scroll-viewport,\n"
+        "[data-test-chart-name*='Proyectos'] .ag-body-horizontal-scroll-viewport {\n"
+        "  display: none !important;\n"
+        "  height: 0 !important;\n"
+        "  min-height: 0 !important;\n"
+        "  max-height: 0 !important;\n"
+        "  overflow: hidden !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-center-cols-viewport,\n"
+        "[data-test-chart-name*='Proyectos'] .ag-center-cols-viewport,\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-header-viewport,\n"
+        "[data-test-chart-name*='Proyectos'] .ag-header-viewport {\n"
+        "  overflow-x: hidden !important;\n"
+        "}\n"
+        "/* Resumen mensual: ocultar year/month (solo sirven para orden cronológico) */\n"
+        ".chart-slice[data-test-chart-name*='Resumen mensual'] .ag-header-cell[col-id='year'],\n"
+        ".chart-slice[data-test-chart-name*='Resumen mensual'] .ag-cell[col-id='year'],\n"
+        ".chart-slice[data-test-chart-name*='Resumen mensual'] .ag-header-cell[col-id='month'],\n"
+        ".chart-slice[data-test-chart-name*='Resumen mensual'] .ag-cell[col-id='month'],\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-header-cell[col-id='year'],\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-cell[col-id='year'],\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-header-cell[col-id='month'],\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-cell[col-id='month'] {\n"
+        "  display: none !important;\n"
+        "  width: 0 !important;\n"
+        "  min-width: 0 !important;\n"
+        "  max-width: 0 !important;\n"
+        "  padding: 0 !important;\n"
+        "  border: none !important;\n"
+        "  overflow: hidden !important;\n"
+        "}\n"
+        "/* Resumen mensual: ocultar filtro de cabecera + asa de resize (línea) */\n"
+        ".chart-slice[data-test-chart-name*='Resumen mensual'] .custom-header ~ *,\n"
+        "[data-test-chart-name*='Resumen mensual'] .custom-header ~ *,\n"
+        ".chart-slice[data-test-chart-name*='Resumen mensual'] .header-filter,\n"
+        ".chart-slice[data-test-chart-name*='Resumen mensual'] .three-dots-menu,\n"
+        ".chart-slice[data-test-chart-name*='Resumen mensual'] .ag-header-cell-resize,\n"
+        ".chart-slice[data-test-chart-name*='Resumen mensual'] .ag-header-cell-menu-button,\n"
+        ".chart-slice[data-test-chart-name*='Resumen mensual'] .ag-icon-filter,\n"
+        ".chart-slice[data-test-chart-name*='Resumen mensual'] .ag-header-icon,\n"
+        "[data-test-chart-name*='Resumen mensual'] .header-filter,\n"
+        "[data-test-chart-name*='Resumen mensual'] .three-dots-menu,\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-header-cell-resize {\n"
+        "  display: none !important;\n"
+        "  visibility: hidden !important;\n"
+        "  pointer-events: none !important;\n"
         "}\n"
     )
 
