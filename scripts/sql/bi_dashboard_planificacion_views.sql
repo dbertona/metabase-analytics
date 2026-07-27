@@ -197,6 +197,53 @@ HAVING ABS(SUM(f.facturado)) > 0.0001 OR ABS(SUM(f.coste)) > 0.0001;
 COMMENT ON VIEW bi_v_resumen_proyectos IS
   'Resumen Proyectos PBI: Operational + Completed/Open/Planning; excluye filas 0/0.';
 
+-- -----------------------------------------------------------------------------
+-- Unidad / Gastos (página PBI «Unidad»)
+-- Pivot coste por concepto analítico × mes. Filtro de página PBI: Structure.
+-- Dims year/empresa/department_code/tipo para filtros nativos del dashboard.
+-- TRIM(descripcion_ca) unifica duplicados por espacios en BC.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE VIEW bi_v_unidad AS
+SELECT
+    c.empresa,
+    c.year,
+    c.departamento AS department_code,
+    d.department_name,
+    c.tipo,
+    c.tipo_proyecto,
+    TRIM(c.descripcion_ca) AS concepto_analitico,
+    SUM(c.coste) FILTER (WHERE c.month = 1) AS m01,
+    SUM(c.coste) FILTER (WHERE c.month = 2) AS m02,
+    SUM(c.coste) FILTER (WHERE c.month = 3) AS m03,
+    SUM(c.coste) FILTER (WHERE c.month = 4) AS m04,
+    SUM(c.coste) FILTER (WHERE c.month = 5) AS m05,
+    SUM(c.coste) FILTER (WHERE c.month = 6) AS m06,
+    SUM(c.coste) FILTER (WHERE c.month = 7) AS m07,
+    SUM(c.coste) FILTER (WHERE c.month = 8) AS m08,
+    SUM(c.coste) FILTER (WHERE c.month = 9) AS m09,
+    SUM(c.coste) FILTER (WHERE c.month = 10) AS m10,
+    SUM(c.coste) FILTER (WHERE c.month = 11) AS m11,
+    SUM(c.coste) FILTER (WHERE c.month = 12) AS m12,
+    SUM(c.coste) AS total
+FROM v_se_coste c
+LEFT JOIN mb_v_dim_departamento d
+    ON d.company_name = c.empresa
+   AND d.department_code = c.departamento
+WHERE c.tipo_proyecto = 'Structure'
+  AND COALESCE(TRIM(c.descripcion_ca), '') <> ''
+GROUP BY
+    c.empresa,
+    c.year,
+    c.departamento,
+    d.department_name,
+    c.tipo,
+    c.tipo_proyecto,
+    TRIM(c.descripcion_ca)
+HAVING ABS(SUM(c.coste)) > 0.0001;
+
+COMMENT ON VIEW bi_v_unidad IS
+  'Unidad/Gastos PBI: coste por concepto×mes; tipo_proyecto=Structure fijo.';
+
 -- KPI agregados por empresa/año (referencia / legacy; tarjetas usan bi_v_planificacion_kpi)
 CREATE OR REPLACE VIEW bi_v_kpi_anual_empresa AS
 WITH agg AS (
