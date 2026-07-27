@@ -1,7 +1,25 @@
+---
+alwaysApply: true
+description: Patrón obligatorio para crear o modificar tablas AG Grid en Superset
+---
+
 # Tablas AG Grid en Superset — patrón canónico
 
 > **Referencia completa:** `docs/TABLAS_AG_GRID.md`
-> **Última actualización:** 2026-07-26
+> **Última actualización:** 2026-07-27
+
+## Regla obligatoria
+
+Cuando un agente cree o modifique una tabla Superset, debe usar **Proyectos**
+como patrón funcional completo. No basta con que la tabla renderice.
+
+Antes de editar/regenerar:
+
+1. Leer `.cursor/DOCUMENTATION_INDEX.md`.
+2. Leer `docs/TABLAS_AG_GRID.md` completo.
+3. Ejecutar el pull UI obligatorio descrito en
+   `.cursor/rules/superset-dashboard-ui-sync.mdc`.
+4. Confirmar con el usuario el chart, columnas, buscador y persistencia.
 
 ## Requisito previo
 
@@ -35,12 +53,14 @@ def mi_tabla_params() -> dict:
         "column_config": {
             "campo_dimension": {
                 "customColumnName": "Nombre visible",
-                # Evitar columnWidth fijo si se usa autoSizeAgGridColumns (tail_js)
+                "truncateLongCells": True,
+                "columnWidth": 280,  # fallback; JS usa el espacio restante
             },
             "Etiqueta": {
                 "d3NumberFormat": ",.0f",
                 "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
                 "showCellBars": False,
+                "truncateLongCells": True,
             },
         },
     }
@@ -121,55 +141,58 @@ Añadir siempre estos bloques para las tablas AG Grid:
 
 ---
 
-## JS en `tail_js_custom_extra.html` — altura + auto-size columnas
+## JS en `tail_js_custom_extra.html`
 
-Ambas funciones usan `AG_GRID_CHART_SELECTORS` y se ejecutan cada 1.5 s.
-Para añadir una tabla nueva, añadir el selector a ese array:
+Toda tabla nueva debe registrarse en los helpers necesarios y usar IDs propios.
 
-```javascript
-var AG_GRID_CHART_SELECTORS = [
-  "[data-test-chart-name*='Resumen mensual']",
-  "[data-test-chart-name*='Proyectos']",
-  "[data-test-chart-name*='Mi Tabla']",   // ← añadir aquí
-];
-```
-
-- **`fixAgGridHeight`:** `alturaCard − alturaHeader − 8px` → inline en
-  `.slice_container` y `[class*="ag-theme"]`.
-- **`autoSizeAgGridColumns`:** mide cabecera/celdas (canvas) y aplica anchos
-  exactos vía `applyColumnState`. Parchea `sizeColumnsToFit` de Superset
-  (que ensanchaba al card y generaba holgura/scroll). Sin `columnWidth` fijo.
+- **Altura:** el grid debe ocupar todo el card. Si se oculta la fila del
+  buscador, aplicar `height:100% !important` a su wrapper padre.
+- **Columnas:** dimensión textual = espacio restante; métricas con anchos
+  compactos. Interceptar `sizeColumnsToFit` para impedir *snapback*.
+- **Resize:** persistir solo `columnResized` con
+  `source="uiColumnResized"`.
+- **Estado:** usar key `localStorage` única por chart.
+- **Compartido:** guardar/leer los cuatro `columnWidth` mediante API del chart.
+- **Idempotencia:** marcar la instancia `GridApi`, no depender solo del DOM.
 
 ---
 
-## Buscador junto al título (opcional)
+## Buscador en la cabecera
 
 Si `include_search: True`, el buscador por defecto aparece a la derecha
-debajo del header. Para moverlo junto al título del chart:
+debajo del header. El patrón obligatorio:
 
-1. En `moveProyectosSearchBesideTitle` (en `tail_js_custom_extra.html`),
-   añadir el selector del nuevo chart:
-   ```javascript
-   var charts = document.querySelectorAll(
-     "[data-test-chart-name*='Proyectos'], [data-test-chart-name*='Mi Tabla']"
-   );
-   ```
-2. La función crea un `<input>` proxy nativo, lo inserta después de
-   `.header-title` y oculta `.dropdown-controls-container` de AG Grid.
+1. Crear un proxy nativo con clase y `aria-label` únicos.
+2. Insertarlo antes de `.header-controls` (a la izquierda de ⋮).
+3. No mover el input React real.
+4. Buscar el input real en cada evento y reenviar `value` + evento `input`.
+5. Ocultar `.dropdown-controls-container`.
+6. Devolver al grid la altura reservada por Superset.
 
 ---
 
 ## Checklist al crear una tabla nueva
 
+- [ ] Pull UI ejecutado antes de editar/regenerar
 - [ ] `AG_GRID_TABLE_ENABLED: True` en `superset_config.py`
 - [ ] `viz_type = "ag-grid-table"` en el script Python
-- [ ] `show_cell_bars: False` + `server_pagination: False` (salvo >10k filas)
-- [ ] Sin `columnWidth` fijo si se usa auto-size al contenido
+- [ ] `truncateLongCells: True` en dimensión y métricas
+- [ ] Dimensión textual usa el espacio restante; métricas compactas
+- [ ] `show_cell_bars: False` y paginación decidida según volumen
 - [ ] CSS del bloque «Altura completa» añadido al `dashboard_css`
-- [ ] Selector añadido en `AG_GRID_CHART_SELECTORS` en `tail_js_custom_extra.html`
-- [ ] Si usa buscador: selector añadido en `moveProyectosSearchBesideTitle`
-- [ ] Aplicar cambios: `python3 scripts/setup-superset-planificacion.py`
+- [ ] Helpers JS registrados con selector/chart ID y storage key propios
+- [ ] Buscador antes de ⋮, funcional y sin fila adicional
+- [ ] Grid termina a la misma altura que tablas equivalentes
+- [ ] Resize manual sin *snapback*
+- [ ] Refresco conserva anchos localmente
+- [ ] Navegador sin `localStorage` recupera anchos compartidos
+- [ ] Editor compartido es propietario y tiene rol mínimo `can_write Chart`
+- [ ] API GET/PUT chart devuelve 200; no ocultar 403/400
+- [ ] Sintaxis JS/Python y `git diff --check` correctos
+- [ ] Commit + push a `gitea` antes de aplicar
+- [ ] Superset reiniciado si cambió plantilla Jinja
+- [ ] `/analytics/health` OK y navegador sin errores nuevos
 
 ---
 
-**Última actualización:** 2026-07-26
+**Última actualización:** 2026-07-27
