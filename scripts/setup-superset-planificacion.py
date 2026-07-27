@@ -452,7 +452,7 @@ def gastos_unidad_params() -> dict[str, Any]:
         "concepto_analitico": {
             "customColumnName": "Concepto Analitico",
             "truncateLongCells": True,
-            "columnWidth": 280,
+            "columnWidth": 220,
         },
     }
     metrics: list[dict[str, Any]] = []
@@ -463,7 +463,8 @@ def gastos_unidad_params() -> dict[str, Any]:
             "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
             "showCellBars": False,
             "truncateLongCells": True,
-            "columnWidth": 110 if label == "Total" else 90,
+            # Total más ancho; meses compactos para que quepa en el card
+            "columnWidth": 128 if label == "Total" else 70,
         }
     return {
         "adhoc_filters": dim_adhoc_filters("tipo"),
@@ -1065,6 +1066,16 @@ def persist_dashboard_config(
         "[data-test-chart-name*='Gastos'] .slice_container,\n"
         "[data-test-chart-name*='Gastos'] .chart-container {\n"
         "  overflow: visible !important;\n"
+        "}\n"
+        "/* Total fijado a la derecha: siempre visible */\n"
+        "[data-test-chart-name*='Gastos'] .ag-pinned-right-cols-container,\n"
+        "[data-test-chart-name*='Gastos'] .ag-pinned-right-header,\n"
+        "[data-test-chart-name*='Gastos'] .ag-pinned-right-floating-bottom {\n"
+        "  min-width: 128px !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Gastos'] .ag-header-cell[col-id='Total'],\n"
+        "[data-test-chart-name*='Gastos'] .ag-cell[col-id='Total'] {\n"
+        "  font-weight: 600 !important;\n"
         "}\n"
         "/* Sin scroll horizontal fantasma (anchos se ajustan por JS) */\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-body-horizontal-scroll,\n"

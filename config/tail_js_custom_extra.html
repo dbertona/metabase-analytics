@@ -268,6 +268,7 @@
       anyVisible = true;
       applyGastosHeightToChart(chart, target);
       clampGastosToViewport(chart);
+      ensureGastosColumnsFit(chart);
     });
     document.body.classList.toggle("ps-unidad-gastos-active", anyVisible);
     return anyVisible;
@@ -1399,25 +1400,105 @@
   }
 
   function getDefaultGastosWidths(chart) {
-    var viewport =
-      chart.querySelector(".ag-center-cols-viewport") ||
+    var root =
+      chart.querySelector(".ag-root") ||
       chart.querySelector(".ag-body-viewport") ||
       chart.querySelector(".slice_container") ||
       chart;
-    var available = viewport.clientWidth || chart.clientWidth || 1200;
-    // Rellenar siempre el ancho del card: meses + Total + concepto = available.
-    var totalW = 100;
-    var conceptoMin = 200;
-    var monthsBudget = Math.max(available - conceptoMin - totalW, 12 * 64);
-    var monthW = Math.floor(monthsBudget / 12);
-    var concepto = Math.max(conceptoMin, available - monthW * 12 - totalW);
+    // Ancho útil del card (restar borde + scrollbar vertical).
+    var available = Math.max(
+      480,
+      (root.clientWidth || chart.clientWidth || 1200) - 18
+    );
+    // Total fijado a la derecha: debe caber entero ("1,981,836 €").
+    var totalW = 128;
+    var conceptoMin = 160;
+    var monthMin = 52;
+    var centerAvail = Math.max(360, available - totalW);
+    var monthW = Math.floor((centerAvail - conceptoMin) / 12);
+    if (monthW < monthMin) {
+      monthW = monthMin;
+      conceptoMin = Math.max(120, centerAvail - monthW * 12);
+    }
+    var concepto = centerAvail - monthW * 12;
+    if (concepto < 120) {
+      concepto = 120;
+      monthW = Math.max(44, Math.floor((centerAvail - concepto) / 12));
+      concepto = Math.max(120, centerAvail - monthW * 12);
+    }
+    // Garantía: concepto + 12 meses + Total ≤ available
+    while (concepto + monthW * 12 + totalW > available && monthW > 44) {
+      monthW -= 1;
+      concepto = Math.max(120, available - totalW - monthW * 12);
+    }
     var map = {
       concepto_analitico: concepto,
       Total: totalW,
     };
-    var months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
+    var months = [
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12",
+    ];
     for (var i = 0; i < months.length; i++) map[months[i]] = monthW;
     return map;
+  }
+
+  /** Aplica anchos y fija Total a la derecha (siempre visible). */
+  function applyGastosColumnLayout(api, chart) {
+    if (!api || !chart) return;
+    var map = getDefaultGastosWidths(chart);
+    var state = Object.keys(map).map(function (id) {
+      var row = { colId: id, width: map[id] };
+      if (id === "Total") row.pinned = "right";
+      else row.pinned = null;
+      return row;
+    });
+    try {
+      api.applyColumnState({ state: state, applyOrder: false });
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  function isGastosTotalClipped(chart) {
+    var totalHeader =
+      chart.querySelector('.ag-header-cell[col-id="Total"]') ||
+      chart.querySelector('.ag-pinned-right-header .ag-header-cell[col-id="Total"]');
+    if (!totalHeader) return true;
+    var hr = totalHeader.getBoundingClientRect();
+    if (hr.width < 90) return true;
+    var holder =
+      chart.closest('[data-test="dashboard-component-chart-holder"]') || chart;
+    var cr = holder.getBoundingClientRect();
+    // Más de ~4px fuera del card = recortado
+    return hr.right > cr.right + 4;
+  }
+
+  function ensureGastosColumnsFit(chart) {
+    if (!isGastosChart(chart) || !isGastosChartVisible(chart)) return;
+    var agTheme = chart.querySelector('[class*="ag-theme"]');
+    if (!agTheme) return;
+    var api = findAgGridApi(agTheme);
+    if (!api) return;
+    if (!api.__psGastosColPersistInit) {
+      initGastosColPersist(chart, api);
+      return;
+    }
+    if (isGastosTotalClipped(chart)) {
+      applyGastosColumnLayout(api, chart);
+      blankGastosNA(chart);
+      labelAgGridTotalsRow(chart);
+    }
   }
 
   function blankGastosNA(chart) {
@@ -1508,10 +1589,11 @@
     chart.__psGastosColPersistInit = true;
 
     function applyFit() {
-      applyColWidthMap(api, getDefaultGastosWidths(chart));
+      applyGastosColumnLayout(api, chart);
       clearGastosClientSortOnce(api);
       fixGastosConceptoColumn(api, chart);
       blankGastosNA(chart);
+      labelAgGridTotalsRow(chart);
     }
 
     api.sizeColumnsToFit = function () {
@@ -1521,6 +1603,7 @@
     applyFit();
     setTimeout(applyFit, 300);
     setTimeout(applyFit, 900);
+    setTimeout(applyFit, 1800);
 
     try {
       api.addEventListener("columnResized", function (e) {
@@ -1783,6 +1866,7 @@
     Array.prototype.forEach.call(gastosCharts, function (chart) {
       if (!isGastosChart(chart)) return;
       blankGastosNA(chart);
+      ensureGastosColumnsFit(chart);
       var agTheme = chart.querySelector('[class*="ag-theme"]');
       if (!agTheme) return;
       var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
