@@ -657,26 +657,59 @@
   var _psColSaveTimer = null;
 
   /**
-   * Registra el listener de resize en el grid de Proyectos.
-   * Se inicializa una vez por instancia de chart.
+   * Registra el listener de resize y blinda los anchos guardados.
+   * Se inicializa una vez por instancia de grid (no por elemento DOM).
+   *
+   * Problema raíz: Superset llama api.sizeColumnsToFit() cuando terminan
+   * de cargar los datos → sobrescribe lo que aplicamos desde localStorage.
+   * Solución: parchar sizeColumnsToFit para que, si hay anchos guardados,
+   * los re-aplique en lugar de igualar columnas. Si no hay anchos guardados,
+   * deja pasar el comportamiento nativo.
    */
   function initProyectosColPersist(chart, api) {
-    if (chart.__psColPersistInit) return;
+    // Guardia por instancia de API (no por DOM: el DOM puede recrearse)
+    if (api.__psColPersistInit) return;
+    api.__psColPersistInit = true;
     chart.__psColPersistInit = true;
 
-    // Restaurar anchos guardados (localStorage → respuesta inmediata)
-    var saved = loadWidthsLocal();
-    if (saved) applyColWidthMap(api, saved);
+    // ── 1. Parchear sizeColumnsToFit ──────────────────────────────────────
+    // Cuando Superset llama sizeColumnsToFit() tras cargar datos,
+    // interceptamos y re-aplicamos los anchos guardados.
+    var _origSizeToFit = api.sizeColumnsToFit.bind(api);
+    api.sizeColumnsToFit = function () {
+      var saved = loadWidthsLocal();
+      if (saved) {
+        // Hay anchos guardados: primero deja que Superset calcule,
+        // luego sobreescribimos con los guardados tras un tick.
+        try { _origSizeToFit(); } catch (e) { /* ignore */ }
+        setTimeout(function () {
+          var s = loadWidthsLocal();
+          if (s) applyColWidthMap(api, s);
+        }, 0);
+      } else {
+        // Sin anchos guardados: comportamiento nativo
+        try { _origSizeToFit(); } catch (e) { /* ignore */ }
+      }
+    };
 
-    // Escuchar resize manual
+    // ── 2. Restaurar anchos guardados ahora ───────────────────────────────
+    var saved = loadWidthsLocal();
+    if (saved) {
+      applyColWidthMap(api, saved);
+      // Re-aplicar tras 500ms por si Superset aún no terminó de renderizar
+      setTimeout(function () {
+        var s = loadWidthsLocal();
+        if (s) applyColWidthMap(api, s);
+      }, 500);
+    }
+
+    // ── 3. Escuchar resize manual ─────────────────────────────────────────
     try {
       api.addEventListener("columnResized", function (e) {
         if (!e || !e.finished) return;
         var map = getColWidthMap(api);
         if (!map) return;
-        // Guardar en localStorage inmediatamente
         saveWidthsLocal(map);
-        // Guardar en Superset con debounce 1s (evita llamadas durante drag)
         if (_psColSaveTimer) clearTimeout(_psColSaveTimer);
         _psColSaveTimer = setTimeout(function () {
           saveWidthsToSuperset(map);
@@ -758,7 +791,8 @@
       var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
       if (!rows.length) return;
       var api = findAgGridApi(agTheme);
-      if (api) initProyectosColPersist(chart, api);
+      // La guardia está en la instancia de API para sobrevivir recreaciones del DOM
+      if (api && !api.__psColPersistInit) initProyectosColPersist(chart, api);
     });
   }, 800);
 
