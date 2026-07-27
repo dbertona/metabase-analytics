@@ -2,6 +2,53 @@
 
 ## [Unreleased]
 
+## [2026-07-27f] — Cierre rama `feat/pestana-unidad-gastos`
+
+### Summary
+
+- Pestaña **Unidad** con tabla AG Grid **Gastos** y vista `bi_v_unidad`.
+- Dashboard fit-to-viewport por CSS (`100dvh` − offsets), sin motores JS de altura.
+- Totales AG Grid visibles: `ag-theme` anclado al card (`position: absolute; inset: 0`).
+- Quita reaplicación conflictiva de alturas al cambiar Resumen ↔ Unidad.
+
+### Fixed
+
+- Pie de totales recortado por `overflow` al forzar alto de tablas.
+- Hueco gris / scroll vertical por altura fija del layout JSON en la fila de tabs.
+- Flash y pelea de layouts entre Gastos y Resumen/Proyectos.
+
+### Note
+
+- El layout de tablas ya no se recalcula en bucle por JS; solo se publican
+  offsets CSS (`--ps-dash-top`, `--ps-tables-top`, `--ps-unidad-top`).
+
+## [2026-07-27e] — Filtro nativo Proyectos
+
+### Added
+
+- Filtro `NATIVE_FILTER-PROYECTO` (multi-select) sobre `proyecto`.
+- Scope: Resumen mensual, Proyectos, Evolución, Margen acumulado, Probabilidad.
+- Vistas `bi_v_evolucion_mensual` y `bi_v_facturacion_probabilidad` con grano por
+  proyecto (sin mostrar la columna en esos charts).
+
+### Note
+
+- KPIs Obj/Plan y Gastos (Unidad) quedan fuera del filtro proyecto.
+
+## [2026-07-27d] — Sin scroll vertical de página (panel filtros)
+
+### Fixed
+
+- El panel de filtros izquierdo ensanchaba el documento (~80px); CSS con
+  `overflow-y: auto` solo en `[data-test=dashboard-filters-panel]` (no en el
+  hijo sticky: eso ocultaba los controles).
+
+## [2026-07-27c] — Probabilidad: importes en K€
+
+### Fixed
+
+- Etiquetas de Facturación por Probabilidad: importe real en `K€` (p. ej. `5.900 K€`), no la categoría con `€` ni el número completo.
+
 ## [2026-07-27b] — Cierre rama `fix/probabilidad-formato-euro-porcentaje`
 
 ### Summary

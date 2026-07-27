@@ -61,36 +61,117 @@
     });
   }
 
+  /**
+   * Solo publica offsets CSS para calc(100dvh - …). No escribe height en charts.
+   */
+  function publishDashboardViewportVars() {
+    var content = document.querySelector(".dashboard-content");
+    if (content) {
+      var top = content.getBoundingClientRect().top;
+      if (top > 40 && top < window.innerHeight * 0.5) {
+        document.documentElement.style.setProperty(
+          "--ps-dash-top",
+          Math.round(top) + "px"
+        );
+      }
+    }
+    var resumen = document.querySelector(
+      '[data-test-chart-name*="Resumen mensual"]'
+    );
+    if (resumen && resumen.offsetParent !== null) {
+      var rt = resumen.getBoundingClientRect().top;
+      if (rt > 80 && rt < window.innerHeight - 120) {
+        document.documentElement.style.setProperty(
+          "--ps-tables-top",
+          Math.round(rt) + "px"
+        );
+      }
+    }
+    var gastos = document.querySelector('[data-test-chart-name*="Gastos"]');
+    if (gastos && gastos.offsetParent !== null) {
+      var gt = gastos.getBoundingClientRect().top;
+      if (gt > 60 && gt < window.innerHeight - 120) {
+        document.documentElement.style.setProperty(
+          "--ps-unidad-top",
+          Math.round(gt) + "px"
+        );
+      }
+    }
+  }
+  window.addEventListener("resize", publishDashboardViewportVars);
+  setInterval(publishDashboardViewportVars, 1200);
+  setTimeout(publishDashboardViewportVars, 0);
+  setTimeout(publishDashboardViewportVars, 400);
+
   var AG_GRID_CHART_SELECTORS = [
     "[data-test-chart-name*='Resumen mensual']",
   ];
 
+  function isGastosChartVisible(chart) {
+    if (!chart || !chart.getBoundingClientRect) return false;
+    if (chart.offsetParent === null) return false;
+    var rect = chart.getBoundingClientRect();
+    return rect.width > 40 && rect.bottom > 0 && rect.top < window.innerHeight + 40;
+  }
+
   /**
-   * Fuerza que el AG Grid llene todo el espacio disponible dentro del card.
-   * Calcula en píxeles: altura del holder − altura del header − 8px margen.
-   * Aplica inline style a .slice_container y al div ag-theme-* para bypasear
-   * cualquier inline style que React pueda estar poniendo.
+   * Sustituye «Resumen»/«Summary» del pie por «Total» (visible y en negrita).
+   * Sin tocar alturas: AG Grid gestiona el layout nativo.
    */
-  function fixAgGridHeight() {
-    AG_GRID_CHART_SELECTORS.forEach(function (sel) {
+  function labelAgGridTotalsRow(chart) {
+    if (!chart) return;
+    var bottom = chart.querySelector(".ag-floating-bottom");
+    if (!bottom) return;
+    var dimIds = [
+      "concepto_analitico",
+      "proyecto",
+      "ano_mes",
+      "year",
+      "month",
+    ];
+    var cells = bottom.querySelectorAll(".ag-cell");
+    for (var i = 0; i < cells.length; i++) {
+      var cell = cells[i];
+      var id = cell.getAttribute("col-id") || "";
+      var isDim = false;
+      for (var d = 0; d < dimIds.length; d++) {
+        if (id === dimIds[d] || id.indexOf(dimIds[d]) === 0) {
+          isDim = true;
+          break;
+        }
+      }
+      if (!isDim && i > 0) continue;
+      if (!isDim && i === 0) isDim = true;
+      if (!isDim) continue;
+      cell.style.setProperty("visibility", "visible", "important");
+      var valEl =
+        cell.querySelector(".ag-cell-value") ||
+        cell.querySelector("[class*='cell']") ||
+        cell;
+      var cur = (valEl.textContent || "").replace(/\s+/g, " ").trim();
+      if (
+        !cur ||
+        cur === "Resumen" ||
+        cur === "Summary" ||
+        cur === "N/A" ||
+        /^total$/i.test(cur)
+      ) {
+        valEl.textContent = "Total";
+      }
+      cell.style.setProperty("font-weight", "700", "important");
+    }
+  }
+
+  function labelAllAgGridTotals() {
+    var sels = [
+      '[data-test-chart-name*="Gastos"]',
+      '[data-test-chart-name*="Proyectos"]',
+      '[data-test-chart-name*="Resumen mensual"]',
+    ];
+    sels.forEach(function (sel) {
       var charts = document.querySelectorAll(sel);
       Array.prototype.forEach.call(charts, function (chart) {
-        var header = chart.querySelector("[data-test='slice-header']");
-        var sliceContainer = chart.querySelector(".slice_container");
-        var agTheme = chart.querySelector('[class*="ag-theme"]');
-        if (!sliceContainer || !agTheme) return;
-
-        var holderH = chart.getBoundingClientRect().height;
-        var headerH = header ? header.getBoundingClientRect().height : 0;
-        var available = Math.floor(holderH - headerH - 8);
-        if (available < 80) return; // aún no renderizado
-
-        var current = parseInt(sliceContainer.style.height, 10);
-        if (Math.abs(current - available) < 4) return; // ya correcto, no reasignar
-
-        sliceContainer.style.setProperty("height", available + "px", "important");
-        sliceContainer.style.setProperty("overflow", "hidden", "important");
-        agTheme.style.setProperty("height", available + "px", "important");
+        labelAgGridTotalsRow(chart);
       });
     });
   }
@@ -763,6 +844,395 @@
 
   // ─── Fin persistencia Proyectos ─────────────────────────────────────────────
 
+  // ─── Persistencia / layout — chart Gastos (pestaña Unidad) ──────────────────
+  var PS_GASTOS_COL_STORAGE_KEY = "ps-gastos-col-widths-v1";
+
+  /**
+   * AG Grid Table (Superset) ignora order_by_cols de dimensión y manda
+   * ORDER BY primer metric (m01/"01" DESC). Reescribimos el body de /chart/data
+   * para forzar ORDER BY concepto_analitico ASC — datos llegan ya ordenados,
+   * sin reordenado client-side (refresh feo).
+   */
+  (function patchGastosChartDataOrder() {
+    if (window.__psGastosOrderPatch) return;
+    window.__psGastosOrderPatch = true;
+
+    function rewriteBody(bodyStr) {
+      if (!bodyStr || typeof bodyStr !== "string") return bodyStr;
+      try {
+        var body = JSON.parse(bodyStr);
+        var queries = body.queries;
+        if (!Array.isArray(queries)) return bodyStr;
+        var changed = false;
+        for (var i = 0; i < queries.length; i++) {
+          var q = queries[i];
+          if (!q) continue;
+          var cols = q.columns || [];
+          var hasConcepto = false;
+          for (var j = 0; j < cols.length; j++) {
+            var c = cols[j];
+            if (c === "concepto_analitico") hasConcepto = true;
+            else if (c && typeof c === "object" && (c.label === "concepto_analitico" || c.sqlExpression === "concepto_analitico")) {
+              hasConcepto = true;
+            }
+          }
+          if (!hasConcepto) continue;
+          q.orderby = [["concepto_analitico", true]];
+          changed = true;
+        }
+        return changed ? JSON.stringify(body) : bodyStr;
+      } catch (e) {
+        return bodyStr;
+      }
+    }
+
+    if (typeof window.fetch === "function") {
+      var origFetch = window.fetch;
+      window.fetch = function (input, init) {
+        var url = String(input && input.url ? input.url : input);
+        if (url.indexOf("chart/data") !== -1 && init && init.body) {
+          var next = rewriteBody(init.body);
+          if (next !== init.body) {
+            init = Object.assign({}, init, { body: next });
+          }
+        }
+        return origFetch.call(this, input, init);
+      };
+    }
+
+    var XO = XMLHttpRequest.prototype.open;
+    var XS = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function (method, url) {
+      this.__psUrl = url;
+      return XO.apply(this, arguments);
+    };
+    XMLHttpRequest.prototype.send = function (body) {
+      if (this.__psUrl && String(this.__psUrl).indexOf("chart/data") !== -1 && body) {
+        body = rewriteBody(body);
+      }
+      return XS.call(this, body);
+    };
+  })();
+
+  function isGastosChart(chart) {
+    var name = chart.getAttribute("data-test-chart-name") || "";
+    if (name.indexOf("Gastos") !== -1) return true;
+    var title = chart.querySelector(
+      '[data-test="slice-header"] .header-title, [data-test="slice-header"] .editable-title'
+    );
+    var t = title ? (title.textContent || "").replace(/\s+/g, " ").trim() : "";
+    return t === "Gastos" || t.indexOf("Gastos") === 0;
+  }
+
+  function getDefaultGastosWidths(chart) {
+    // Medir el card completo (no el center ya reducido por un pin previo).
+    var holder =
+      chart.closest('[data-test="dashboard-component-chart-holder"]') || chart;
+    var available = Math.max(
+      520,
+      Math.floor(holder.getBoundingClientRect().width || chart.clientWidth || 1200) -
+        24
+    );
+    // Total pinned a la derecha. Meses deben poder mostrar "713,072 €".
+    var totalW = 118;
+    var conceptoMin = 150;
+    var monthMin = 70;
+    var centerAvail = Math.max(400, available - totalW);
+    var monthW = Math.floor((centerAvail - conceptoMin) / 12);
+    if (monthW < monthMin) {
+      monthW = monthMin;
+      conceptoMin = Math.max(110, centerAvail - monthW * 12);
+    }
+    var concepto = centerAvail - monthW * 12;
+    if (concepto < 110) {
+      concepto = 110;
+      monthW = Math.max(64, Math.floor((centerAvail - concepto) / 12));
+      concepto = Math.max(110, centerAvail - monthW * 12);
+    }
+    while (concepto + monthW * 12 + totalW > available && monthW > 60) {
+      monthW -= 1;
+      concepto = Math.max(110, available - totalW - monthW * 12);
+    }
+    var map = {
+      concepto_analitico: concepto,
+      Total: totalW,
+    };
+    var months = [
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12",
+    ];
+    for (var i = 0; i < months.length; i++) map[months[i]] = monthW;
+    return map;
+  }
+
+  /** Aplica anchos y fija Total a la derecha (siempre visible). */
+  function applyGastosColumnLayout(api, chart) {
+    if (!api || !chart) return;
+    var map = getDefaultGastosWidths(chart);
+    var state = Object.keys(map).map(function (id) {
+      var row = { colId: id, width: map[id] };
+      if (id === "Total") row.pinned = "right";
+      else row.pinned = null;
+      return row;
+    });
+    try {
+      api.applyColumnState({ state: state, applyOrder: false });
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  function isGastosTotalClipped(chart) {
+    var totalHeader =
+      chart.querySelector('.ag-header-cell[col-id="Total"]') ||
+      chart.querySelector('.ag-pinned-right-header .ag-header-cell[col-id="Total"]');
+    if (!totalHeader) return true;
+    var hr = totalHeader.getBoundingClientRect();
+    if (hr.width < 90) return true;
+    var holder =
+      chart.closest('[data-test="dashboard-component-chart-holder"]') || chart;
+    var cr = holder.getBoundingClientRect();
+    if (hr.right > cr.right + 4) return true;
+    // Mes 12 también debe caber (síntoma de anchos doblemente restados)
+    var m12 = chart.querySelector('.ag-header-cell[col-id="12"]');
+    if (m12 && m12.getBoundingClientRect().width < 58) return true;
+    return false;
+  }
+
+  function ensureGastosColumnsFit(chart) {
+    if (!isGastosChart(chart) || !isGastosChartVisible(chart)) return;
+    var agTheme = chart.querySelector('[class*="ag-theme"]');
+    if (!agTheme) return;
+    var api = findAgGridApi(agTheme);
+    if (!api) return;
+    if (!api.__psGastosColPersistInit) {
+      initGastosColPersist(chart, api);
+      return;
+    }
+    if (isGastosTotalClipped(chart)) {
+      applyGastosColumnLayout(api, chart);
+      blankGastosNA(chart);
+      labelAgGridTotalsRow(chart);
+    }
+  }
+
+  function blankGastosNA(chart) {
+    var cells = chart.querySelectorAll(".ag-cell, .ag-floating-bottom .ag-cell");
+    for (var i = 0; i < cells.length; i++) {
+      var cell = cells[i];
+      var t = (cell.textContent || "").replace(/\u00a0/g, " ").trim();
+      if (t === "N/A" || t === "n/a") {
+        cell.textContent = "";
+      }
+    }
+  }
+
+  /**
+   * Cabecera «Concepto Analitico».
+   * NO aplicar sort en AG Grid: el orden viene de order_by_cols (SQL).
+   * applyColumnState(sort) provoca un refresh feo (reordenado en cliente).
+   */
+  function fixGastosConceptoColumn(api, chart) {
+    if (!api) return;
+    try {
+      var defs = typeof api.getColumnDefs === "function" ? api.getColumnDefs() : null;
+      if (defs && defs.length) {
+        var changed = false;
+        for (var i = 0; i < defs.length; i++) {
+          var d = defs[i] || {};
+          var id = String(d.colId || d.field || "");
+          if (id === "concepto_analitico" || id.indexOf("concepto_analitico") === 0) {
+            if (d.headerName !== "Concepto Analitico") {
+              d.headerName = "Concepto Analitico";
+              changed = true;
+            }
+          }
+        }
+        if (changed && typeof api.setColumnDefs === "function") {
+          api.setColumnDefs(defs);
+        }
+      }
+      if (typeof api.getColumn === "function") {
+        var col = api.getColumn("concepto_analitico");
+        if (col && col.getColDef) {
+          col.getColDef().headerName = "Concepto Analitico";
+          if (typeof api.refreshHeader === "function") api.refreshHeader();
+        }
+      }
+    } catch (err) { /* grid aún montando */ }
+
+    if (chart) {
+      var headers = chart.querySelectorAll(".ag-header-cell");
+      Array.prototype.forEach.call(headers, function (h) {
+        var colId = h.getAttribute("col-id") || "";
+        if (colId !== "concepto_analitico") return;
+        var label = h.querySelector(".ag-header-cell-text, .ag-header-cell-label");
+        if (label && /concepto_analitico/i.test(label.textContent || "")) {
+          label.textContent = "Concepto Analitico";
+        }
+      });
+    }
+  }
+
+  /** Una sola vez: quitar sort client-side residual sin reordenar en cada modelUpdated. */
+  function clearGastosClientSortOnce(api) {
+    if (!api || api.__psGastosSortCleared) return;
+    api.__psGastosSortCleared = true;
+    try {
+      if (typeof api.applyColumnState === "function") {
+        api.applyColumnState({
+          state: [{ colId: "concepto_analitico", sort: null }],
+          defaultState: { sort: null },
+        });
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function saveGastosWidthsLocal(map) {
+    try { localStorage.setItem(PS_GASTOS_COL_STORAGE_KEY, JSON.stringify(map)); } catch (e) { /* ignore */ }
+  }
+
+  function loadGastosWidthsLocal() {
+    // No restaurar anchos viejos que dejaban hueco a la derecha del card.
+    // Siempre recalcular al ancho actual; el usuario puede seguir redimensionando.
+    return null;
+  }
+
+  function initGastosColPersist(chart, api) {
+    if (api.__psGastosColPersistInit) return;
+    api.__psGastosColPersistInit = true;
+    chart.__psGastosColPersistInit = true;
+
+    function applyFit() {
+      applyGastosColumnLayout(api, chart);
+      clearGastosClientSortOnce(api);
+      fixGastosConceptoColumn(api, chart);
+      blankGastosNA(chart);
+      labelAgGridTotalsRow(chart);
+    }
+
+    api.sizeColumnsToFit = function () {
+      applyFit();
+    };
+
+    applyFit();
+    setTimeout(applyFit, 300);
+    setTimeout(applyFit, 900);
+    setTimeout(applyFit, 1800);
+
+    try {
+      api.addEventListener("columnResized", function (e) {
+        if (!e || !e.finished || e.source !== "uiColumnResized") return;
+        var map = getColWidthMap(api);
+        if (!map) return;
+        saveGastosWidthsLocal(map);
+      });
+      api.addEventListener("modelUpdated", function () {
+        fixGastosConceptoColumn(api, chart);
+        blankGastosNA(chart);
+      });
+      api.addEventListener("firstDataRendered", function () {
+        applyFit();
+      });
+    } catch (err) { /* grid aún montando */ }
+  }
+
+  function placeGastosSearchInHeader() {
+    var charts = document.querySelectorAll('[data-test-chart-name*="Gastos"]');
+    Array.prototype.forEach.call(charts, function (chart) {
+      var header = chart.querySelector('[data-test="slice-header"]');
+      var realInput = chart.querySelector(
+        ".dropdown-controls-container #filter-text-box"
+      );
+      var originalRow = chart.querySelector(".dropdown-controls-container");
+      if (!header || !realInput || !originalRow) return;
+
+      originalRow.style.setProperty("display", "none", "important");
+      if (originalRow.parentElement) {
+        originalRow.parentElement.style.setProperty("height", "100%", "important");
+      }
+
+      var proxy = header.querySelector(".ps-gastos-search-proxy");
+      if (proxy) {
+        proxy.placeholder = realInput.placeholder || "Buscar";
+        return;
+      }
+
+      proxy = document.createElement("input");
+      proxy.type = "text";
+      proxy.placeholder = realInput.placeholder || "Buscar";
+      proxy.className = "ps-gastos-search-proxy";
+      proxy.setAttribute("aria-label", "Buscar conceptos");
+      proxy.style.cssText = [
+        "border:1px solid #d9d9d9",
+        "border-radius:4px",
+        "padding:3px 9px",
+        "font-size:14px",
+        "height:28px",
+        "width:175px",
+        "outline:none",
+        "background:#fff",
+        "color:#333",
+        "flex:0 0 175px",
+        "margin-right:8px",
+      ].join(";");
+
+      proxy.addEventListener("input", function () {
+        var currentInput = chart.querySelector(
+          ".dropdown-controls-container #filter-text-box"
+        );
+        if (!currentInput) return;
+        var descriptor = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype,
+          "value"
+        );
+        descriptor.set.call(currentInput, proxy.value);
+        currentInput.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      proxy.addEventListener("focus", function () {
+        proxy.style.borderColor = "#007c89";
+      });
+      proxy.addEventListener("blur", function () {
+        proxy.style.borderColor = "#d9d9d9";
+      });
+
+      var headerControls = header.querySelector(".header-controls");
+      header.insertBefore(proxy, headerControls || header.lastChild);
+    });
+  }
+
+  /**
+   * Resumen mensual no tiene buscador, pero AG Grid deja una fila de controles
+   * vacía que añade ~7–11px entre título y tabla (Proyectos la oculta).
+   */
+  function hideResumenDropdownControls() {
+    var charts = document.querySelectorAll(
+      '[data-test-chart-name*="Resumen mensual"]'
+    );
+    Array.prototype.forEach.call(charts, function (chart) {
+      var row = chart.querySelector(".dropdown-controls-container");
+      if (!row) return;
+      row.style.setProperty("display", "none", "important");
+      row.style.setProperty("height", "0", "important");
+      row.style.setProperty("min-height", "0", "important");
+      row.style.setProperty("margin", "0", "important");
+      row.style.setProperty("padding", "0", "important");
+      if (row.parentElement) {
+        row.parentElement.style.setProperty("height", "100%", "important");
+      }
+    });
+  }
+
   /**
    * Coloca un buscador proxy inmediatamente antes del menú de tres puntos.
    * El input real permanece en AG Grid para conservar su lógica React, pero su
@@ -899,11 +1369,12 @@
   setInterval(function () {
     fixDoubleAppRootAnchors(document);
     fixUsersAnchors(document);
-    fixAgGridHeight();
     autoSizeAgGridColumns();
     hideResumenHeaderChrome();
     bumpProbabilidadChartFonts();
     placeProyectosSearchInHeader();
+    hideResumenDropdownControls();
+    placeGastosSearchInHeader();
     // Inicializar persistencia de anchos en el chart Proyectos (idempotente)
     var proyCharts = document.querySelectorAll('[data-test-chart-name*="Proyectos"]');
     Array.prototype.forEach.call(proyCharts, function (chart) {
@@ -915,6 +1386,20 @@
       // La guardia está en la instancia de API para sobrevivir recreaciones del DOM
       if (api && !api.__psColPersistInit) initProyectosColPersist(chart, api);
     });
+    var gastosCharts = document.querySelectorAll('[data-test-chart-name*="Gastos"]');
+    Array.prototype.forEach.call(gastosCharts, function (chart) {
+      if (!isGastosChart(chart)) return;
+      blankGastosNA(chart);
+      ensureGastosColumnsFit(chart);
+      var agTheme = chart.querySelector('[class*="ag-theme"]');
+      if (!agTheme) return;
+      var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
+      if (!rows.length) return;
+      var api = findAgGridApi(agTheme);
+      if (api && !api.__psGastosColPersistInit) initGastosColPersist(chart, api);
+      else if (api) blankGastosNA(chart);
+    });
+    labelAllAgGridTotals();
   }, 800);
 
   /**
@@ -1023,16 +1508,47 @@
     return null;
   }
 
-  /** Formatea importe con miles y sufijo € (paridad con currency_format EUR). */
+  /**
+   * Importe en miles con sufijo K€ (p. ej. 90000 → «90 K€»).
+   * Evita el número completo y el «90 €» cuando el valor era la categoría.
+   */
   function formatEuroAmount(val) {
     if (val == null || val === "") return "";
-    var n = typeof val === "number" ? val : Number(String(val).replace(/,/g, ""));
+    var raw = String(val).replace(/[^\d.-]/g, "");
+    var n = typeof val === "number" ? val : Number(raw);
     if (!isFinite(n)) return String(val);
+    var k = Math.round(n / 1000);
     return (
-      Math.round(n).toLocaleString("en-US", {
+      k.toLocaleString("es-ES", {
         maximumFractionDigits: 0,
-      }) + " €"
+      }) + " K€"
     );
+  }
+
+  /**
+   * En barra horizontal ECharts el value suele ser [importe, categoría] o
+   * [categoría, importe]. Elegimos el de mayor magnitud (facturación ≫ 0–100).
+   */
+  function pickSeriesAmount(p) {
+    var v =
+      p && p.value != null
+        ? p.value
+        : p && p.data != null
+          ? p.data
+          : null;
+    if (v && typeof v === "object" && !Array.isArray(v) && v.value != null) {
+      v = v.value;
+    }
+    if (Array.isArray(v)) {
+      var best = null;
+      for (var i = 0; i < v.length; i++) {
+        var n = typeof v[i] === "number" ? v[i] : Number(v[i]);
+        if (!isFinite(n)) continue;
+        if (best == null || Math.abs(n) > Math.abs(best)) best = n;
+      }
+      return best != null ? best : v[v.length - 1];
+    }
+    return v;
   }
 
   /** Categoría probabilidad: 100 → 100% (sin tocar si ya lleva %). */
@@ -1045,7 +1561,7 @@
 
   /**
    * Horizontal bar: eje categoría = yAxis (izq.), valores = xAxis (abajo).
-   * Añade % a la izquierda y € en importes (eje, labels, tooltip).
+   * Añade % a la izquierda e importes en K€ (eje, labels, tooltip).
    */
   function applyProbabilidadFont(inst, fontPx) {
     if (!inst || typeof inst.setOption !== "function") return;
@@ -1063,15 +1579,12 @@
       for (var s = 0; s < series.length; s++) {
         seriesPatch.push({
           label: Object.assign(
-            { show: true, formatter: function (p) {
-              var v =
-                p && p.value != null
-                  ? Array.isArray(p.value)
-                    ? p.value[p.value.length - 1]
-                    : p.value
-                  : p && p.data;
-              return formatEuroAmount(v);
-            } },
+            {
+              show: true,
+              formatter: function (p) {
+                return formatEuroAmount(pickSeriesAmount(p));
+              },
+            },
             labelStyle
           ),
         });
@@ -1083,13 +1596,7 @@
               {
                 show: true,
                 formatter: function (p) {
-                  var v =
-                    p && p.value != null
-                      ? Array.isArray(p.value)
-                        ? p.value[p.value.length - 1]
-                        : p.value
-                      : "";
-                  return formatEuroAmount(v);
+                  return formatEuroAmount(pickSeriesAmount(p));
                 },
               },
               labelStyle
@@ -1170,14 +1677,25 @@
     var origFill = proto.fillText;
     var origStroke = proto.strokeText;
     var PROB_RE = /^(100|90|70|50|30|10|0)$/;
-    var AMOUNT_RE = /^-?[\d,]+(\.\d+)?$/;
+    var AMOUNT_RE = /^-?[\d.,]+$/;
+    var EURO_RE = /^(-?[\d.,]+)\s*€$/;
     function rewriteText(raw) {
       var t = String(raw == null ? "" : raw).trim();
       if (!t) return raw;
+      if (t.indexOf("K€") !== -1) return raw;
       if (PROB_RE.test(t)) return t + "%";
-      if (AMOUNT_RE.test(t) && t.indexOf("%") === -1 && t.indexOf("€") === -1) {
+      var euroM = t.match(EURO_RE);
+      if (euroM) {
+        var nEuro = Number(String(euroM[1]).replace(/[^\d.-]/g, ""));
+        // Solo reconvertir importes reales; «90 €» erróneo (=categoría) no → K€
+        if (isFinite(nEuro) && Math.abs(nEuro) > 100) {
+          return formatEuroAmount(nEuro);
+        }
+        return raw;
+      }
+      if (AMOUNT_RE.test(t) && t.indexOf("%") === -1) {
         // Eje/valores grandes (p. ej. 2000000 o 2,000,000); no tocar 0–100 del eje cat.
-        var n = Number(t.replace(/,/g, ""));
+        var n = Number(t.replace(/[^\d.-]/g, ""));
         if (isFinite(n) && Math.abs(n) > 100) return formatEuroAmount(n);
       }
       return raw;

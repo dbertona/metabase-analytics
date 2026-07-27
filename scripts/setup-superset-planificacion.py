@@ -60,6 +60,7 @@ DATASETS = [
     "bi_v_evolucion_mensual",
     "bi_v_facturacion_probabilidad",
     "bi_v_resumen_proyectos",
+    "bi_v_unidad",
 ]
 
 
@@ -134,17 +135,35 @@ class SupersetClient:
     def ensure_dataset(self, db_id: int, table_name: str) -> int:
         q = {"filters": [{"col": "table_name", "opr": "eq", "value": table_name}]}
         res = self._request("GET", f"/api/v1/dataset/?q={urllib.parse.quote(json.dumps(q))}")
+        ds_id: int | None = None
         for item in res.get("result") or []:
             if item.get("database", {}).get("id") == db_id:
-                print(f"Dataset: {table_name} (id={item['id']})")
-                return item["id"]
-        ds_id = self._request(
-            "POST",
-            "/api/v1/dataset/",
-            {"database": db_id, "schema": "public", "table_name": table_name},
-        )["id"]
-        print(f"Dataset creado: {table_name} (id={ds_id})")
+                ds_id = int(item["id"])
+                break
+        if ds_id is None:
+            ds_id = int(
+                self._request(
+                    "POST",
+                    "/api/v1/dataset/",
+                    {"database": db_id, "schema": "public", "table_name": table_name},
+                )["id"]
+            )
+            print(f"Dataset creado: {table_name} (id={ds_id})")
+        else:
+            print(f"Dataset: {table_name} (id={ds_id})")
+        # Sincronizar columnas tras ALTER de vistas BI (p. ej. +proyecto).
+        self.refresh_dataset(ds_id)
         return ds_id
+
+    def refresh_dataset(self, ds_id: int) -> None:
+        for method in ("PUT", "POST"):
+            try:
+                self._request(method, f"/api/v1/dataset/{ds_id}/refresh")
+                print(f"  columnas refrescadas (dataset id={ds_id})")
+                return
+            except RuntimeError:
+                continue
+        print(f"  aviso: no se pudo refrescar columnas dataset id={ds_id}")
 
     def list_charts(self) -> list[dict[str, Any]]:
         res = self._request(
@@ -281,11 +300,11 @@ def dim_adhoc_filters(*extra_cols: str) -> list[dict[str, Any]]:
 def probabilidad_bar_params() -> dict[str, Any]:
     """Barras PBI: probabilidad (100..10) × facturación P+R.
     Superset 6.1: dist_bar legacy no está registrado → echarts_timeseries_bar.
-    Importes en € vía currency_format; el % en etiquetas de categoría lo aplica
-    tail_js (formatter ECharts) — no usar x_axis_title '%' (queda flotando).
+    Importes en K€ vía tail_js (formatter ECharts); el % en categorías también.
+    No usar x_axis_title '%' (queda flotando).
     """
     return {
-        "adhoc_filters": dim_adhoc_filters(),
+        "adhoc_filters": dim_adhoc_filters("proyecto"),
         "x_axis": "probabilidad",
         "metrics": [metric_sum("facturacion", "Facturación")],
         "groupby": [],
@@ -311,7 +330,7 @@ def resumen_mensual_params() -> dict[str, Any]:
     """Tabla PBI Resumen: AñoMes | Fact. | Coste | Margen % (agregada)."""
     # Orden backend robusto: year+month ASC (evita orden erróneo por Fact. DESC).
     return {
-        "adhoc_filters": dim_adhoc_filters("tipo"),
+        "adhoc_filters": dim_adhoc_filters("tipo", "proyecto"),
         "query_mode": "aggregate",
         "groupby": ["year", "month", "ano_mes"],
         "metrics": [
@@ -360,7 +379,7 @@ def resumen_mensual_params() -> dict[str, Any]:
 def resumen_proyectos_params() -> dict[str, Any]:
     """Tabla PBI Resumen Proyectos: Proyecto | Fact. | Coste | Margen %."""
     return {
-        "adhoc_filters": dim_adhoc_filters("tipo"),
+        "adhoc_filters": dim_adhoc_filters("tipo", "proyecto"),
         "query_mode": "aggregate",
         "groupby": ["proyecto"],
         "metrics": [
@@ -412,6 +431,76 @@ def resumen_proyectos_params() -> dict[str, Any]:
     }
 
 
+def gastos_unidad_params() -> dict[str, Any]:
+    """Tabla PBI Unidad/Gastos: Concepto × meses 01-12 + Total (coste, Structure)."""
+    month_cols = [
+        ("m01", "01"),
+        ("m02", "02"),
+        ("m03", "03"),
+        ("m04", "04"),
+        ("m05", "05"),
+        ("m06", "06"),
+        ("m07", "07"),
+        ("m08", "08"),
+        ("m09", "09"),
+        ("m10", "10"),
+        ("m11", "11"),
+        ("m12", "12"),
+        ("total", "Total"),
+    ]
+    column_config: dict[str, Any] = {
+        "concepto_analitico": {
+            "customColumnName": "Concepto Analitico",
+            "truncateLongCells": True,
+            "columnWidth": 220,
+        },
+    }
+    metrics: list[dict[str, Any]] = []
+    for col, label in month_cols:
+        metrics.append(metric_sum(col, label))
+        column_config[label] = {
+            "d3NumberFormat": ",.0f",
+            "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
+            "showCellBars": False,
+            "truncateLongCells": True,
+            # Total más ancho; meses compactos para que quepa en el card
+            "columnWidth": 128 if label == "Total" else 70,
+        }
+    return {
+        "adhoc_filters": dim_adhoc_filters("tipo"),
+        "query_mode": "aggregate",
+        "groupby": ["concepto_analitico"],
+        "metrics": metrics,
+        "percent_metrics": [],
+        # Forzar ORDER BY concepto en SQL. En ag-grid-table, order_by_cols con
+        # solo el nombre de dimensión se ignora y cae al 1er metric (m01 DESC) —
+        # eso dejaba filas desordenadas y un refresh feo al reordenar en cliente.
+        "order_by_cols": [
+            json.dumps(
+                [
+                    {
+                        "expressionType": "SQL",
+                        "sqlExpression": "concepto_analitico",
+                        "label": "orden_concepto",
+                    },
+                    True,
+                ],
+                ensure_ascii=False,
+            ),
+        ],
+        "order_desc": False,
+        "row_limit": 5000,
+        "server_pagination": False,
+        "show_totals": True,
+        "include_search": True,
+        "show_cell_bars": False,
+        "color_pn": False,
+        "align_pn": False,
+        "table_timestamp_format": "smart_date",
+        "column_config": column_config,
+    }
+
+
 def big_number_params(metric: dict[str, Any], fmt: str, *, currency: bool = False) -> dict[str, Any]:
     # header_font_size es factor × 16px; 1.25 ≈ 20px (Segoe UI solicitado)
     # subheader = etiqueta bajo el valor (Facturación, Margen, etc.) como en Power BI
@@ -444,22 +533,54 @@ def persist_dashboard_config(
     client: SupersetClient,
     dash_id: int,
     dataset_ids: dict[str, int],
-    chart_ids: list[int],
+    charts: list[dict[str, Any]],
 ) -> None:
     # KPI cards (bi_v_planificacion_kpi) exponen year/empresa/department_code vía
     # adhoc_filters IS NOT NULL (ver dim_adhoc_filters). Valores de filtro Tipo
-    # siguen en bi_v_evolucion_mensual.
+    # siguen en bi_v_evolucion_mensual; Proyectos en bi_v_resumen_proyectos.
     detail_ds = dataset_ids["bi_v_planificacion_kpi"]
     evo_ds = dataset_ids["bi_v_evolucion_mensual"]
-    kpi_chart_ids = chart_ids[:8]  # 8 tarjetas Obj/Plan
-    # order: resumen mensual, proyectos, prob, evo, margen
-    table_id = chart_ids[8]
-    projects_id = chart_ids[9]
-    prob_chart_ids = [chart_ids[10]] if len(chart_ids) > 10 else []
-    evo_chart_ids = chart_ids[11:13]  # Evolución + Margen (filtro Tipo)
-    filter_scope_all = (
-        kpi_chart_ids + [table_id, projects_id] + evo_chart_ids + prob_chart_ids
+    proy_ds = dataset_ids["bi_v_resumen_proyectos"]
+    by_name = {c["name"]: c["id"] for c in charts}
+    kpi_chart_ids = [
+        by_name[n]
+        for n in (
+            "Obj · Facturación",
+            "Obj · Margen",
+            "Obj · Crecimiento",
+            "Obj · Beneficio",
+            "Plan · Facturación",
+            "Plan · Margen",
+            "Plan · Crecimiento",
+            "Plan · Beneficio",
+        )
+        if n in by_name
+    ]
+    table_id = by_name["Resumen mensual"]
+    projects_id = by_name["Proyectos"]
+    gastos_id = by_name.get("Gastos")
+    prob_chart_ids = (
+        [by_name["Facturación por Probabilidad"]]
+        if "Facturación por Probabilidad" in by_name
+        else []
     )
+    evo_chart_ids = [
+        by_name[n]
+        for n in ("Evolución mensual", "Margen acumulado")
+        if n in by_name
+    ]
+    # Filtro proyecto: tablas/gráficos con columna proyecto (no KPIs ni Gastos).
+    project_filter_charts = (
+        [table_id, projects_id] + evo_chart_ids + prob_chart_ids
+    )
+    filter_scope_all = (
+        kpi_chart_ids
+        + [table_id, projects_id]
+        + ([gastos_id] if gastos_id else [])
+        + evo_chart_ids
+        + prob_chart_ids
+    )
+    tabs_all = ["TAB-RESUMEN", "TAB-UNIDAD", "TAB-GRAFICOS"]
 
     dashboard_css = (
         "/* Power BI look: Segoe UI 20px en valor KPI */\n"
@@ -479,6 +600,197 @@ def persist_dashboard_config(
         ".dashboard-component-tabs, "
         ".dashboard-component-tabs .ant-tabs-nav {\n"
         "  background: transparent !important;\n"
+        "}\n"
+        "/*\n"
+        " * Fit-to-viewport:\n"
+        " * Superset fija la altura de la fila de tabs en el layout JSON; height:100%\n"
+        " * no llega al viewport y deja un hueco gris + scroll. Forzamos esa fila.\n"
+        " */\n"
+        ":root {\n"
+        "  --ps-dash-top: 126px;\n"
+        "  --ps-tables-top: 510px;\n"
+        "  --ps-unidad-top: 200px;\n"
+        "}\n"
+        "html, body, #app {\n"
+        "  height: 100dvh !important;\n"
+        "  max-height: 100dvh !important;\n"
+        "  overflow: hidden !important;\n"
+        "}\n"
+        ".dashboard-content,\n"
+        ".grid-content {\n"
+        "  height: calc(100dvh - var(--ps-dash-top)) !important;\n"
+        "  max-height: calc(100dvh - var(--ps-dash-top)) !important;\n"
+        "  overflow: hidden !important;\n"
+        "  box-sizing: border-box !important;\n"
+        "}\n"
+        "/* La fila del componente Tabs debe llenar el shell (no la altura del JSON) */\n"
+        ".grid-row:has(.dashboard-component-tabs),\n"
+        ".dragdroppable-row:has(.dashboard-component-tabs),\n"
+        ".dragdroppable:has(> .dashboard-component-tabs),\n"
+        ".resizable-container:has(.dashboard-component-tabs),\n"
+        ".dashboard-component-tabs {\n"
+        "  height: calc(100dvh - var(--ps-dash-top)) !important;\n"
+        "  max-height: calc(100dvh - var(--ps-dash-top)) !important;\n"
+        "  min-height: 0 !important;\n"
+        "}\n"
+        ".dashboard-component-tabs .ant-tabs {\n"
+        "  height: 100% !important;\n"
+        "  max-height: 100% !important;\n"
+        "  display: flex !important;\n"
+        "  flex-direction: column !important;\n"
+        "  overflow: hidden !important;\n"
+        "}\n"
+        ".dashboard-component-tabs .ant-tabs-nav {\n"
+        "  flex: 0 0 auto !important;\n"
+        "}\n"
+        ".dashboard-component-tabs .ant-tabs-content-holder,\n"
+        ".dashboard-component-tabs .ant-tabs-content,\n"
+        ".dashboard-component-tabs .ant-tabs-tabpane-active,\n"
+        ".dashboard-component-tabs-content {\n"
+        "  flex: 1 1 auto !important;\n"
+        "  height: auto !important;\n"
+        "  max-height: none !important;\n"
+        "  min-height: 0 !important;\n"
+        "  overflow: hidden !important;\n"
+        "}\n"
+        "/* Fila de tablas: resto del viewport bajo KPIs */\n"
+        ".grid-row:has([data-test-chart-name*='Resumen mensual']),\n"
+        ".dragdroppable-row:has([data-test-chart-name*='Resumen mensual']) {\n"
+        "  height: calc(100dvh - var(--ps-tables-top)) !important;\n"
+        "  max-height: calc(100dvh - var(--ps-tables-top)) !important;\n"
+        "  min-height: 220px !important;\n"
+        "}\n"
+        "/* Solo el card externo usa calc; el interior es 100% (si no, el pie se recorta) */\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Resumen mensual'],\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Proyectos'] {\n"
+        "  height: calc(100dvh - var(--ps-tables-top)) !important;\n"
+        "  max-height: calc(100dvh - var(--ps-tables-top)) !important;\n"
+        "  min-height: 220px !important;\n"
+        "  display: flex !important;\n"
+        "  flex-direction: column !important;\n"
+        "}\n"
+        ".resizable-container:has([data-test-chart-name*='Resumen mensual']),\n"
+        ".resizable-container:has([data-test-chart-name*='Proyectos']),\n"
+        ".dragdroppable-column:has([data-test-chart-name*='Resumen mensual']),\n"
+        ".dragdroppable-column:has([data-test-chart-name*='Proyectos']) {\n"
+        "  height: 100% !important;\n"
+        "  max-height: 100% !important;\n"
+        "  min-height: 0 !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Resumen mensual'],\n"
+        "[data-test-chart-name*='Proyectos'] {\n"
+        "  flex: 1 1 auto !important;\n"
+        "  height: 100% !important;\n"
+        "  max-height: 100% !important;\n"
+        "  min-height: 0 !important;\n"
+        "  display: flex !important;\n"
+        "  flex-direction: column !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Resumen mensual'] .slice_container,\n"
+        "[data-test-chart-name*='Proyectos'] .slice_container,\n"
+        "[data-test-chart-name*='Resumen mensual'] .chart-container,\n"
+        "[data-test-chart-name*='Proyectos'] .chart-container {\n"
+        "  height: 100% !important;\n"
+        "  max-height: 100% !important;\n"
+        "  min-height: 0 !important;\n"
+        "  flex: 1 1 auto !important;\n"
+        "  position: relative !important;\n"
+        "  overflow: hidden !important;\n"
+        "}\n"
+        "/* ag-theme ignora max-height:% si hay wrappers intermedios; anclar al contenedor */\n"
+        "[data-test-chart-name*='Resumen mensual'] [class*='ag-theme'],\n"
+        "[data-test-chart-name*='Proyectos'] [class*='ag-theme'] {\n"
+        "  position: absolute !important;\n"
+        "  inset: 0 !important;\n"
+        "  width: 100% !important;\n"
+        "  height: auto !important;\n"
+        "  max-height: none !important;\n"
+        "  min-height: 0 !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-root-wrapper,\n"
+        "[data-test-chart-name*='Proyectos'] .ag-root-wrapper,\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-root-wrapper-body,\n"
+        "[data-test-chart-name*='Proyectos'] .ag-root-wrapper-body,\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-root,\n"
+        "[data-test-chart-name*='Proyectos'] .ag-root {\n"
+        "  height: 100% !important;\n"
+        "  max-height: 100% !important;\n"
+        "  min-height: 0 !important;\n"
+        "  width: 100% !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-root,\n"
+        "[data-test-chart-name*='Proyectos'] .ag-root {\n"
+        "  display: flex !important;\n"
+        "  flex-direction: column !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-body-viewport,\n"
+        "[data-test-chart-name*='Proyectos'] .ag-body-viewport {\n"
+        "  flex: 1 1 auto !important;\n"
+        "  min-height: 0 !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-floating-bottom,\n"
+        "[data-test-chart-name*='Proyectos'] .ag-floating-bottom {\n"
+        "  flex-shrink: 0 !important;\n"
+        "}\n"
+        "/* Gastos (Unidad) */\n"
+        ".grid-row:has([data-test-chart-name*='Gastos']),\n"
+        ".dragdroppable-row:has([data-test-chart-name*='Gastos']) {\n"
+        "  height: calc(100dvh - var(--ps-unidad-top)) !important;\n"
+        "  max-height: calc(100dvh - var(--ps-unidad-top)) !important;\n"
+        "  min-height: 220px !important;\n"
+        "}\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Gastos'] {\n"
+        "  height: calc(100dvh - var(--ps-unidad-top)) !important;\n"
+        "  max-height: calc(100dvh - var(--ps-unidad-top)) !important;\n"
+        "  min-height: 220px !important;\n"
+        "  display: flex !important;\n"
+        "  flex-direction: column !important;\n"
+        "}\n"
+        ".resizable-container:has([data-test-chart-name*='Gastos']) {\n"
+        "  height: 100% !important;\n"
+        "  max-height: 100% !important;\n"
+        "  min-height: 0 !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Gastos'] {\n"
+        "  flex: 1 1 auto !important;\n"
+        "  height: 100% !important;\n"
+        "  max-height: 100% !important;\n"
+        "  min-height: 0 !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Gastos'] .slice_container,\n"
+        "[data-test-chart-name*='Gastos'] .chart-container {\n"
+        "  height: 100% !important;\n"
+        "  max-height: 100% !important;\n"
+        "  min-height: 0 !important;\n"
+        "  position: relative !important;\n"
+        "  overflow: hidden !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Gastos'] [class*='ag-theme'] {\n"
+        "  position: absolute !important;\n"
+        "  inset: 0 !important;\n"
+        "  width: 100% !important;\n"
+        "  height: auto !important;\n"
+        "  max-height: none !important;\n"
+        "  min-height: 0 !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Gastos'] .ag-root-wrapper,\n"
+        "[data-test-chart-name*='Gastos'] .ag-root-wrapper-body,\n"
+        "[data-test-chart-name*='Gastos'] .ag-root {\n"
+        "  height: 100% !important;\n"
+        "  max-height: 100% !important;\n"
+        "  min-height: 0 !important;\n"
+        "  width: 100% !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Gastos'] .ag-root {\n"
+        "  display: flex !important;\n"
+        "  flex-direction: column !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Gastos'] .ag-body-viewport {\n"
+        "  flex: 1 1 auto !important;\n"
+        "  min-height: 0 !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Gastos'] .ag-floating-bottom {\n"
+        "  flex-shrink: 0 !important;\n"
         "}\n"
         "/* Card base: blanca, radio, sombra suave */\n"
         ".dashboard-component-chart-holder {\n"
@@ -529,13 +841,49 @@ def persist_dashboard_config(
         "}\n"
         "/* Tablas: padding uniforme sin alterar el layout nativo del card */\n"
         ".dashboard-component-chart-holder[data-test-chart-name*='Resumen mensual'],\n"
-        ".dashboard-component-chart-holder[data-test-chart-name*='Proyectos'] {\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Proyectos'],\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Gastos'] {\n"
         "  padding: 8px !important;\n"
+        "}\n"
+        "/* Gastos (Unidad): ocupar alto disponible sin scroll de página */\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Gastos'] {\n"
+        "  width: 100% !important;\n"
+        "  max-width: 100% !important;\n"
+        "  margin-left: 0 !important;\n"
+        "  margin-right: 0 !important;\n"
+        "  display: flex !important;\n"
+        "  flex-direction: column !important;\n"
+        "}\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Gastos'] .chart-slice {\n"
+        "  display: flex !important;\n"
+        "  flex-direction: column !important;\n"
+        "  height: 100% !important;\n"
+        "  flex: 1 1 auto !important;\n"
+        "  min-height: 0 !important;\n"
+        "}\n"
+        ".dragdroppable-row:has([data-test-chart-name*='Gastos']),\n"
+        ".grid-row:has([data-test-chart-name*='Gastos']) {\n"
+        "  width: 100% !important;\n"
+        "  max-width: 100% !important;\n"
+        "}\n"
+        "/* Altura de Gastos: layout nativo AG Grid / Superset (sin --ps-gastos-h). */\n"
+        "/*\n"
+        " * Panel de filtros: el contenido desbordaba ~80px y generaba scroll de página.\n"
+        " * Solo el panel (no el hijo sticky de altura 0): overflow interno.\n"
+        " * NO aplicar max-height/overflow al > div — colapsa los controles.\n"
+        " */\n"
+        "[data-test='dashboard-filters-panel'] {\n"
+        "  overflow-x: hidden !important;\n"
+        "  overflow-y: auto !important;\n"
+        "  max-height: 100% !important;\n"
         "}\n"
         "/* ⋮ visible alineado con el titulo — Superset 6.x usa data-test=slice-header */\n"
         ".dashboard-component-chart-holder[data-test-chart-name*='Resumen mensual']"
         " [data-test='slice-header'] .header-controls,\n"
         ".dashboard-component-chart-holder[data-test-chart-name*='Proyectos']"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Gastos']"
+        " [data-test='slice-header'] .header-controls,\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Gastos']"
         " [data-test='slice-header'] .header-controls {\n"
         "  display: flex !important;\n"
         "  align-items: center !important;\n"
@@ -727,18 +1075,35 @@ def persist_dashboard_config(
         "[data-test-chart-name*='Resumen mensual'] select[aria-label*='page'],\n"
         "[data-test-chart-name*='Resumen mensual'] .row-count-container,\n"
         "[data-test-chart-name*='Proyectos'] .dt-length,\n"
+        "[data-test-chart-name*='Gastos'] .dt-length,\n"
         "[data-test-chart-name*='Proyectos'] .dataTables_length,\n"
+        "[data-test-chart-name*='Gastos'] .dataTables_length,\n"
         "[data-test-chart-name*='Proyectos'] .ant-pagination,\n"
+        "[data-test-chart-name*='Gastos'] .ant-pagination,\n"
         "[data-test-chart-name*='Proyectos'] .pagination-container,\n"
+        "[data-test-chart-name*='Gastos'] .pagination-container,\n"
         "[data-test-chart-name*='Proyectos'] select[aria-label*='page'],\n"
-        "[data-test-chart-name*='Proyectos'] .row-count-container {\n"
+        "[data-test-chart-name*='Gastos'] select[aria-label*='page'],\n"
+        "[data-test-chart-name*='Proyectos'] .row-count-container,\n"
+        "[data-test-chart-name*='Gastos'] .row-count-container {\n"
         "  display: none !important;\n"
+        "}\n"
+        "/* Resumen: sin fila de controles vacía (Proyectos la oculta al mover el buscador) */\n"
+        "[data-test-chart-name*='Resumen mensual'] .dropdown-controls-container {\n"
+        "  display: none !important;\n"
+        "  height: 0 !important;\n"
+        "  min-height: 0 !important;\n"
+        "  margin: 0 !important;\n"
+        "  padding: 0 !important;\n"
+        "  overflow: hidden !important;\n"
         "}\n"
         "/* Cabeceras: sin wrap + borde inferior + fuente (1.56em × 0.85 → 1.33em) */\n"
         "[data-test-chart-name*='Resumen mensual'] thead th,\n"
         "[data-test-chart-name*='Proyectos'] thead th,\n"
+        "[data-test-chart-name*='Gastos'] thead th,\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-header-cell,\n"
-        "[data-test-chart-name*='Proyectos'] .ag-header-cell {\n"
+        "[data-test-chart-name*='Proyectos'] .ag-header-cell,\n"
+        "[data-test-chart-name*='Gastos'] .ag-header-cell {\n"
         "  white-space: nowrap !important;\n"
         "  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;\n"
         "  font-size: 1.26em !important;\n"
@@ -748,16 +1113,20 @@ def persist_dashboard_config(
         "/* Celdas: font 1.33em (table + AG Grid) */\n"
         "[data-test-chart-name*='Resumen mensual'] td,\n"
         "[data-test-chart-name*='Proyectos'] td,\n"
+        "[data-test-chart-name*='Gastos'] td,\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-cell,\n"
-        "[data-test-chart-name*='Proyectos'] .ag-cell {\n"
+        "[data-test-chart-name*='Proyectos'] .ag-cell,\n"
+        "[data-test-chart-name*='Gastos'] .ag-cell {\n"
         "  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;\n"
         "  font-size: 1.26em !important;\n"
         "}\n"
         "/* Tablas: altura completa — propagar height por toda la cadena */\n"
         "[data-test-chart-name*='Resumen mensual'] .slice_container,\n"
         "[data-test-chart-name*='Proyectos'] .slice_container,\n"
+        "[data-test-chart-name*='Gastos'] .slice_container,\n"
         "[data-test-chart-name*='Resumen mensual'] .chart-container,\n"
-        "[data-test-chart-name*='Proyectos'] .chart-container {\n"
+        "[data-test-chart-name*='Proyectos'] .chart-container,\n"
+        "[data-test-chart-name*='Gastos'] .chart-container {\n"
         "  height: calc(100% - 8px) !important;\n"
         "  overflow: hidden !important;\n"
         "  display: flex !important;\n"
@@ -765,49 +1134,92 @@ def persist_dashboard_config(
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] .slice_container > div,\n"
         "[data-test-chart-name*='Proyectos'] .slice_container > div,\n"
+        "[data-test-chart-name*='Gastos'] .slice_container > div,\n"
         "[data-test-chart-name*='Resumen mensual'] .chart-container > div,\n"
-        "[data-test-chart-name*='Proyectos'] .chart-container > div {\n"
+        "[data-test-chart-name*='Proyectos'] .chart-container > div,\n"
+        "[data-test-chart-name*='Gastos'] .chart-container > div {\n"
         "  height: 100% !important;\n"
         "  flex: 1 1 auto !important;\n"
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] [class*='ag-theme'],\n"
-        "[data-test-chart-name*='Proyectos'] [class*='ag-theme'] {\n"
+        "[data-test-chart-name*='Proyectos'] [class*='ag-theme'],\n"
+        "[data-test-chart-name*='Gastos'] [class*='ag-theme'] {\n"
         "  height: 100% !important;\n"
+        "  min-height: 100% !important;\n"
+        "  flex: 1 1 auto !important;\n"
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-root-wrapper,\n"
-        "[data-test-chart-name*='Proyectos'] .ag-root-wrapper {\n"
+        "[data-test-chart-name*='Proyectos'] .ag-root-wrapper,\n"
+        "[data-test-chart-name*='Gastos'] .ag-root-wrapper {\n"
         "  height: 100% !important;\n"
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-root-wrapper-body,\n"
-        "[data-test-chart-name*='Proyectos'] .ag-root-wrapper-body {\n"
+        "[data-test-chart-name*='Proyectos'] .ag-root-wrapper-body,\n"
+        "[data-test-chart-name*='Gastos'] .ag-root-wrapper-body {\n"
         "  height: 100% !important;\n"
         "  flex: 1 1 auto !important;\n"
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-root,\n"
-        "[data-test-chart-name*='Proyectos'] .ag-root {\n"
+        "[data-test-chart-name*='Proyectos'] .ag-root,\n"
+        "[data-test-chart-name*='Gastos'] .ag-root {\n"
         "  height: 100% !important;\n"
         "}\n"
         "/* Ocultar barras internas */\n"
         "[data-test-chart-name*='Resumen mensual'] .cell-bar,\n"
         "[data-test-chart-name*='Resumen mensual'] .cell-bars,\n"
         "[data-test-chart-name*='Proyectos'] .cell-bar,\n"
-        "[data-test-chart-name*='Proyectos'] .cell-bars {\n"
+        "[data-test-chart-name*='Gastos'] .cell-bar,\n"
+        "[data-test-chart-name*='Proyectos'] .cell-bars,\n"
+        "[data-test-chart-name*='Gastos'] .cell-bars {\n"
         "  display: none !important;\n"
         "}\n"
-        "/* Totales AG Grid: ocultar etiqueta Summary/Resumen + icono info */\n"
-        "[data-test-chart-name*='Resumen mensual'] .ag-floating-bottom .ag-cell[col-id='ano_mes'],\n"
-        "[data-test-chart-name*='Proyectos'] .ag-floating-bottom .ag-cell[col-id='proyecto'] {\n"
-        "  visibility: hidden !important;\n"
-        "}\n"
+        "/* Totales AG Grid: fila fija visible; etiqueta «Total» vía JS */\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-floating-bottom .anticon,\n"
-        "[data-test-chart-name*='Proyectos'] .ag-floating-bottom .anticon {\n"
+        "[data-test-chart-name*='Proyectos'] .ag-floating-bottom .anticon,\n"
+        "[data-test-chart-name*='Gastos'] .ag-floating-bottom .anticon {\n"
         "  display: none !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-floating-bottom,\n"
+        "[data-test-chart-name*='Proyectos'] .ag-floating-bottom,\n"
+        "[data-test-chart-name*='Gastos'] .ag-floating-bottom {\n"
+        "  flex-shrink: 0 !important;\n"
+        "  min-height: 40px !important;\n"
+        "  height: 40px !important;\n"
+        "  border-top: 3px solid #475569 !important;\n"
+        "  background: #e2e8f0 !important;\n"
+        "  z-index: 20 !important;\n"
+        "  overflow: visible !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Resumen mensual'] .ag-floating-bottom .ag-cell,\n"
+        "[data-test-chart-name*='Proyectos'] .ag-floating-bottom .ag-cell,\n"
+        "[data-test-chart-name*='Gastos'] .ag-floating-bottom .ag-cell {\n"
+        "  font-weight: 700 !important;\n"
+        "  color: #0f172a !important;\n"
+        "  background: #e2e8f0 !important;\n"
+        "}\n"
+        "/* Evitar que ag-theme recorte el pie (el holder ya hace de máscara) */\n"
+        "[data-test-chart-name*='Gastos'] [class*='ag-theme'],\n"
+        "[data-test-chart-name*='Gastos'] .slice_container,\n"
+        "[data-test-chart-name*='Gastos'] .chart-container {\n"
+        "  overflow: visible !important;\n"
+        "}\n"
+        "/* Total fijado a la derecha: siempre visible */\n"
+        "[data-test-chart-name*='Gastos'] .ag-pinned-right-cols-container,\n"
+        "[data-test-chart-name*='Gastos'] .ag-pinned-right-header,\n"
+        "[data-test-chart-name*='Gastos'] .ag-pinned-right-floating-bottom {\n"
+        "  min-width: 128px !important;\n"
+        "}\n"
+        "[data-test-chart-name*='Gastos'] .ag-header-cell[col-id='Total'],\n"
+        "[data-test-chart-name*='Gastos'] .ag-cell[col-id='Total'] {\n"
+        "  font-weight: 600 !important;\n"
         "}\n"
         "/* Sin scroll horizontal fantasma (anchos se ajustan por JS) */\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-body-horizontal-scroll,\n"
         "[data-test-chart-name*='Proyectos'] .ag-body-horizontal-scroll,\n"
+        "[data-test-chart-name*='Gastos'] .ag-body-horizontal-scroll,\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-body-horizontal-scroll-viewport,\n"
-        "[data-test-chart-name*='Proyectos'] .ag-body-horizontal-scroll-viewport {\n"
+        "[data-test-chart-name*='Proyectos'] .ag-body-horizontal-scroll-viewport,\n"
+        "[data-test-chart-name*='Gastos'] .ag-body-horizontal-scroll-viewport {\n"
         "  display: none !important;\n"
         "  height: 0 !important;\n"
         "  min-height: 0 !important;\n"
@@ -816,8 +1228,10 @@ def persist_dashboard_config(
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-center-cols-viewport,\n"
         "[data-test-chart-name*='Proyectos'] .ag-center-cols-viewport,\n"
+        "[data-test-chart-name*='Gastos'] .ag-center-cols-viewport,\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-header-viewport,\n"
-        "[data-test-chart-name*='Proyectos'] .ag-header-viewport {\n"
+        "[data-test-chart-name*='Proyectos'] .ag-header-viewport,\n"
+        "[data-test-chart-name*='Gastos'] .ag-header-viewport {\n"
         "  overflow-x: hidden !important;\n"
         "}\n"
         "/* Resumen mensual: ocultar year/month (solo sirven para orden cronológico) */\n"
@@ -877,7 +1291,7 @@ def persist_dashboard_config(
                 "cascadeParentIds": [],
                 "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
                 "chartsInScope": filter_scope_all,
-                "tabsInScope": ["TAB-RESUMEN", "TAB-GRAFICOS"],
+                "tabsInScope": tabs_all,
             },
             {
                 "id": "NATIVE_FILTER-EMPRESA",
@@ -901,7 +1315,7 @@ def persist_dashboard_config(
                 "cascadeParentIds": [],
                 "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
                 "chartsInScope": filter_scope_all,
-                "tabsInScope": ["TAB-RESUMEN", "TAB-GRAFICOS"],
+                "tabsInScope": tabs_all,
             },
             {
                 "id": "NATIVE_FILTER-DEPT",
@@ -920,7 +1334,7 @@ def persist_dashboard_config(
                 "cascadeParentIds": [],
                 "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
                 "chartsInScope": filter_scope_all,
-                "tabsInScope": ["TAB-RESUMEN", "TAB-GRAFICOS"],
+                "tabsInScope": tabs_all,
             },
             {
                 "id": "NATIVE_FILTER-TIPO",
@@ -932,8 +1346,28 @@ def persist_dashboard_config(
                 "controlValues": {"multiSelect": False, "enableEmptyFilter": False},
                 "cascadeParentIds": [],
                 "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
-                "chartsInScope": evo_chart_ids + [table_id, projects_id],
-                "tabsInScope": ["TAB-RESUMEN", "TAB-GRAFICOS"],
+                "chartsInScope": evo_chart_ids
+                + [table_id, projects_id]
+                + ([gastos_id] if gastos_id else []),
+                "tabsInScope": tabs_all,
+            },
+            {
+                "id": "NATIVE_FILTER-PROYECTO",
+                "name": "Proyectos",
+                "filterType": "filter_select",
+                "type": "NATIVE_FILTER",
+                "targets": [{"datasetId": proy_ds, "column": {"name": "proyecto"}}],
+                "defaultDataMask": {"filterState": {"value": None}},
+                "controlValues": {
+                    "multiSelect": True,
+                    "enableEmptyFilter": False,
+                    "sortAscending": True,
+                    "searchAllOptions": True,
+                },
+                "cascadeParentIds": [],
+                "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
+                "chartsInScope": project_filter_charts,
+                "tabsInScope": tabs_all,
             },
         ],
     }
@@ -947,16 +1381,17 @@ def persist_dashboard_config(
     )
     print(
         f"Dashboard config persistida vía API "
-        f"(filtros evo_ds={evo_ds} + KPI detail_ds={detail_ds})"
+        f"(filtros evo_ds={evo_ds} + KPI detail_ds={detail_ds} + proy_ds={proy_ds})"
     )
 
 
 def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
-    """Layout con pestañas: Resumen (KPI+tablas) | Gráficos (evolución)."""
+    """Layout: Resumen | Gráficos | Unidad (Gastos Structure)."""
     obj_keys = [c["key"] for c in charts if c["section"] == "obj"]
     plan_keys = [c["key"] for c in charts if c["section"] == "plan"]
     table_keys = [c["key"] for c in charts if c["section"] == "table"]
     projects_keys = [c["key"] for c in charts if c["section"] == "projects"]
+    unidad_keys = [c["key"] for c in charts if c["section"] == "unidad"]
     prob_keys = [c["key"] for c in charts if c["section"] == "prob"]
     chart_keys = [c["key"] for c in charts if c["section"] == "chart"]
     prob_key = prob_keys[0] if prob_keys else None
@@ -965,6 +1400,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
     kpi_col_width = 6
     tab_resumen = ["ROOT_ID", "GRID_ID", "TABS-MAIN", "TAB-RESUMEN"]
     tab_graficos = ["ROOT_ID", "GRID_ID", "TABS-MAIN", "TAB-GRAFICOS"]
+    tab_unidad = ["ROOT_ID", "GRID_ID", "TABS-MAIN", "TAB-UNIDAD"]
     col_parents = tab_resumen + ["ROW-KPI-BAND", "COLUMN-KPIS"]
     position: dict[str, Any] = {
         "DASHBOARD_VERSION": "v2",
@@ -978,7 +1414,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         "TABS-MAIN": {
             "type": "TABS",
             "id": "TABS-MAIN",
-            "children": ["TAB-RESUMEN", "TAB-GRAFICOS"],
+            "children": ["TAB-RESUMEN", "TAB-UNIDAD", "TAB-GRAFICOS"],
             "parents": ["ROOT_ID", "GRID_ID"],
             "meta": {},
         },
@@ -995,6 +1431,13 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "children": ["ROW-CHARTS"],
             "parents": ["ROOT_ID", "GRID_ID", "TABS-MAIN"],
             "meta": {"text": "Gráficos", "defaultText": "Gráficos"},
+        },
+        "TAB-UNIDAD": {
+            "type": "TAB",
+            "id": "TAB-UNIDAD",
+            "children": ["ROW-UNIDAD"],
+            "parents": ["ROOT_ID", "GRID_ID", "TABS-MAIN"],
+            "meta": {"text": "Unidad", "defaultText": "Unidad"},
         },
         "ROW-KPI-BAND": {
             "type": "ROW",
@@ -1064,13 +1507,22 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "parents": list(tab_graficos),
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
+        "ROW-UNIDAD": {
+            "type": "ROW", "id": "ROW-UNIDAD",
+            "children": unidad_keys,
+            "parents": list(tab_unidad),
+            "meta": {"background": "BACKGROUND_TRANSPARENT"},
+        },
     }
     sizes = {
         # Alturas UI: KPI 10; tablas Resumen/Proyectos misma altura; charts 36.
         "obj": (1, 10),
         "plan": (1, 10),
-        "table": (4, 53),
-        "projects": (8, 53),
+        "table": (4, 68),
+        "projects": (8, 68),
+        # Altura layout alta: el CSS :has fija calc(100dvh-210px) al activar tab;
+        # este valor evita que el grid React pinte un card enano el primer frame.
+        "unidad": (12, 78),
         "prob": (6, 36),
         "chart": (6, 36),
     }
@@ -1093,6 +1545,9 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             if c["section"] == "projects":
                 display_name = "Proyectos"
             parents = tab_resumen + ["ROW-TABLES"]
+        elif c["section"] == "unidad":
+            display_name = "Gastos"
+            parents = tab_unidad + ["ROW-UNIDAD"]
         else:
             parents = tab_graficos + ["ROW-CHARTS"]
         position[c["key"]] = {
@@ -1126,13 +1581,14 @@ def main() -> int:
     evo_ds = dataset_ids["bi_v_evolucion_mensual"]
     prob_ds = dataset_ids["bi_v_facturacion_probabilidad"]
     proy_ds = dataset_ids["bi_v_resumen_proyectos"]
+    unidad_ds = dataset_ids["bi_v_unidad"]
 
     print("==> 3/4 Creando charts...")
     existing = {c["slice_name"]: c["id"] for c in client.list_charts()}
     stale_names = set(existing) - {
         "Obj · Facturación", "Obj · Margen", "Obj · Crecimiento", "Obj · Beneficio",
         "Plan · Facturación", "Plan · Margen", "Plan · Crecimiento", "Plan · Beneficio",
-        "Resumen mensual", "Proyectos", "Evolución mensual", "Margen acumulado",
+        "Resumen mensual", "Proyectos", "Gastos", "Evolución mensual", "Margen acumulado",
         "Facturación por Probabilidad",
         "Facturación", "Margen", "Crecimiento", "Beneficio", "Δ %",
     }
@@ -1173,16 +1629,23 @@ def main() -> int:
         ("Resumen mensual", "table", evo_ds, "ag-grid-table", resumen_mensual_params()),
         # PBI Resumen Proyectos: Operational + estado Completed/Open/Planning
         ("Proyectos", "projects", proy_ds, "ag-grid-table", resumen_proyectos_params()),
+        # PBI Unidad: coste por concepto×mes (Structure fijo en bi_v_unidad)
+        ("Gastos", "unidad", unidad_ds, "ag-grid-table", gastos_unidad_params()),
         ("Facturación por Probabilidad", "prob", prob_ds, "echarts_timeseries_bar",
          probabilidad_bar_params()),
         ("Evolución mensual", "chart", evo_ds, "echarts_timeseries_line",
-         {"adhoc_filters": dim_adhoc_filters("tipo"),
+         {"adhoc_filters": dim_adhoc_filters("tipo", "proyecto"),
           "x_axis": "ano_mes", "metrics": [metric_sum("facturacion", "Facturación")],
           "groupby": [], "row_limit": 1000}),
         ("Margen acumulado", "chart", evo_ds, "echarts_timeseries_line",
-         {"adhoc_filters": dim_adhoc_filters("tipo"),
+         {"adhoc_filters": dim_adhoc_filters("tipo", "proyecto"),
           "x_axis": "ano_mes",
-          "metrics": [metric_sql("AVG(margen_pct)", "Margen %")],
+          "metrics": [
+              metric_sql(
+                  "(SUM(facturacion) - SUM(coste)) / NULLIF(SUM(facturacion), 0) * 100",
+                  "Margen %",
+              )
+          ],
           "row_limit": 1000}),
     ]
 
@@ -1221,9 +1684,7 @@ def main() -> int:
         })["id"]
 
     client.attach_charts(dash_id, [c["id"] for c in charts])
-    persist_dashboard_config(
-        client, dash_id, dataset_ids, [c["id"] for c in charts]
-    )
+    persist_dashboard_config(client, dash_id, dataset_ids, charts)
 
     print(f"\n✅ Dashboard listo: {SUPERSET_URL}/superset/dashboard/{DASHBOARD_SLUG}/")
     print(f"   Año por defecto: {CURRENT_YEAR}")

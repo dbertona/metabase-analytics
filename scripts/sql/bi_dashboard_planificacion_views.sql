@@ -95,35 +95,59 @@ LEFT JOIN real_anterior_dept ra
    AND ra.year = COALESCE(obj.year, plan_actual.year)
    AND ra.department_code = COALESCE(obj.department_code, plan_actual.department_code);
 
--- Evolución mensual (tablas y gráficos + fuente de valores de filtros nativos)
-CREATE OR REPLACE VIEW bi_v_evolucion_mensual AS
-SELECT
-    r.empresa,
-    r.year,
-    r.month,
-    r.ano_mes,
-    r.codigo_unico_departamento,
-    split_part(r.codigo_unico_departamento, ':', 2) AS department_code,
-    d.department_name,
-    r.tipo,
-    r.total_venta AS facturacion,
-    r.total_gasto AS coste,
-    r.margen_eur AS beneficio,
-    r.margen_pct
-FROM v_se_resumen_mensual r
-LEFT JOIN mb_v_dim_departamento d
-    ON d.company_name = r.empresa
-   AND d.department_code = split_part(r.codigo_unico_departamento, ':', 2);
-
--- Facturación por probabilidad (gráfico de barras — panel Resumen PBI)
--- PBI: % = probability=0 → 100; resto = probability. Total = P + R.
--- PSI 2026 bucket 100%: ~5.707 mil €
-CREATE OR REPLACE VIEW bi_v_facturacion_probabilidad AS
+-- Evolución mensual (tablas y gráficos + fuente de filtros nativos)
+-- Grano: mes × tipo × dept × proyecto — permite filtrar por proyecto sin
+-- cambiar las columnas visibles (Resumen agrupa solo por ano_mes).
+DROP VIEW IF EXISTS bi_v_evolucion_mensual;
+CREATE VIEW bi_v_evolucion_mensual AS
 SELECT
     f.empresa,
     f.year,
-    f.departamento AS department_code,
+    f.month,
+    f.ano_mes,
+    f.codigo_unico_departamento,
+    f.departamento::text AS department_code,
     d.department_name,
+    f.tipo,
+    f.job,
+    f.encabezado AS proyecto,
+    SUM(f.facturado) AS facturacion,
+    SUM(f.coste) AS coste,
+    SUM(f.facturado - f.coste) AS beneficio,
+    CASE
+        WHEN SUM(f.facturado) > 0
+            THEN (SUM(f.facturado) - SUM(f.coste)) / SUM(f.facturado) * 100
+    END AS margen_pct
+FROM v_se_facturacion f
+LEFT JOIN mb_v_dim_departamento d
+    ON d.company_name = f.empresa
+   AND d.department_code = f.departamento
+WHERE f.tipo IN ('P', 'R')
+GROUP BY
+    f.empresa,
+    f.year,
+    f.month,
+    f.ano_mes,
+    f.codigo_unico_departamento,
+    f.departamento,
+    d.department_name,
+    f.tipo,
+    f.job,
+    f.encabezado;
+
+-- Facturación por probabilidad (gráfico de barras — panel Resumen PBI)
+-- PBI: % = probability=0 → 100; resto = probability. Total = P + R.
+-- Grano con proyecto para filtro nativo (el chart agrupa solo por probabilidad).
+-- PSI 2026 bucket 100%: ~5.707 mil €
+DROP VIEW IF EXISTS bi_v_facturacion_probabilidad;
+CREATE VIEW bi_v_facturacion_probabilidad AS
+SELECT
+    f.empresa,
+    f.year,
+    f.departamento::text AS department_code,
+    d.department_name,
+    f.job,
+    f.encabezado AS proyecto,
     CASE
         WHEN COALESCE(f.probability, 0) = 0 THEN 100::numeric
         ELSE COALESCE(f.probability, 0)
@@ -139,6 +163,8 @@ GROUP BY
     f.year,
     f.departamento,
     d.department_name,
+    f.job,
+    f.encabezado,
     CASE
         WHEN COALESCE(f.probability, 0) = 0 THEN 100::numeric
         ELSE COALESCE(f.probability, 0)
@@ -147,9 +173,9 @@ GROUP BY
 COMMENT ON VIEW bi_v_planificacion_kpi IS
   'KPIs Objetivos/Plan por dept (Planificación Actual = P+R; crecimiento vs Ingresos año ant.). Filtro Departamento OK.';
 COMMENT ON VIEW bi_v_evolucion_mensual IS
-  'Evolución mensual facturación/coste/margen por tipo P o R. Fuente de filtros Año/Empresa/Dept/Tipo.';
+  'Evolución mensual facturación/coste/margen por tipo P/R y proyecto. Fuente filtros Año/Empresa/Dept/Tipo/Proyecto.';
 COMMENT ON VIEW bi_v_facturacion_probabilidad IS
-  'Facturación P+R por probabilidad (0→100 como PBI). Panel Resumen.';
+  'Facturación P+R por probabilidad y proyecto (0→100 como PBI). Panel Resumen.';
 
 -- -----------------------------------------------------------------------------
 -- Resumen por proyecto (página PBI «Resumen Proyectos»)
@@ -196,6 +222,53 @@ HAVING ABS(SUM(f.facturado)) > 0.0001 OR ABS(SUM(f.coste)) > 0.0001;
 
 COMMENT ON VIEW bi_v_resumen_proyectos IS
   'Resumen Proyectos PBI: Operational + Completed/Open/Planning; excluye filas 0/0.';
+
+-- -----------------------------------------------------------------------------
+-- Unidad / Gastos (página PBI «Unidad»)
+-- Pivot coste por concepto analítico × mes. Filtro de página PBI: Structure.
+-- Dims year/empresa/department_code/tipo para filtros nativos del dashboard.
+-- TRIM(descripcion_ca) unifica duplicados por espacios en BC.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE VIEW bi_v_unidad AS
+SELECT
+    c.empresa,
+    c.year,
+    c.departamento AS department_code,
+    d.department_name,
+    c.tipo,
+    c.tipo_proyecto,
+    TRIM(c.descripcion_ca) AS concepto_analitico,
+    SUM(c.coste) FILTER (WHERE c.month = 1) AS m01,
+    SUM(c.coste) FILTER (WHERE c.month = 2) AS m02,
+    SUM(c.coste) FILTER (WHERE c.month = 3) AS m03,
+    SUM(c.coste) FILTER (WHERE c.month = 4) AS m04,
+    SUM(c.coste) FILTER (WHERE c.month = 5) AS m05,
+    SUM(c.coste) FILTER (WHERE c.month = 6) AS m06,
+    SUM(c.coste) FILTER (WHERE c.month = 7) AS m07,
+    SUM(c.coste) FILTER (WHERE c.month = 8) AS m08,
+    SUM(c.coste) FILTER (WHERE c.month = 9) AS m09,
+    SUM(c.coste) FILTER (WHERE c.month = 10) AS m10,
+    SUM(c.coste) FILTER (WHERE c.month = 11) AS m11,
+    SUM(c.coste) FILTER (WHERE c.month = 12) AS m12,
+    SUM(c.coste) AS total
+FROM v_se_coste c
+LEFT JOIN mb_v_dim_departamento d
+    ON d.company_name = c.empresa
+   AND d.department_code = c.departamento
+WHERE c.tipo_proyecto = 'Structure'
+  AND COALESCE(TRIM(c.descripcion_ca), '') <> ''
+GROUP BY
+    c.empresa,
+    c.year,
+    c.departamento,
+    d.department_name,
+    c.tipo,
+    c.tipo_proyecto,
+    TRIM(c.descripcion_ca)
+HAVING ABS(SUM(c.coste)) > 0.0001;
+
+COMMENT ON VIEW bi_v_unidad IS
+  'Unidad/Gastos PBI: coste por concepto×mes; tipo_proyecto=Structure fijo.';
 
 -- KPI agregados por empresa/año (referencia / legacy; tarjetas usan bi_v_planificacion_kpi)
 CREATE OR REPLACE VIEW bi_v_kpi_anual_empresa AS
