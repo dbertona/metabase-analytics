@@ -107,33 +107,44 @@
     chart.style.removeProperty("min-height");
 
     var node = chart.parentElement;
-    for (var i = 0; i < 8 && node && node !== document.body; i++) {
+    for (var i = 0; i < 10 && node && node !== document.body; i++) {
       var cls = node.className || "";
       if (
         cls.indexOf("dragdroppable") !== -1 ||
         cls.indexOf("dashboard-component") !== -1 ||
         cls.indexOf("grid-row") !== -1 ||
+        cls.indexOf("resizable-container") !== -1 ||
         (node.getAttribute &&
           node.getAttribute("data-test") === "dashboard-component-chart-holder")
       ) {
         node.style.setProperty("height", target + "px", "important");
         node.style.setProperty("max-height", target + "px", "important");
-        node.style.removeProperty("min-height");
+        node.style.setProperty("min-height", target + "px", "important");
         node.style.setProperty("overflow", "hidden", "important");
       }
       node = node.parentElement;
     }
 
-    // Propagar al grid interno ya (no esperar al siguiente tick)
+    // Propagar al grid interno YA (también sin ag-theme: estado "Esperando…")
     var header = chart.querySelector("[data-test='slice-header']");
     var sliceContainer = chart.querySelector(".slice_container");
+    var chartContainer = chart.querySelector(".chart-container");
     var agTheme = chart.querySelector('[class*="ag-theme"]');
-    if (sliceContainer && agTheme) {
-      var headerH = header ? header.getBoundingClientRect().height : 0;
-      var available = Math.max(80, Math.floor(target - headerH - 8));
-      sliceContainer.style.setProperty("height", available + "px", "important");
-      sliceContainer.style.setProperty("overflow", "hidden", "important");
-      agTheme.style.setProperty("height", available + "px", "important");
+    var headerH = header ? header.getBoundingClientRect().height : 28;
+    var available = Math.max(80, Math.floor(target - headerH - 8));
+
+    [sliceContainer, chartContainer, agTheme].forEach(function (el) {
+      if (!el) return;
+      el.style.setProperty("height", available + "px", "important");
+      el.style.setProperty("max-height", available + "px", "important");
+      el.style.setProperty("min-height", available + "px", "important");
+      el.style.setProperty("overflow", "hidden", "important");
+    });
+    if (agTheme) {
+      var root = agTheme.querySelector(".ag-root-wrapper");
+      if (root) {
+        root.style.setProperty("height", available + "px", "important");
+      }
       if (typeof agTheme.__psApiResize === "function") {
         try { agTheme.__psApiResize(); } catch (e) { /* ignore */ }
       }
@@ -178,7 +189,7 @@
     }
     publishGastosCssHeight();
     fillGastosViewportHeight();
-    var delays = [0, 16, 50, 120, 300];
+    var delays = [0, 16, 50, 100, 200, 400, 700, 1200];
     delays.forEach(function (ms) {
       setTimeout(function () {
         fillGastosViewportHeight();
@@ -186,6 +197,57 @@
       }, ms);
     });
   }
+
+  /**
+   * Cuando AG Grid monta (tras "Esperando…"), nace ~464px y luego crece.
+   * Observer: aplicar altura en el mismo momento en que aparece .ag-theme.
+   */
+  function bindGastosGridMountObserver() {
+    if (document.documentElement.__psGastosGridMountObs) return;
+    document.documentElement.__psGastosGridMountObs = true;
+    try {
+      var obs = new MutationObserver(function (mutations) {
+        var hit = false;
+        for (var i = 0; i < mutations.length && !hit; i++) {
+          var m = mutations[i];
+          var nodes = [];
+          if (m.addedNodes && m.addedNodes.length) {
+            Array.prototype.push.apply(nodes, m.addedNodes);
+          }
+          if (m.target) nodes.push(m.target);
+          for (var j = 0; j < nodes.length; j++) {
+            var n = nodes[j];
+            if (!n || n.nodeType !== 1) continue;
+            var cls = n.className && n.className.toString
+              ? n.className.toString()
+              : "";
+            if (
+              cls.indexOf("ag-theme") !== -1 ||
+              cls.indexOf("slice_container") !== -1 ||
+              (n.querySelector &&
+                (n.querySelector('[class*="ag-theme"]') ||
+                  n.querySelector(".slice_container")))
+            ) {
+              if (
+                document.querySelector('[data-test-chart-name*="Gastos"]')
+              ) {
+                hit = true;
+                break;
+              }
+            }
+          }
+        }
+        if (hit) {
+          fillGastosViewportHeight();
+        }
+      });
+      obs.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+    } catch (e) { /* ignore */ }
+  }
+  bindGastosGridMountObserver();
 
   function fixAgGridHeightInner() {
     AG_GRID_HEIGHT_SELECTORS.forEach(function (sel) {
