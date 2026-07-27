@@ -413,7 +413,10 @@
 
         var holderH = chart.getBoundingClientRect().height;
         var headerH = header ? header.getBoundingClientRect().height : 0;
-        var available = Math.floor(holderH - headerH - 8);
+        // Reservar cabecera + 48px de pie. El margen de 8px dejaba que
+        // AG Grid recomputase el body sobre ag-floating-bottom al volver
+        // desde Unidad, ocultando los totales de Resumen/Proyectos.
+        var available = Math.floor(holderH - headerH - 56);
         if (available < 80) return;
 
         [sliceContainer, chartContainer, agTheme].forEach(function (el) {
@@ -423,13 +426,53 @@
           el.style.setProperty("min-height", available + "px", "important");
           el.style.setProperty("overflow", "hidden", "important");
         });
-        var root = agTheme.querySelector(".ag-root-wrapper");
-        if (root) {
+        [
+          ".ag-root-wrapper",
+          ".ag-root-wrapper-body",
+          ".ag-root",
+        ].forEach(function (selector) {
+          var root = agTheme.querySelector(selector);
+          if (!root) return;
           root.style.setProperty("height", available + "px", "important");
-        }
+          root.style.setProperty("max-height", available + "px", "important");
+          root.style.setProperty("min-height", available + "px", "important");
+        });
+        reserveAgGridFooterSpace(chart);
       });
     });
     syncResumenProyectosEqualHeight();
+  }
+
+  /**
+   * Mantiene el pie de totales visible también tras un cambio de pestaña.
+   * Superset recalcula el viewport de las filas después de montar el tab y
+   * puede ocupar el espacio que corresponde a ag-floating-bottom.
+   */
+  function reserveAgGridFooterSpace(chart) {
+    if (!chart) return;
+    var root = chart.querySelector(".ag-root");
+    var header = chart.querySelector(".ag-header");
+    var body = chart.querySelector(".ag-body-viewport");
+    var bottom = chart.querySelector(".ag-floating-bottom");
+    if (!root || !body || !bottom) return;
+
+    var FOOTER_H = 48;
+    var rootH = root.getBoundingClientRect().height;
+    var headerH = header ? header.getBoundingClientRect().height : 36;
+    var bodyH = Math.max(80, Math.floor(rootH - headerH - FOOTER_H - 4));
+
+    body.style.setProperty("height", bodyH + "px", "important");
+    body.style.setProperty("max-height", bodyH + "px", "important");
+    body.style.setProperty("min-height", "0", "important");
+    body.style.setProperty("flex", "0 0 " + bodyH + "px", "important");
+
+    bottom.style.setProperty("height", FOOTER_H + "px", "important");
+    bottom.style.setProperty("min-height", FOOTER_H + "px", "important");
+    bottom.style.setProperty("max-height", FOOTER_H + "px", "important");
+    bottom.style.setProperty("flex", "0 0 " + FOOTER_H + "px", "important");
+    bottom.style.setProperty("display", "flex", "important");
+    bottom.style.setProperty("visibility", "visible", "important");
+    bottom.style.setProperty("opacity", "1", "important");
   }
 
   /**
