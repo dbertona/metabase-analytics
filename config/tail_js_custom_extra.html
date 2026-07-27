@@ -307,6 +307,56 @@
   }
 
   /**
+   * Ajusta alto interno de un chart AG Grid para que la fila de totales
+   * (ag-floating-bottom) quede dentro del card (overflow:hidden).
+   */
+  function applyAgGridInnerHeight(chart, target) {
+    if (!chart || !(target > 0)) return;
+    chart.style.setProperty("height", target + "px", "important");
+    chart.style.setProperty("max-height", target + "px", "important");
+    chart.style.setProperty("min-height", target + "px", "important");
+
+    var header = chart.querySelector("[data-test='slice-header']");
+    var headerH = header ? header.getBoundingClientRect().height : 28;
+    var available = Math.max(80, Math.floor(target - headerH - 24));
+    var sliceContainer = chart.querySelector(".slice_container");
+    var chartContainer = chart.querySelector(".chart-container");
+    var agTheme = chart.querySelector('[class*="ag-theme"]');
+
+    [sliceContainer, chartContainer, agTheme].forEach(function (el) {
+      if (!el) return;
+      el.style.setProperty("height", available + "px", "important");
+      el.style.setProperty("max-height", available + "px", "important");
+      el.style.setProperty("min-height", available + "px", "important");
+      el.style.setProperty("overflow", "hidden", "important");
+    });
+    if (agTheme) {
+      var walk = agTheme.parentElement;
+      while (walk && walk !== chart) {
+        walk.style.setProperty("height", available + "px", "important");
+        walk.style.setProperty("max-height", available + "px", "important");
+        walk.style.setProperty("min-height", "0", "important");
+        walk = walk.parentElement;
+      }
+      [" .ag-root-wrapper", " .ag-root-wrapper-body", " .ag-root"].forEach(
+        function (sel) {
+          var el = agTheme.querySelector(sel.trim());
+          if (!el) return;
+          el.style.setProperty("height", available + "px", "important");
+          el.style.setProperty("max-height", available + "px", "important");
+        }
+      );
+      if (typeof agTheme.__psApiResize === "function") {
+        try {
+          agTheme.__psApiResize();
+        } catch (e) {
+          /* ignore */
+        }
+      }
+    }
+  }
+
+  /**
    * Resumen mensual y Proyectos: mismo alto, llenando hasta el pie del viewport
    * (aprovecha el espacio gris inferior en pantallas altas).
    */
@@ -331,7 +381,7 @@
       resumen.getBoundingClientRect().top,
       proyectos.getBoundingClientRect().top
     );
-    var bottomPad = 12;
+    var bottomPad = 16;
     var viewportTarget = Math.floor(window.innerHeight - top - bottomPad);
     var layoutH = Math.max(
       Math.floor(resumen.getBoundingClientRect().height),
@@ -343,10 +393,6 @@
     if (viewportTarget >= 200) target = viewportTarget;
 
     [resumen, proyectos].forEach(function (chart) {
-      chart.style.setProperty("height", target + "px", "important");
-      chart.style.setProperty("max-height", target + "px", "important");
-      chart.style.setProperty("min-height", target + "px", "important");
-
       var node = chart.parentElement;
       for (var i = 0; i < 6 && node && node !== document.body; i++) {
         var cls = node.className || "";
@@ -359,26 +405,11 @@
           node.style.setProperty("height", target + "px", "important");
           node.style.setProperty("min-height", target + "px", "important");
           node.style.setProperty("max-height", target + "px", "important");
+          node.style.setProperty("overflow", "hidden", "important");
         }
         node = node.parentElement;
       }
-
-      var header = chart.querySelector("[data-test='slice-header']");
-      var headerH = header ? header.getBoundingClientRect().height : 28;
-      var available = Math.max(80, Math.floor(target - headerH - 8));
-      var sliceContainer = chart.querySelector(".slice_container");
-      var chartContainer = chart.querySelector(".chart-container");
-      var agTheme = chart.querySelector('[class*="ag-theme"]');
-      [sliceContainer, chartContainer, agTheme].forEach(function (el) {
-        if (!el) return;
-        el.style.setProperty("height", available + "px", "important");
-        el.style.setProperty("max-height", available + "px", "important");
-        el.style.setProperty("min-height", available + "px", "important");
-      });
-      if (agTheme) {
-        var root = agTheme.querySelector(".ag-root-wrapper");
-        if (root) root.style.setProperty("height", available + "px", "important");
-      }
+      applyAgGridInnerHeight(chart, target);
     });
   }
 
@@ -403,13 +434,15 @@
         burstFillGastosHeight();
       } else if (!isUnidad && lastUnidad) {
         document.body.classList.remove("ps-unidad-gastos-active");
-        // Al volver a Resumen: llenar pie del viewport
+        // Al volver a Resumen: llenar pie del viewport + reasegurar totales visibles
         setTimeout(syncResumenProyectosEqualHeight, 0);
         setTimeout(syncResumenProyectosEqualHeight, 100);
         setTimeout(syncResumenProyectosEqualHeight, 400);
+        setTimeout(syncResumenProyectosEqualHeight, 800);
       } else if (isResumen) {
         setTimeout(syncResumenProyectosEqualHeight, 0);
         setTimeout(syncResumenProyectosEqualHeight, 200);
+        setTimeout(syncResumenProyectosEqualHeight, 600);
       }
       lastUnidad = isUnidad;
     }
