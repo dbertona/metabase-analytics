@@ -1387,6 +1387,28 @@
   }
 
   /**
+   * Resumen mensual no tiene buscador, pero AG Grid deja una fila de controles
+   * vacía que añade ~7–11px entre título y tabla (Proyectos la oculta).
+   */
+  function hideResumenDropdownControls() {
+    var charts = document.querySelectorAll(
+      '[data-test-chart-name*="Resumen mensual"]'
+    );
+    Array.prototype.forEach.call(charts, function (chart) {
+      var row = chart.querySelector(".dropdown-controls-container");
+      if (!row) return;
+      row.style.setProperty("display", "none", "important");
+      row.style.setProperty("height", "0", "important");
+      row.style.setProperty("min-height", "0", "important");
+      row.style.setProperty("margin", "0", "important");
+      row.style.setProperty("padding", "0", "important");
+      if (row.parentElement) {
+        row.parentElement.style.setProperty("height", "100%", "important");
+      }
+    });
+  }
+
+  /**
    * Coloca un buscador proxy inmediatamente antes del menú de tres puntos.
    * El input real permanece en AG Grid para conservar su lógica React, pero su
    * fila se oculta para no consumir una línea adicional.
@@ -1527,6 +1549,7 @@
     hideResumenHeaderChrome();
     bumpProbabilidadChartFonts();
     placeProyectosSearchInHeader();
+    hideResumenDropdownControls();
     placeGastosSearchInHeader();
     // Inicializar persistencia de anchos en el chart Proyectos (idempotente)
     var proyCharts = document.querySelectorAll('[data-test-chart-name*="Proyectos"]');
