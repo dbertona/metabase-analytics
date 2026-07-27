@@ -83,14 +83,14 @@ Añadir siempre estos bloques para las tablas AG Grid:
 [data-test-chart-name*='Mi Tabla'] .ag-header-cell {
   white-space: nowrap !important;
   font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;
-  font-size: 1.26em !important;
+  font-size: 1.077em !important;
   border-bottom: 2px solid #d1d5db !important;
   box-shadow: none !important;
 }
 [data-test-chart-name*='Mi Tabla'] td,
 [data-test-chart-name*='Mi Tabla'] .ag-cell {
   font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;
-  font-size: 1.26em !important;
+  font-size: 1.077em !important;
 }
 
 /* ── Ocultar paginación y barras ── */
