@@ -560,6 +560,27 @@
   }
 
   /**
+   * Proyectos: fuerza white-space:nowrap en todas las celdas del cuerpo y fila
+   * de totales vía inline style con !important — máxima prioridad CSS, anula
+   * cualquier regla de AG Grid (incluida la clase .ag-cell-wrap-text).
+   * Llama resetRowHeights para que AG Grid recalcule alturas a 1 línea.
+   */
+  function forceProyectosNowrap(chart, api) {
+    var cells = chart.querySelectorAll(
+      ".ag-center-cols-container .ag-cell, .ag-floating-bottom .ag-cell"
+    );
+    Array.prototype.forEach.call(cells, function (c) {
+      c.style.setProperty("white-space", "nowrap", "important");
+      c.style.setProperty("overflow", "hidden", "important");
+      c.style.setProperty("text-overflow", "ellipsis", "important");
+    });
+    // Recalcula alturas de fila para que AG Grid use 1 línea.
+    if (api && typeof api.resetRowHeights === "function") {
+      try { api.resetRowHeights(); } catch (e) { /* grid aún montando */ }
+    }
+  }
+
+  /**
    * Resumen: columnas al contenido, alineadas a la IZQUIERDA (sin flex).
    * Proyectos: métricas justas; columna texto = resto (sin scroll).
    */
@@ -616,6 +637,11 @@
               collapseHiddenSortColumns(api);
             }
             sortResumenByAnoMes(api);
+          }
+          if (proyectos) {
+            // Forzar nowrap vía inline style con !important (mayor prioridad que cualquier CSS,
+            // incluidos los estilos de AG Grid que puedan tener white-space:normal via clase).
+            forceProyectosNowrap(chart, api);
           }
           if (proyectos && hasHorizontalScroll(chart)) {
             fitColumnsByDomMeasure(chart, api, {
