@@ -781,6 +781,15 @@
       if (!header || !realInput || !originalRow) return;
 
       originalRow.style.setProperty("display", "none", "important");
+      // Superset reserva altura para los controles aunque estén ocultos.
+      // Devolverla al grid hace que Proyectos termine a la altura de Resumen.
+      if (originalRow.parentElement) {
+        originalRow.parentElement.style.setProperty(
+          "height",
+          "100%",
+          "important"
+        );
+      }
 
       var proxy = header.querySelector(".ps-proyectos-search-proxy");
       if (proxy) {
