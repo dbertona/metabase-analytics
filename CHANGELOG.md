@@ -10,6 +10,10 @@
 - Importes del eje, barras y tooltip con sufijo `€`.
 - Eliminado el título de eje flotante `%` (quedaba suelto en el medio).
 
+### Fixed
+
+- API setup/pull: reenviar cookies `Secure` por HTTP LAN (CSRF session token missing).
+
 ## [2026-07-27] — Cierre rama `feat/ag-grid-autosize-columns`
 
 ### Added / Changed
