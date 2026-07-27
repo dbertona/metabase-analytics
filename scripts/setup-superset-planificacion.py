@@ -32,6 +32,8 @@ CURRENT_YEAR = datetime.date.today().year
 DEFAULT_EMPRESA = "Power Solution Iberia SL"  # paridad panel Resumen PBI (PSI)
 DASHBOARD_TITLE = "Seguimiento Económico — Resumen"
 DASHBOARD_SLUG = "planificacion-ps-analytics"  # URL estable (Fase 3)
+# Admin PowerSolution + dbertona: pueden guardar el ancho compartido de Proyectos.
+PROYECTOS_OWNER_IDS = [1, 2]
 
 PS_DB = {
     "database_name": "PS Analytics",
@@ -164,6 +166,8 @@ class SupersetClient:
             "datasource_type": "table",
             "params": json.dumps(params),
         }
+        if name == "Proyectos":
+            payload["owners"] = PROYECTOS_OWNER_IDS
         if name in existing_by_name:
             cid = existing_by_name[name]
             self._request("PUT", f"/api/v1/chart/{cid}", payload)
