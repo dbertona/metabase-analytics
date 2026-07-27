@@ -356,6 +356,9 @@ def resumen_proyectos_params() -> dict[str, Any]:
         "color_pn": True,
         "align_pn": False,
         "table_timestamp_format": "smart_date",
+        # truncateLongCells=True → AG Grid: wrapText=false + autoHeight=false en todas las cols.
+        # Sin esto, el plugin pone wrapText=true por defecto y el texto siempre se parte.
+        "truncateLongCells": True,
         "column_config": {
             "proyecto": {
                 "customColumnName": "Proyectos",
