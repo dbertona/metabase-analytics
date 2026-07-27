@@ -453,11 +453,23 @@ def gastos_unidad_params() -> dict[str, Any]:
         "groupby": ["concepto_analitico"],
         "metrics": metrics,
         "percent_metrics": [],
-        # ASC por concepto en SQL (order_by → ORDER BY). No ordenar en JS/AG Grid:
-        # el sort client-side provoca un refresh feo al montar la tabla.
+        # Forzar ORDER BY concepto en SQL. En ag-grid-table, order_by_cols con
+        # solo el nombre de dimensión se ignora y cae al 1er metric (m01 DESC) —
+        # eso dejaba filas desordenadas y un refresh feo al reordenar en cliente.
         "order_by_cols": [
-            json.dumps(["concepto_analitico", True], ensure_ascii=False),
+            json.dumps(
+                [
+                    {
+                        "expressionType": "SQL",
+                        "sqlExpression": "concepto_analitico",
+                        "label": "orden_concepto",
+                    },
+                    True,
+                ],
+                ensure_ascii=False,
+            ),
         ],
+        "order_desc": False,
         "row_limit": 5000,
         "server_pagination": False,
         "show_totals": True,
