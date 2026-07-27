@@ -251,8 +251,44 @@
   }
 
   function sortResumenByAnoMes(api) {
-    // NO reordenar en cliente: confiar en ORDER BY backend.
-    // Reordenar aquí termina pisando el orden correcto de Superset en algunos renders.
+    if (!api || typeof api.getColumnState !== "function") return;
+    if (typeof api.applyColumnState !== "function") return;
+    var state = api.getColumnState() || [];
+    if (!state.length) return;
+
+    var hasYear = false;
+    var hasMonth = false;
+    var yearSort = null;
+    var monthSort = null;
+    var sortedOther = false;
+
+    for (var i = 0; i < state.length; i++) {
+      var col = state[i];
+      var id = String(col.colId || "");
+      if (id === "year") {
+        hasYear = true;
+        yearSort = col.sort || null;
+        continue;
+      }
+      if (id === "month") {
+        hasMonth = true;
+        monthSort = col.sort || null;
+        continue;
+      }
+      if (col.sort) sortedOther = true;
+    }
+
+    // Priorizar columnas hidden year/month: garantizan cronología real.
+    if (!hasYear || !hasMonth) return;
+    if (yearSort === "asc" && monthSort === "asc" && !sortedOther) return;
+
+    api.applyColumnState({
+      defaultState: { sort: null, sortIndex: null },
+      state: [
+        { colId: "year", sort: "asc", sortIndex: 0 },
+        { colId: "month", sort: "asc", sortIndex: 1 },
+      ],
+    });
   }
 
   /** year/month: ordenan pero no deben ocupar píxeles (hueco a la izquierda). */
@@ -393,7 +429,8 @@
       );
       var limit = Math.min(bodyCells.length, 80);
       for (var i = 0; i < limit; i++) {
-        var t = (bodyCells[i].textContent || "").trim();
+        // Normaliza saltos/espacios: evita medir texto ya envuelto por AG Grid.
+        var t = (bodyCells[i].textContent || "").replace(/\s+/g, " ").trim();
         if (!t) continue;
         var w = Math.ceil(ctx.measureText(t).width) + pad;
         if (w > maxPx) maxPx = w;
@@ -403,7 +440,7 @@
       );
       Array.prototype.forEach.call(pinCells, function (pc) {
         if (window.getComputedStyle(pc).visibility === "hidden") return;
-        var t = (pc.textContent || "").trim();
+        var t = (pc.textContent || "").replace(/\s+/g, " ").trim();
         if (!t) return;
         var w = Math.ceil(ctx.measureText(t).width) + pad;
         if (w > maxPx) maxPx = w;
@@ -458,7 +495,8 @@
         }
       }
       if (textIdx >= 0) {
-        // avail ya trae margen; no sumar más holgura aquí
+        // Columna texto = espacio restante tras métricas (mínimo 120px).
+        // El CSS white-space:nowrap (ensurePsTableStyle) garantiza medición correcta.
         var textW = Math.max(120, avail - metricsTotal);
         state[textIdx].width = textW;
         state[textIdx].minWidth = 100;
@@ -566,6 +604,7 @@
           }
           if (resumen) {
             collapseHiddenSortColumns(api);
+            sortResumenByAnoMes(api);
             if (hasHorizontalScroll(chart)) {
               fitColumnsByDomMeasure(chart, api, {
                 pad: 10,
@@ -576,6 +615,7 @@
               });
               collapseHiddenSortColumns(api);
             }
+            sortResumenByAnoMes(api);
           }
           if (proyectos && hasHorizontalScroll(chart)) {
             fitColumnsByDomMeasure(chart, api, {
@@ -915,6 +955,15 @@
       "  max-width: 0 !important;",
       "  padding: 0 !important;",
       "  border: none !important;",
+      "}",
+      /* Proyectos: una línea por fila, texto largo con ellipsis.
+         Esto garantiza que el canvas mida el texto completo en una sola línea
+         y que el autoajuste de columna sea correcto. */
+      '[data-test-chart-name*="Proyectos"] .ag-center-cols-container .ag-cell,',
+      '[data-test-chart-name*="Proyectos"] .ag-floating-bottom .ag-cell {',
+      "  white-space: nowrap !important;",
+      "  overflow: hidden !important;",
+      "  text-overflow: ellipsis !important;",
       "}",
     ].join("\n");
     if (!style) {
