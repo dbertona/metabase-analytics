@@ -40,7 +40,7 @@ Debajo: Resumen mensual (ancho 12) · Evolución + Margen (6+6).
 |-------|---------|--------|
 | 8 tarjetas KPI (Obj/Plan) | `bi_v_planificacion_kpi` | Tiene `department_code` + `facturacion_real_anterior` → filtro Departamento y Crecimiento |
 | Resumen / Evolución / Margen | `bi_v_evolucion_mensual` | Fuente de **valores** de filtros Tipo P/R; dims también en Resumen |
-| Facturación por Probabilidad | `bi_v_facturacion_probabilidad` | Al lado de KPIs (7+5); fuera del scope de filtros Año/Empresa/Dept |
+| Facturación por Probabilidad | `bi_v_facturacion_probabilidad` | Al lado de KPIs (7+5); fuera del scope de filtros Año/Empresa/Dept; etiquetas `N%` e importes con `€` (params + `tail_js`) |
 
 ### Filtros configurados
 
