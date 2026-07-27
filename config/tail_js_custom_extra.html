@@ -764,6 +764,74 @@
   // ─── Fin persistencia Proyectos ─────────────────────────────────────────────
 
   /**
+   * Coloca un buscador proxy inmediatamente antes del menú de tres puntos.
+   * El input real permanece en AG Grid para conservar su lógica React, pero su
+   * fila se oculta para no consumir una línea adicional.
+   */
+  function placeProyectosSearchInHeader() {
+    var charts = document.querySelectorAll(
+      '[data-test-chart-name*="Proyectos"]'
+    );
+    Array.prototype.forEach.call(charts, function (chart) {
+      var header = chart.querySelector('[data-test="slice-header"]');
+      var realInput = chart.querySelector(
+        ".dropdown-controls-container #filter-text-box"
+      );
+      var originalRow = chart.querySelector(".dropdown-controls-container");
+      if (!header || !realInput || !originalRow) return;
+
+      originalRow.style.setProperty("display", "none", "important");
+
+      var proxy = header.querySelector(".ps-proyectos-search-proxy");
+      if (proxy) {
+        proxy.placeholder = realInput.placeholder || "Buscar";
+        return;
+      }
+
+      proxy = document.createElement("input");
+      proxy.type = "text";
+      proxy.placeholder = realInput.placeholder || "Buscar";
+      proxy.className = "ps-proyectos-search-proxy";
+      proxy.setAttribute("aria-label", "Buscar proyectos");
+      proxy.style.cssText = [
+        "border:1px solid #d9d9d9",
+        "border-radius:4px",
+        "padding:3px 9px",
+        "font-size:14px",
+        "height:28px",
+        "width:175px",
+        "outline:none",
+        "background:#fff",
+        "color:#333",
+        "flex:0 0 175px",
+        "margin-right:8px",
+      ].join(";");
+
+      proxy.addEventListener("input", function () {
+        var currentInput = chart.querySelector(
+          ".dropdown-controls-container #filter-text-box"
+        );
+        if (!currentInput) return;
+        var descriptor = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype,
+          "value"
+        );
+        descriptor.set.call(currentInput, proxy.value);
+        currentInput.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      proxy.addEventListener("focus", function () {
+        proxy.style.borderColor = "#007c89";
+      });
+      proxy.addEventListener("blur", function () {
+        proxy.style.borderColor = "#d9d9d9";
+      });
+
+      var headerControls = header.querySelector(".header-controls");
+      header.insertBefore(proxy, headerControls || header.lastChild);
+    });
+  }
+
+  /**
    * Resumen mensual: columnas al contenido, alineadas a la izquierda (sin flex).
    */
   function autoSizeAgGridColumns() {
@@ -826,6 +894,7 @@
     autoSizeAgGridColumns();
     hideResumenHeaderChrome();
     bumpProbabilidadChartFonts();
+    placeProyectosSearchInHeader();
     // Inicializar persistencia de anchos en el chart Proyectos (idempotente)
     var proyCharts = document.querySelectorAll('[data-test-chart-name*="Proyectos"]');
     Array.prototype.forEach.call(proyCharts, function (chart) {
