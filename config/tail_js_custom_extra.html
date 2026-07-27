@@ -76,7 +76,43 @@
    * Aplica inline style a .slice_container y al div ag-theme-* para bypasear
    * cualquier inline style que React pueda estar poniendo.
    */
+  function fillGastosViewportHeight() {
+    var charts = document.querySelectorAll('[data-test-chart-name*="Gastos"]');
+    Array.prototype.forEach.call(charts, function (chart) {
+      if (!chart.getBoundingClientRect) return;
+      // Tab inactiva: offsetParent null o altura 0
+      var rect = chart.getBoundingClientRect();
+      if (!rect.width || rect.top < 0) return;
+      if (chart.offsetParent === null && rect.height === 0) return;
+
+      var bottomPad = 20;
+      var target = Math.floor(window.innerHeight - rect.top - bottomPad);
+      if (target < 320) return;
+      if (Math.abs(rect.height - target) < 6) return;
+
+      chart.style.setProperty("height", target + "px", "important");
+      chart.style.setProperty("min-height", target + "px", "important");
+
+      // Subir por el árbol de layout de Superset para que el card no quede corto
+      var node = chart.parentElement;
+      for (var i = 0; i < 8 && node && node !== document.body; i++) {
+        var cls = node.className || "";
+        if (
+          cls.indexOf("dragdroppable") !== -1 ||
+          cls.indexOf("dashboard-component") !== -1 ||
+          cls.indexOf("grid-row") !== -1 ||
+          (node.getAttribute && node.getAttribute("data-test") === "dashboard-component-chart-holder")
+        ) {
+          node.style.setProperty("height", target + "px", "important");
+          node.style.setProperty("min-height", target + "px", "important");
+        }
+        node = node.parentElement;
+      }
+    });
+  }
+
   function fixAgGridHeight() {
+    fillGastosViewportHeight();
     AG_GRID_HEIGHT_SELECTORS.forEach(function (sel) {
       var charts = document.querySelectorAll(sel);
       Array.prototype.forEach.call(charts, function (chart) {

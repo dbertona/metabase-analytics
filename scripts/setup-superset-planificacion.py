@@ -614,12 +614,21 @@ def persist_dashboard_config(
         ".dashboard-component-chart-holder[data-test-chart-name*='Gastos'] {\n"
         "  padding: 8px !important;\n"
         "}\n"
-        "/* Gastos (Unidad): ocupar todo el ancho de la pestaña */\n"
+        "/* Gastos (Unidad): ocupar todo el alto disponible de la pestaña */\n"
         ".dashboard-component-chart-holder[data-test-chart-name*='Gastos'] {\n"
         "  width: 100% !important;\n"
         "  max-width: 100% !important;\n"
         "  margin-left: 0 !important;\n"
         "  margin-right: 0 !important;\n"
+        "  display: flex !important;\n"
+        "  flex-direction: column !important;\n"
+        "}\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Gastos'] .chart-slice {\n"
+        "  display: flex !important;\n"
+        "  flex-direction: column !important;\n"
+        "  height: 100% !important;\n"
+        "  flex: 1 1 auto !important;\n"
+        "  min-height: 0 !important;\n"
         "}\n"
         ".dragdroppable-row:has([data-test-chart-name*='Gastos']),\n"
         ".grid-row:has([data-test-chart-name*='Gastos']) {\n"
@@ -1211,7 +1220,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         "plan": (1, 10),
         "table": (4, 53),
         "projects": (8, 53),
-        "unidad": (12, 70),
+        "unidad": (12, 120),  # alto generoso; JS rellena el viewport restante
         "prob": (6, 36),
         "chart": (6, 36),
     }
