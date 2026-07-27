@@ -78,22 +78,24 @@
    */
   function fillGastosViewportHeight() {
     var charts = document.querySelectorAll('[data-test-chart-name*="Gastos"]');
+    var anyVisible = false;
     Array.prototype.forEach.call(charts, function (chart) {
       if (!chart.getBoundingClientRect) return;
-      // Tab inactiva: offsetParent null o altura 0
       var rect = chart.getBoundingClientRect();
-      if (!rect.width || rect.top < 0) return;
-      if (chart.offsetParent === null && rect.height === 0) return;
+      // Tab inactiva o no montado
+      if (!rect.width || rect.height === 0) return;
+      if (chart.offsetParent === null) return;
+      anyVisible = true;
 
-      var bottomPad = 20;
+      // Encajar exactamente en el viewport: evita scroll de página
+      var bottomPad = 12;
       var target = Math.floor(window.innerHeight - rect.top - bottomPad);
-      if (target < 320) return;
-      if (Math.abs(rect.height - target) < 6) return;
+      if (target < 280) return;
+      if (Math.abs(rect.height - target) < 4) return;
 
       chart.style.setProperty("height", target + "px", "important");
-      chart.style.setProperty("min-height", target + "px", "important");
+      chart.style.removeProperty("min-height");
 
-      // Subir por el árbol de layout de Superset para que el card no quede corto
       var node = chart.parentElement;
       for (var i = 0; i < 8 && node && node !== document.body; i++) {
         var cls = node.className || "";
@@ -101,14 +103,17 @@
           cls.indexOf("dragdroppable") !== -1 ||
           cls.indexOf("dashboard-component") !== -1 ||
           cls.indexOf("grid-row") !== -1 ||
-          (node.getAttribute && node.getAttribute("data-test") === "dashboard-component-chart-holder")
+          (node.getAttribute &&
+            node.getAttribute("data-test") === "dashboard-component-chart-holder")
         ) {
           node.style.setProperty("height", target + "px", "important");
-          node.style.setProperty("min-height", target + "px", "important");
+          node.style.removeProperty("min-height");
+          node.style.setProperty("overflow", "hidden", "important");
         }
         node = node.parentElement;
       }
     });
+    document.body.classList.toggle("ps-unidad-gastos-active", anyVisible);
   }
 
   function fixAgGridHeight() {

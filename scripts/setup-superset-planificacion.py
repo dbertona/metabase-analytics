@@ -617,7 +617,7 @@ def persist_dashboard_config(
         ".dashboard-component-chart-holder[data-test-chart-name*='Gastos'] {\n"
         "  padding: 8px !important;\n"
         "}\n"
-        "/* Gastos (Unidad): ocupar todo el alto disponible de la pestaña */\n"
+        "/* Gastos (Unidad): ocupar alto disponible sin scroll de página */\n"
         ".dashboard-component-chart-holder[data-test-chart-name*='Gastos'] {\n"
         "  width: 100% !important;\n"
         "  max-width: 100% !important;\n"
@@ -637,6 +637,16 @@ def persist_dashboard_config(
         ".grid-row:has([data-test-chart-name*='Gastos']) {\n"
         "  width: 100% !important;\n"
         "  max-width: 100% !important;\n"
+        "}\n"
+        "/* Pestaña Unidad activa: sin scroll vertical del dashboard */\n"
+        "body.ps-unidad-gastos-active,\n"
+        "body.ps-unidad-gastos-active .dashboard,\n"
+        "body.ps-unidad-gastos-active .dashboard-content,\n"
+        "body.ps-unidad-gastos-active .grid-content,\n"
+        "body.ps-unidad-gastos-active .dashboard-builder-view,\n"
+        "body.ps-unidad-gastos-active #dashboard-view {\n"
+        "  overflow-y: hidden !important;\n"
+        "  max-height: 100vh !important;\n"
         "}\n"
         "/* ⋮ visible alineado con el titulo — Superset 6.x usa data-test=slice-header */\n"
         ".dashboard-component-chart-holder[data-test-chart-name*='Resumen mensual']"
@@ -1223,7 +1233,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         "plan": (1, 10),
         "table": (4, 53),
         "projects": (8, 53),
-        "unidad": (12, 120),  # alto generoso; JS rellena el viewport restante
+        "unidad": (12, 55),  # base; JS ajusta al viewport sin crear scroll de página
         "prob": (6, 36),
         "chart": (6, 36),
     }
