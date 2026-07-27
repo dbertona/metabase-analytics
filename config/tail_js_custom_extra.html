@@ -1400,36 +1400,33 @@
   }
 
   function getDefaultGastosWidths(chart) {
-    var root =
-      chart.querySelector(".ag-root") ||
-      chart.querySelector(".ag-body-viewport") ||
-      chart.querySelector(".slice_container") ||
-      chart;
-    // Ancho útil del card (restar borde + scrollbar vertical).
+    // Medir el card completo (no el center ya reducido por un pin previo).
+    var holder =
+      chart.closest('[data-test="dashboard-component-chart-holder"]') || chart;
     var available = Math.max(
-      480,
-      (root.clientWidth || chart.clientWidth || 1200) - 18
+      520,
+      Math.floor(holder.getBoundingClientRect().width || chart.clientWidth || 1200) -
+        24
     );
-    // Total fijado a la derecha: debe caber entero ("1,981,836 €").
-    var totalW = 128;
-    var conceptoMin = 160;
-    var monthMin = 52;
-    var centerAvail = Math.max(360, available - totalW);
+    // Total pinned a la derecha. Meses deben poder mostrar "713,072 €".
+    var totalW = 118;
+    var conceptoMin = 150;
+    var monthMin = 70;
+    var centerAvail = Math.max(400, available - totalW);
     var monthW = Math.floor((centerAvail - conceptoMin) / 12);
     if (monthW < monthMin) {
       monthW = monthMin;
-      conceptoMin = Math.max(120, centerAvail - monthW * 12);
+      conceptoMin = Math.max(110, centerAvail - monthW * 12);
     }
     var concepto = centerAvail - monthW * 12;
-    if (concepto < 120) {
-      concepto = 120;
-      monthW = Math.max(44, Math.floor((centerAvail - concepto) / 12));
-      concepto = Math.max(120, centerAvail - monthW * 12);
+    if (concepto < 110) {
+      concepto = 110;
+      monthW = Math.max(64, Math.floor((centerAvail - concepto) / 12));
+      concepto = Math.max(110, centerAvail - monthW * 12);
     }
-    // Garantía: concepto + 12 meses + Total ≤ available
-    while (concepto + monthW * 12 + totalW > available && monthW > 44) {
+    while (concepto + monthW * 12 + totalW > available && monthW > 60) {
       monthW -= 1;
-      concepto = Math.max(120, available - totalW - monthW * 12);
+      concepto = Math.max(110, available - totalW - monthW * 12);
     }
     var map = {
       concepto_analitico: concepto,
@@ -1480,8 +1477,11 @@
     var holder =
       chart.closest('[data-test="dashboard-component-chart-holder"]') || chart;
     var cr = holder.getBoundingClientRect();
-    // Más de ~4px fuera del card = recortado
-    return hr.right > cr.right + 4;
+    if (hr.right > cr.right + 4) return true;
+    // Mes 12 también debe caber (síntoma de anchos doblemente restados)
+    var m12 = chart.querySelector('.ag-header-cell[col-id="12"]');
+    if (m12 && m12.getBoundingClientRect().width < 58) return true;
+    return false;
   }
 
   function ensureGastosColumnsFit(chart) {
