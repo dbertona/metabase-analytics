@@ -430,8 +430,9 @@ La tabla no está terminada solo porque se renderice.
 
 ### 9.1 Navegador
 
-- Todas las columnas previstas son visibles y no hay scroll horizontal
-  accidental.
+- Todas las columnas previstas son visibles. Sin scroll horizontal si caben;
+  con overflow real (pantalla estrecha / muchas columnas) la barra horizontal
+  de AG Grid debe aparecer y ser usable.
 - La columna textual usa el espacio restante.
 - El texto permanece en una línea con elipsis.
 - Las métricas son compactas y legibles.
