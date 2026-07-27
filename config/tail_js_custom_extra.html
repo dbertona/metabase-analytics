@@ -850,6 +850,57 @@
     }
   }
 
+  /** Cabecera legible + orden A→Z por concepto (AG Grid ignora a veces customColumnName). */
+  function fixGastosConceptoColumn(api, chart) {
+    if (!api) return;
+    try {
+      var defs = typeof api.getColumnDefs === "function" ? api.getColumnDefs() : null;
+      if (defs && defs.length) {
+        var changed = false;
+        for (var i = 0; i < defs.length; i++) {
+          var d = defs[i] || {};
+          var id = String(d.colId || d.field || "");
+          if (id === "concepto_analitico" || id.indexOf("concepto_analitico") === 0) {
+            if (d.headerName !== "Concepto Analitico") {
+              d.headerName = "Concepto Analitico";
+              changed = true;
+            }
+          }
+        }
+        if (changed && typeof api.setColumnDefs === "function") {
+          api.setColumnDefs(defs);
+        }
+      }
+      // Fallback: colDef directo
+      if (typeof api.getColumn === "function") {
+        var col = api.getColumn("concepto_analitico");
+        if (col && col.getColDef) {
+          col.getColDef().headerName = "Concepto Analitico";
+          if (typeof api.refreshHeader === "function") api.refreshHeader();
+        }
+      }
+      if (typeof api.applyColumnState === "function") {
+        api.applyColumnState({
+          state: [{ colId: "concepto_analitico", sort: "asc", sortIndex: 0 }],
+          defaultState: { sort: null },
+        });
+      }
+    } catch (err) { /* grid aún montando */ }
+
+    // Fallback DOM: sustituye el texto de cabecera si sigue el nombre técnico
+    if (chart) {
+      var headers = chart.querySelectorAll(".ag-header-cell");
+      Array.prototype.forEach.call(headers, function (h) {
+        var colId = h.getAttribute("col-id") || "";
+        if (colId !== "concepto_analitico") return;
+        var label = h.querySelector(".ag-header-cell-text, .ag-header-cell-label");
+        if (label && /concepto_analitico/i.test(label.textContent || "")) {
+          label.textContent = "Concepto Analitico";
+        }
+      });
+    }
+  }
+
   function saveGastosWidthsLocal(map) {
     try { localStorage.setItem(PS_GASTOS_COL_STORAGE_KEY, JSON.stringify(map)); } catch (e) { /* ignore */ }
   }
@@ -867,6 +918,7 @@
 
     function applyFit() {
       applyColWidthMap(api, getDefaultGastosWidths(chart));
+      fixGastosConceptoColumn(api, chart);
       blankGastosNA(chart);
     }
 
@@ -886,6 +938,7 @@
         saveGastosWidthsLocal(map);
       });
       api.addEventListener("modelUpdated", function () {
+        fixGastosConceptoColumn(api, chart);
         blankGastosNA(chart);
       });
       api.addEventListener("firstDataRendered", function () {

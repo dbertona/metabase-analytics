@@ -453,7 +453,10 @@ def gastos_unidad_params() -> dict[str, Any]:
         "groupby": ["concepto_analitico"],
         "metrics": metrics,
         "percent_metrics": [],
-        "order_by_cols": ['["concepto_analitico", true]'],
+        # ASC por concepto (como PBI). true = ascending en order_by_cols de Superset.
+        "order_by_cols": [
+            json.dumps(["concepto_analitico", True], ensure_ascii=False),
+        ],
         "row_limit": 5000,
         "server_pagination": False,
         "show_totals": True,
