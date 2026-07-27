@@ -495,12 +495,13 @@
         }
       }
       if (textIdx >= 0) {
-        // Columna texto = espacio restante tras métricas (mínimo 120px).
-        // El CSS white-space:nowrap (ensurePsTableStyle) garantiza medición correcta.
-        var textW = Math.max(120, avail - metricsTotal);
+        // Columna texto = mayor de (ancho medido de contenido, espacio restante).
+        // Sin maxWidth: el usuario puede ensanchar manualmente sin que AG Grid lo rechace.
+        var naturalW = state[textIdx].width; // medido del textContent real
+        var textW = Math.max(naturalW, avail - metricsTotal, 120);
         state[textIdx].width = textW;
         state[textIdx].minWidth = 100;
-        state[textIdx].maxWidth = textW;
+        // maxWidth intencionalmente NO fijado: permite resize manual libre.
         state[textIdx].flex = null;
       }
     } else if (opts.fitViewport && avail > 80) {
@@ -584,6 +585,34 @@
    * Resumen: columnas al contenido, alineadas a la IZQUIERDA (sin flex).
    * Proyectos: métricas justas; columna texto = resto (sin scroll).
    */
+
+  // Mapa: chart element → timestamp del último resize manual del usuario.
+  // Durante 10s tras un resize manual, no sobreescribimos el ancho del texto.
+  var _psResizeTs = new WeakMap();
+  var PS_RESIZE_COOLDOWN = 10000; // ms
+
+  /**
+   * Registra un listener de resize manual en el grid de Proyectos.
+   * Se llama solo una vez por instancia (marcada con __psResizeListened).
+   */
+  function attachProyectosResizeListener(chart, api) {
+    if (chart.__psResizeListened) return;
+    chart.__psResizeListened = true;
+    try {
+      api.addEventListener("columnResized", function (e) {
+        // finished=true → el usuario soltó el drag (no eventos intermedios)
+        if (e && e.finished) {
+          _psResizeTs.set(chart, Date.now());
+        }
+      });
+    } catch (err) { /* grid aún montando */ }
+  }
+
+  function proyectosUserResizedRecently(chart) {
+    var ts = _psResizeTs.get(chart);
+    return ts && (Date.now() - ts < PS_RESIZE_COOLDOWN);
+  }
+
   function autoSizeAgGridColumns() {
     AG_GRID_CHART_SELECTORS.forEach(function (sel) {
       var charts = document.querySelectorAll(sel);
@@ -603,11 +632,16 @@
           if (resumen) {
             collapseHiddenSortColumns(api);
           }
-          var ok = fitColumnsByDomMeasure(chart, api, {
+          if (proyectos) {
+            // Registrar listener para detectar resize manual del usuario
+            attachProyectosResizeListener(chart, api);
+          }
+          // Si el usuario redimensionó recientemente Proyectos, respetar su elección
+          var skipProyectosResize = proyectos && proyectosUserResizedRecently(chart);
+          var ok = skipProyectosResize || fitColumnsByDomMeasure(chart, api, {
             pad: resumen || proyectos ? 14 : 24,
             lock: !!resumen,
             lockMetrics: !!proyectos,
-            // Resumen: encoger para que quepan las 4 cols a la izquierda
             fitViewport: !!resumen,
             flexTextColumn: !!proyectos,
             collapseSortCols: !!resumen,
@@ -638,12 +672,12 @@
             }
             sortResumenByAnoMes(api);
           }
-          if (proyectos) {
+          if (proyectos && !skipProyectosResize) {
             // Forzar nowrap vía inline style con !important (mayor prioridad que cualquier CSS,
             // incluidos los estilos de AG Grid que puedan tener white-space:normal via clase).
             forceProyectosNowrap(chart, api);
           }
-          if (proyectos && hasHorizontalScroll(chart)) {
+          if (proyectos && !skipProyectosResize && hasHorizontalScroll(chart)) {
             fitColumnsByDomMeasure(chart, api, {
               pad: 12,
               lockMetrics: true,
