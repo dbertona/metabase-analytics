@@ -287,7 +287,6 @@
     delays.forEach(function (ms) {
       setTimeout(function () {
         fillGastosViewportHeight();
-        fixAgGridHeightInner();
       }, ms);
     });
   }
@@ -347,6 +346,7 @@
     AG_GRID_HEIGHT_SELECTORS.forEach(function (sel) {
       var charts = document.querySelectorAll(sel);
       Array.prototype.forEach.call(charts, function (chart) {
+        if (chart.offsetParent === null) return;
         // Gastos ya se ajusta en applyGastosHeightToChart
         if ((chart.getAttribute("data-test-chart-name") || "").indexOf("Gastos") !== -1) {
           return;
@@ -376,6 +376,49 @@
       });
     });
     syncResumenProyectosEqualHeight();
+  }
+
+  function getActiveDashboardTabLabel() {
+    var active = document.querySelector(
+      ".dashboard-component-tabs .ant-tabs-tab-active, .ant-tabs-tab-active"
+    );
+    return active ? (active.textContent || "").replace(/\s+/g, " ").trim() : "";
+  }
+
+  function isResumenTabActive() {
+    var label = getActiveDashboardTabLabel();
+    return /^Resumen$/i.test(label) || /^Resumen\b/i.test(label);
+  }
+
+  function isUnidadTabActive() {
+    return /unidad/i.test(getActiveDashboardTabLabel());
+  }
+
+  function applyResumenLayout() {
+    fixAgGridHeightInner();
+    autoSizeAgGridColumns();
+    hideResumenDropdownControls();
+    placeProyectosSearchInHeader();
+    labelAllAgGridTotals();
+  }
+
+  function applyUnidadLayout() {
+    fillGastosViewportHeight();
+    placeGastosSearchInHeader();
+    labelAllAgGridTotals();
+  }
+
+  var _psLayoutTick = null;
+  function scheduleLayoutTick() {
+    if (_psLayoutTick) clearTimeout(_psLayoutTick);
+    _psLayoutTick = setTimeout(function () {
+      _psLayoutTick = null;
+      if (isUnidadTabActive()) {
+        applyUnidadLayout();
+      } else {
+        applyResumenLayout();
+      }
+    }, 40);
   }
 
   /**
@@ -569,17 +612,18 @@
       var isResumen = /^Resumen$/i.test(label) || /^Resumen\b/i.test(label);
       if (isUnidad && !lastUnidad) {
         burstFillGastosHeight();
+        scheduleLayoutTick();
       } else if (!isUnidad && lastUnidad) {
         document.body.classList.remove("ps-unidad-gastos-active");
         // Al volver a Resumen: llenar pie del viewport + reasegurar totales visibles
-        setTimeout(syncResumenProyectosEqualHeight, 0);
-        setTimeout(syncResumenProyectosEqualHeight, 100);
-        setTimeout(syncResumenProyectosEqualHeight, 400);
-        setTimeout(syncResumenProyectosEqualHeight, 800);
+        setTimeout(scheduleLayoutTick, 0);
+        setTimeout(scheduleLayoutTick, 120);
+        setTimeout(scheduleLayoutTick, 420);
+        setTimeout(scheduleLayoutTick, 820);
       } else if (isResumen) {
-        setTimeout(syncResumenProyectosEqualHeight, 0);
-        setTimeout(syncResumenProyectosEqualHeight, 200);
-        setTimeout(syncResumenProyectosEqualHeight, 600);
+        setTimeout(scheduleLayoutTick, 0);
+        setTimeout(scheduleLayoutTick, 220);
+        setTimeout(scheduleLayoutTick, 620);
       }
       lastUnidad = isUnidad;
     }
@@ -620,10 +664,9 @@
 
     window.addEventListener("resize", function () {
       if (document.body.classList.contains("ps-unidad-gastos-active")) {
-        fillGastosViewportHeight();
-        fixAgGridHeightInner();
+        applyUnidadLayout();
       } else {
-        syncResumenProyectosEqualHeight();
+        applyResumenLayout();
       }
     });
 
@@ -1841,16 +1884,13 @@
     });
   }
 
+  // Tick liviano: utilidades globales + relayout dirigido por pestaña.
   setInterval(function () {
     fixDoubleAppRootAnchors(document);
     fixUsersAnchors(document);
-    fixAgGridHeight();
-    autoSizeAgGridColumns();
     hideResumenHeaderChrome();
     bumpProbabilidadChartFonts();
-    placeProyectosSearchInHeader();
-    hideResumenDropdownControls();
-    placeGastosSearchInHeader();
+    scheduleLayoutTick();
     // Inicializar persistencia de anchos en el chart Proyectos (idempotente)
     var proyCharts = document.querySelectorAll('[data-test-chart-name*="Proyectos"]');
     Array.prototype.forEach.call(proyCharts, function (chart) {
