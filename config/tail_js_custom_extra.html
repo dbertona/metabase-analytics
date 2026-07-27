@@ -592,6 +592,24 @@
     try { api.applyColumnState({ state: state, applyOrder: false }); } catch (e) { /* ignore */ }
   }
 
+  /**
+   * Distribución inicial estable: las métricas quedan compactas y Proyectos
+   * recibe todo el ancho restante del viewport.
+   */
+  function getDefaultProyectosWidths(chart) {
+    var viewport =
+      chart.querySelector(".ag-center-cols-viewport") ||
+      chart.querySelector(".ag-body-viewport");
+    var available = viewport ? viewport.clientWidth : chart.clientWidth;
+    var metricTotal = 110 + 110 + 100;
+    return {
+      proyecto: Math.max(280, available - metricTotal),
+      "Fact.": 110,
+      Coste: 110,
+      "Margen %": 100,
+    };
+  }
+
   /** Guarda en localStorage (fallback inmediato). */
   function saveWidthsLocal(map) {
     try { localStorage.setItem(PS_COL_STORAGE_KEY, JSON.stringify(map)); } catch (e) { /* ignore */ }
@@ -663,8 +681,8 @@
    * Problema raíz: Superset llama api.sizeColumnsToFit() cuando terminan
    * de cargar los datos → sobrescribe lo que aplicamos desde localStorage.
    * Solución: parchar sizeColumnsToFit para que, si hay anchos guardados,
-   * los re-aplique en lugar de igualar columnas. Si no hay anchos guardados,
-   * deja pasar el comportamiento nativo.
+   * los re-aplique en lugar de igualar columnas. Sin estado guardado, las
+   * métricas quedan compactas y Proyectos usa todo el espacio restante.
    */
   function initProyectosColPersist(chart, api) {
     // Guardia por instancia de API (no por DOM: el DOM puede recrearse)
@@ -675,38 +693,25 @@
     // ── 1. Parchear sizeColumnsToFit ──────────────────────────────────────
     // Cuando Superset llama sizeColumnsToFit() tras cargar datos,
     // interceptamos y re-aplicamos los anchos guardados.
-    var _origSizeToFit = api.sizeColumnsToFit.bind(api);
     api.sizeColumnsToFit = function () {
       var saved = loadWidthsLocal();
-      if (saved) {
-        // Hay anchos guardados: primero deja que Superset calcule,
-        // luego sobreescribimos con los guardados tras un tick.
-        try { _origSizeToFit(); } catch (e) { /* ignore */ }
-        setTimeout(function () {
-          var s = loadWidthsLocal();
-          if (s) applyColWidthMap(api, s);
-        }, 0);
-      } else {
-        // Sin anchos guardados: comportamiento nativo
-        try { _origSizeToFit(); } catch (e) { /* ignore */ }
-      }
+      applyColWidthMap(api, saved || getDefaultProyectosWidths(chart));
     };
 
     // ── 2. Restaurar anchos guardados ahora ───────────────────────────────
     var saved = loadWidthsLocal();
-    if (saved) {
-      applyColWidthMap(api, saved);
-      // Re-aplicar tras 500ms por si Superset aún no terminó de renderizar
-      setTimeout(function () {
-        var s = loadWidthsLocal();
-        if (s) applyColWidthMap(api, s);
-      }, 500);
-    }
+    applyColWidthMap(api, saved || getDefaultProyectosWidths(chart));
+    // Re-aplicar tras 500ms por si Superset aún no terminó de renderizar.
+    setTimeout(function () {
+      var s = loadWidthsLocal();
+      applyColWidthMap(api, s || getDefaultProyectosWidths(chart));
+    }, 500);
 
     // ── 3. Escuchar resize manual ─────────────────────────────────────────
     try {
       api.addEventListener("columnResized", function (e) {
-        if (!e || !e.finished) return;
+        // Solo persistir un arrastre real del usuario, nunca nuestros ajustes.
+        if (!e || !e.finished || e.source !== "uiColumnResized") return;
         var map = getColWidthMap(api);
         if (!map) return;
         saveWidthsLocal(map);
