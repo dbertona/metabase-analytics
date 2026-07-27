@@ -174,8 +174,64 @@
         }
       }
     }
+    reserveGastosFooterSpace(chart);
     labelAgGridTotalsRow(chart);
     ensureFloatingBottomVisible(chart);
+  }
+
+  /**
+   * El body viewport de AG Grid tiende a comerse el pie de totales.
+   * Forzamos altura del body = root − cabecera − pie, para que
+   * ag-floating-bottom quede SIEMPRE dentro del card (como en Proyectos).
+   */
+  function reserveGastosFooterSpace(chart) {
+    if (!chart) return;
+    var root = chart.querySelector(".ag-root");
+    var header = chart.querySelector(".ag-header");
+    var body = chart.querySelector(".ag-body-viewport");
+    var bottom = chart.querySelector(".ag-floating-bottom");
+    var pinnedFoot = chart.querySelector(".ag-pinned-right-floating-bottom");
+    if (!root || !body) return;
+
+    var FOOT = 48;
+    var rootH = root.getBoundingClientRect().height;
+    if (!(rootH > 80)) return;
+    var headerH = header ? header.getBoundingClientRect().height : 36;
+    var bodyH = Math.max(100, Math.floor(rootH - headerH - FOOT - 4));
+
+    body.style.setProperty("height", bodyH + "px", "important");
+    body.style.setProperty("max-height", bodyH + "px", "important");
+    body.style.setProperty("min-height", "0", "important");
+    body.style.setProperty("flex", "0 0 " + bodyH + "px", "important");
+
+    [bottom, pinnedFoot].forEach(function (el) {
+      if (!el) return;
+      el.style.setProperty("height", FOOT + "px", "important");
+      el.style.setProperty("min-height", FOOT + "px", "important");
+      el.style.setProperty("max-height", FOOT + "px", "important");
+      el.style.setProperty("flex", "0 0 " + FOOT + "px", "important");
+      el.style.setProperty("flex-shrink", "0", "important");
+      el.style.setProperty("display", "flex", "important");
+      el.style.setProperty("visibility", "visible", "important");
+      el.style.setProperty("opacity", "1", "important");
+      el.style.setProperty("background", "#cbd5e1", "important");
+      el.style.setProperty("border-top", "3px solid #334155", "important");
+      el.style.setProperty("z-index", "40", "important");
+    });
+
+    if (!bottom) return;
+    var holder =
+      chart.closest('[data-test="dashboard-component-chart-holder"]') || chart;
+    var br = bottom.getBoundingClientRect();
+    var hr = holder.getBoundingClientRect();
+    var limit = Math.min(hr.bottom, window.innerHeight - 8);
+    if (br.bottom > limit + 1) {
+      var cut = Math.ceil(br.bottom - limit) + 6;
+      var nextBody = Math.max(80, bodyH - cut);
+      body.style.setProperty("height", nextBody + "px", "important");
+      body.style.setProperty("max-height", nextBody + "px", "important");
+      body.style.setProperty("flex", "0 0 " + nextBody + "px", "important");
+    }
   }
 
   /**
@@ -204,9 +260,7 @@
           var need = Math.ceil(br.bottom - er.bottom) + 6;
           var nextH = Math.ceil(er.height + need);
           // No empujar el card fuera del viewport (Unidad no tiene scroll).
-          var maxH = Math.floor(
-            window.innerHeight - er.top - 10
-          );
+          var maxH = Math.floor(window.innerHeight - er.top - 10);
           if (maxH > 120 && nextH > maxH) nextH = maxH;
           el.style.setProperty("height", nextH + "px", "important");
           el.style.setProperty("max-height", nextH + "px", "important");
@@ -1867,6 +1921,7 @@
       if (!isGastosChart(chart)) return;
       blankGastosNA(chart);
       ensureGastosColumnsFit(chart);
+      if (isGastosChartVisible(chart)) reserveGastosFooterSpace(chart);
       var agTheme = chart.querySelector('[class*="ag-theme"]');
       if (!agTheme) return;
       var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
