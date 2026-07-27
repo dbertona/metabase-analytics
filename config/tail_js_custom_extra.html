@@ -1,5 +1,17 @@
 <script>
 (function () {
+  // Upstream apache/superset#42115 (no en 6.1.0): AG Grid 36 puede dejar
+  // .ag-opacity-zero permanente en la fila pinned de totales.
+  if (!document.getElementById("ps-ag-row-pinned-opacity")) {
+    var style = document.createElement("style");
+    style.id = "ps-ag-row-pinned-opacity";
+    style.textContent =
+      "[data-test-chart-name*='Resumen mensual'] .ag-row-pinned," +
+      "[data-test-chart-name*='Proyectos'] .ag-row-pinned," +
+      "[data-test-chart-name*='Gastos'] .ag-row-pinned{opacity:1!important;}";
+    (document.head || document.documentElement).appendChild(style);
+  }
+
   function appRoot() {
     return window.location.pathname.indexOf("/analytics/") === 0 ? "/analytics" : "";
   }
@@ -287,6 +299,7 @@
     delays.forEach(function (ms) {
       setTimeout(function () {
         fillGastosViewportHeight();
+        fixAgGridHeightInner();
       }, ms);
     });
   }
@@ -346,7 +359,6 @@
     AG_GRID_HEIGHT_SELECTORS.forEach(function (sel) {
       var charts = document.querySelectorAll(sel);
       Array.prototype.forEach.call(charts, function (chart) {
-        if (chart.offsetParent === null) return;
         // Gastos ya se ajusta en applyGastosHeightToChart
         if ((chart.getAttribute("data-test-chart-name") || "").indexOf("Gastos") !== -1) {
           return;
@@ -376,58 +388,6 @@
       });
     });
     syncResumenProyectosEqualHeight();
-  }
-
-  function getActiveDashboardTabLabel() {
-    var active = document.querySelector(
-      ".dashboard-component-tabs .ant-tabs-tab-active, .ant-tabs-tab-active"
-    );
-    return active ? (active.textContent || "").replace(/\s+/g, " ").trim() : "";
-  }
-
-  function isResumenTabActive() {
-    var label = getActiveDashboardTabLabel();
-    return /^Resumen$/i.test(label) || /^Resumen\b/i.test(label);
-  }
-
-  function isUnidadTabActive() {
-    return /unidad/i.test(getActiveDashboardTabLabel());
-  }
-
-  function applyResumenLayout() {
-    fixAgGridHeightInner();
-    autoSizeAgGridColumns();
-    hideResumenDropdownControls();
-    placeProyectosSearchInHeader();
-    labelAllAgGridTotals();
-    var charts = document.querySelectorAll(
-      '[data-test-chart-name*="Resumen mensual"], [data-test-chart-name*="Proyectos"]'
-    );
-    Array.prototype.forEach.call(charts, function (chart) {
-      keepResumenProyectosFooterVisible(chart);
-      setTimeout(function () {
-        keepResumenProyectosFooterVisible(chart);
-      }, 120);
-    });
-  }
-
-  function applyUnidadLayout() {
-    fillGastosViewportHeight();
-    placeGastosSearchInHeader();
-    labelAllAgGridTotals();
-  }
-
-  var _psLayoutTick = null;
-  function scheduleLayoutTick() {
-    if (_psLayoutTick) clearTimeout(_psLayoutTick);
-    _psLayoutTick = setTimeout(function () {
-      _psLayoutTick = null;
-      if (isUnidadTabActive()) {
-        applyUnidadLayout();
-      } else {
-        applyResumenLayout();
-      }
-    }, 40);
   }
 
   /**
@@ -482,42 +442,6 @@
     }
     labelAgGridTotalsRow(chart);
     ensureFloatingBottomVisible(chart);
-    keepResumenProyectosFooterVisible(chart);
-  }
-
-  function isResumenOrProyectosChart(chart) {
-    if (!chart || !chart.getAttribute) return false;
-    var name = chart.getAttribute("data-test-chart-name") || "";
-    return name.indexOf("Resumen mensual") !== -1 || name.indexOf("Proyectos") !== -1;
-  }
-
-  /**
-   * Parche mínimo anti-carrera: si AG Grid recalcula body y empuja el pie fuera
-   * del card tras cambiar de pestaña, recorta solo el body viewport.
-   */
-  function keepResumenProyectosFooterVisible(chart) {
-    if (!isResumenOrProyectosChart(chart)) return;
-    var bottom = chart.querySelector(".ag-floating-bottom");
-    var holder = chart.closest('[data-test="dashboard-component-chart-holder"]');
-    var body = chart.querySelector(".ag-body-viewport");
-    var root = chart.querySelector(".ag-root");
-    var header = chart.querySelector(".ag-header");
-    if (!bottom || !holder || !body || !root) return;
-
-    var br = bottom.getBoundingClientRect();
-    var hr = holder.getBoundingClientRect();
-    if (br.bottom <= hr.bottom + 1) return;
-
-    var rootH = root.getBoundingClientRect().height;
-    if (!(rootH > 80)) return;
-    var headerH = header ? header.getBoundingClientRect().height : 36;
-    var footerH = Math.max(36, Math.min(64, Math.round(br.height) || 40));
-    var bodyH = Math.max(80, Math.floor(rootH - headerH - footerH - 4));
-
-    body.style.setProperty("height", bodyH + "px", "important");
-    body.style.setProperty("max-height", bodyH + "px", "important");
-    body.style.setProperty("min-height", "0", "important");
-    body.style.setProperty("flex", "0 0 " + bodyH + "px", "important");
   }
 
   /**
@@ -657,18 +581,17 @@
       var isResumen = /^Resumen$/i.test(label) || /^Resumen\b/i.test(label);
       if (isUnidad && !lastUnidad) {
         burstFillGastosHeight();
-        scheduleLayoutTick();
       } else if (!isUnidad && lastUnidad) {
         document.body.classList.remove("ps-unidad-gastos-active");
         // Al volver a Resumen: llenar pie del viewport + reasegurar totales visibles
-        setTimeout(scheduleLayoutTick, 0);
-        setTimeout(scheduleLayoutTick, 120);
-        setTimeout(scheduleLayoutTick, 420);
-        setTimeout(scheduleLayoutTick, 820);
+        setTimeout(syncResumenProyectosEqualHeight, 0);
+        setTimeout(syncResumenProyectosEqualHeight, 100);
+        setTimeout(syncResumenProyectosEqualHeight, 400);
+        setTimeout(syncResumenProyectosEqualHeight, 800);
       } else if (isResumen) {
-        setTimeout(scheduleLayoutTick, 0);
-        setTimeout(scheduleLayoutTick, 220);
-        setTimeout(scheduleLayoutTick, 620);
+        setTimeout(syncResumenProyectosEqualHeight, 0);
+        setTimeout(syncResumenProyectosEqualHeight, 200);
+        setTimeout(syncResumenProyectosEqualHeight, 600);
       }
       lastUnidad = isUnidad;
     }
@@ -709,9 +632,10 @@
 
     window.addEventListener("resize", function () {
       if (document.body.classList.contains("ps-unidad-gastos-active")) {
-        applyUnidadLayout();
+        fillGastosViewportHeight();
+        fixAgGridHeightInner();
       } else {
-        applyResumenLayout();
+        syncResumenProyectosEqualHeight();
       }
     });
 
@@ -1929,13 +1853,16 @@
     });
   }
 
-  // Tick liviano: utilidades globales + relayout dirigido por pestaña.
   setInterval(function () {
     fixDoubleAppRootAnchors(document);
     fixUsersAnchors(document);
+    fixAgGridHeight();
+    autoSizeAgGridColumns();
     hideResumenHeaderChrome();
     bumpProbabilidadChartFonts();
-    scheduleLayoutTick();
+    placeProyectosSearchInHeader();
+    hideResumenDropdownControls();
+    placeGastosSearchInHeader();
     // Inicializar persistencia de anchos en el chart Proyectos (idempotente)
     var proyCharts = document.querySelectorAll('[data-test-chart-name*="Proyectos"]');
     Array.prototype.forEach.call(proyCharts, function (chart) {
