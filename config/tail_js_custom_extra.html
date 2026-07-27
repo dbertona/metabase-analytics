@@ -61,6 +61,48 @@
     });
   }
 
+  /**
+   * Solo publica offsets CSS para calc(100dvh - …). No escribe height en charts.
+   */
+  function publishDashboardViewportVars() {
+    var content = document.querySelector(".dashboard-content");
+    if (content) {
+      var top = content.getBoundingClientRect().top;
+      if (top > 40 && top < window.innerHeight * 0.5) {
+        document.documentElement.style.setProperty(
+          "--ps-dash-top",
+          Math.round(top) + "px"
+        );
+      }
+    }
+    var resumen = document.querySelector(
+      '[data-test-chart-name*="Resumen mensual"]'
+    );
+    if (resumen && resumen.offsetParent !== null) {
+      var rt = resumen.getBoundingClientRect().top;
+      if (rt > 80 && rt < window.innerHeight - 120) {
+        document.documentElement.style.setProperty(
+          "--ps-tables-top",
+          Math.round(rt) + "px"
+        );
+      }
+    }
+    var gastos = document.querySelector('[data-test-chart-name*="Gastos"]');
+    if (gastos && gastos.offsetParent !== null) {
+      var gt = gastos.getBoundingClientRect().top;
+      if (gt > 60 && gt < window.innerHeight - 120) {
+        document.documentElement.style.setProperty(
+          "--ps-unidad-top",
+          Math.round(gt) + "px"
+        );
+      }
+    }
+  }
+  window.addEventListener("resize", publishDashboardViewportVars);
+  setInterval(publishDashboardViewportVars, 1200);
+  setTimeout(publishDashboardViewportVars, 0);
+  setTimeout(publishDashboardViewportVars, 400);
+
   var AG_GRID_CHART_SELECTORS = [
     "[data-test-chart-name*='Resumen mensual']",
   ];
