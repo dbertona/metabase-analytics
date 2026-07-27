@@ -298,8 +298,8 @@
     var delays = [0, 16, 50, 100, 200, 400, 700, 1200];
     delays.forEach(function (ms) {
       setTimeout(function () {
+        // Solo Gastos: no tocar Resumen/Proyectos mientras Unidad está activa
         fillGastosViewportHeight();
-        fixAgGridHeightInner();
       }, ms);
     });
   }
@@ -355,38 +355,29 @@
   }
   bindGastosGridMountObserver();
 
+  function getActiveDashboardTabLabel() {
+    var active = document.querySelector(
+      ".dashboard-component-tabs .ant-tabs-tab-active, .ant-tabs-tab-active"
+    );
+    return active ? (active.textContent || "").replace(/\s+/g, " ").trim() : "";
+  }
+
+  function isUnidadTabActive() {
+    return /unidad/i.test(getActiveDashboardTabLabel());
+  }
+
+  function isResumenTabActive() {
+    var label = getActiveDashboardTabLabel();
+    return /^Resumen$/i.test(label) || /^Resumen\b/i.test(label);
+  }
+
+  /**
+   * Resumen/Proyectos: una sola fuente de altura (syncResumenProyectosEqualHeight).
+   * El antiguo path con margen de 8px + overflow:hidden pisaba el pie de totales
+   * tras cambiar de pestaña.
+   */
   function fixAgGridHeightInner() {
-    AG_GRID_HEIGHT_SELECTORS.forEach(function (sel) {
-      var charts = document.querySelectorAll(sel);
-      Array.prototype.forEach.call(charts, function (chart) {
-        // Gastos ya se ajusta en applyGastosHeightToChart
-        if ((chart.getAttribute("data-test-chart-name") || "").indexOf("Gastos") !== -1) {
-          return;
-        }
-        var header = chart.querySelector("[data-test='slice-header']");
-        var sliceContainer = chart.querySelector(".slice_container");
-        var chartContainer = chart.querySelector(".chart-container");
-        var agTheme = chart.querySelector('[class*="ag-theme"]');
-        if (!sliceContainer || !agTheme) return;
-
-        var holderH = chart.getBoundingClientRect().height;
-        var headerH = header ? header.getBoundingClientRect().height : 0;
-        var available = Math.floor(holderH - headerH - 8);
-        if (available < 80) return;
-
-        [sliceContainer, chartContainer, agTheme].forEach(function (el) {
-          if (!el) return;
-          el.style.setProperty("height", available + "px", "important");
-          el.style.setProperty("max-height", available + "px", "important");
-          el.style.setProperty("min-height", available + "px", "important");
-          el.style.setProperty("overflow", "hidden", "important");
-        });
-        var root = agTheme.querySelector(".ag-root-wrapper");
-        if (root) {
-          root.style.setProperty("height", available + "px", "important");
-        }
-      });
-    });
+    if (isUnidadTabActive()) return;
     syncResumenProyectosEqualHeight();
   }
 
@@ -413,7 +404,8 @@
       el.style.setProperty("height", available + "px", "important");
       el.style.setProperty("max-height", available + "px", "important");
       el.style.setProperty("min-height", available + "px", "important");
-      el.style.setProperty("overflow", "visible", "important");
+      // hidden: el margen de 40px ya reserva el pie dentro del card
+      el.style.setProperty("overflow", "hidden", "important");
     });
     if (agTheme) {
       var walk = agTheme.parentElement;
@@ -421,12 +413,12 @@
         walk.style.setProperty("height", available + "px", "important");
         walk.style.setProperty("max-height", available + "px", "important");
         walk.style.setProperty("min-height", "0", "important");
-        walk.style.setProperty("overflow", "visible", "important");
+        walk.style.setProperty("overflow", "hidden", "important");
         walk = walk.parentElement;
       }
-      [" .ag-root-wrapper", " .ag-root-wrapper-body", " .ag-root"].forEach(
+      [".ag-root-wrapper", ".ag-root-wrapper-body", ".ag-root"].forEach(
         function (sel) {
-          var el = agTheme.querySelector(sel.trim());
+          var el = agTheme.querySelector(sel);
           if (!el) return;
           el.style.setProperty("height", available + "px", "important");
           el.style.setProperty("max-height", available + "px", "important");
@@ -563,8 +555,14 @@
   }
 
   function fixAgGridHeight() {
-    fillGastosViewportHeight();
-    fixAgGridHeightInner();
+    // Un motor por pestaña: evita que Gastos y Resumen se pisen.
+    if (isUnidadTabActive()) {
+      fillGastosViewportHeight();
+      return;
+    }
+    if (isResumenTabActive()) {
+      syncResumenProyectosEqualHeight();
+    }
   }
 
   function bindGastosTabHeightListeners() {
@@ -631,10 +629,9 @@
     publishGastosCssHeight();
 
     window.addEventListener("resize", function () {
-      if (document.body.classList.contains("ps-unidad-gastos-active")) {
+      if (isUnidadTabActive()) {
         fillGastosViewportHeight();
-        fixAgGridHeightInner();
-      } else {
+      } else if (isResumenTabActive()) {
         syncResumenProyectosEqualHeight();
       }
     });
