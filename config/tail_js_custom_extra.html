@@ -64,6 +64,11 @@
   var AG_GRID_CHART_SELECTORS = [
     "[data-test-chart-name*='Resumen mensual']",
   ];
+  var AG_GRID_HEIGHT_SELECTORS = [
+    "[data-test-chart-name*='Resumen mensual']",
+    "[data-test-chart-name*='Proyectos']",
+    "[data-test-chart-name*='Gastos']",
+  ];
 
   /**
    * Fuerza que el AG Grid llene todo el espacio disponible dentro del card.
@@ -72,7 +77,7 @@
    * cualquier inline style que React pueda estar poniendo.
    */
   function fixAgGridHeight() {
-    AG_GRID_CHART_SELECTORS.forEach(function (sel) {
+    AG_GRID_HEIGHT_SELECTORS.forEach(function (sel) {
       var charts = document.querySelectorAll(sel);
       Array.prototype.forEach.call(charts, function (chart) {
         var header = chart.querySelector("[data-test='slice-header']");
@@ -763,6 +768,138 @@
 
   // ─── Fin persistencia Proyectos ─────────────────────────────────────────────
 
+  // ─── Persistencia / layout — chart Gastos (pestaña Unidad) ──────────────────
+  var PS_GASTOS_COL_STORAGE_KEY = "ps-gastos-col-widths-v1";
+
+  function isGastosChart(chart) {
+    var name = chart.getAttribute("data-test-chart-name") || "";
+    if (name.indexOf("Gastos") !== -1) return true;
+    var title = chart.querySelector(
+      '[data-test="slice-header"] .header-title, [data-test="slice-header"] .editable-title'
+    );
+    var t = title ? (title.textContent || "").replace(/\s+/g, " ").trim() : "";
+    return t === "Gastos" || t.indexOf("Gastos") === 0;
+  }
+
+  function getDefaultGastosWidths(chart) {
+    var viewport =
+      chart.querySelector(".ag-center-cols-viewport") ||
+      chart.querySelector(".ag-body-viewport");
+    var available = viewport ? viewport.clientWidth : chart.clientWidth;
+    var monthW = 90;
+    var totalW = 110;
+    var metricTotal = monthW * 12 + totalW;
+    var map = {
+      concepto_analitico: Math.max(220, available - metricTotal),
+      Total: totalW,
+    };
+    var months = ["01","02","03","04","05","06","07","08","09","10","11","12"];
+    for (var i = 0; i < months.length; i++) map[months[i]] = monthW;
+    return map;
+  }
+
+  function saveGastosWidthsLocal(map) {
+    try { localStorage.setItem(PS_GASTOS_COL_STORAGE_KEY, JSON.stringify(map)); } catch (e) { /* ignore */ }
+  }
+
+  function loadGastosWidthsLocal() {
+    try {
+      var raw = localStorage.getItem(PS_GASTOS_COL_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function initGastosColPersist(chart, api) {
+    if (api.__psGastosColPersistInit) return;
+    api.__psGastosColPersistInit = true;
+    chart.__psGastosColPersistInit = true;
+
+    api.sizeColumnsToFit = function () {
+      var saved = loadGastosWidthsLocal();
+      applyColWidthMap(api, saved || getDefaultGastosWidths(chart));
+    };
+
+    var saved = loadGastosWidthsLocal();
+    applyColWidthMap(api, saved || getDefaultGastosWidths(chart));
+    setTimeout(function () {
+      var s = loadGastosWidthsLocal();
+      applyColWidthMap(api, s || getDefaultGastosWidths(chart));
+    }, 500);
+
+    try {
+      api.addEventListener("columnResized", function (e) {
+        if (!e || !e.finished || e.source !== "uiColumnResized") return;
+        var map = getColWidthMap(api);
+        if (!map) return;
+        saveGastosWidthsLocal(map);
+      });
+    } catch (err) { /* grid aún montando */ }
+  }
+
+  function placeGastosSearchInHeader() {
+    var charts = document.querySelectorAll('[data-test-chart-name*="Gastos"]');
+    Array.prototype.forEach.call(charts, function (chart) {
+      var header = chart.querySelector('[data-test="slice-header"]');
+      var realInput = chart.querySelector(
+        ".dropdown-controls-container #filter-text-box"
+      );
+      var originalRow = chart.querySelector(".dropdown-controls-container");
+      if (!header || !realInput || !originalRow) return;
+
+      originalRow.style.setProperty("display", "none", "important");
+      if (originalRow.parentElement) {
+        originalRow.parentElement.style.setProperty("height", "100%", "important");
+      }
+
+      var proxy = header.querySelector(".ps-gastos-search-proxy");
+      if (proxy) {
+        proxy.placeholder = realInput.placeholder || "Buscar";
+        return;
+      }
+
+      proxy = document.createElement("input");
+      proxy.type = "text";
+      proxy.placeholder = realInput.placeholder || "Buscar";
+      proxy.className = "ps-gastos-search-proxy";
+      proxy.setAttribute("aria-label", "Buscar conceptos");
+      proxy.style.cssText = [
+        "border:1px solid #d9d9d9",
+        "border-radius:4px",
+        "padding:3px 9px",
+        "font-size:14px",
+        "height:28px",
+        "width:175px",
+        "outline:none",
+        "background:#fff",
+        "color:#333",
+        "flex:0 0 175px",
+        "margin-right:8px",
+      ].join(";");
+
+      proxy.addEventListener("input", function () {
+        var currentInput = chart.querySelector(
+          ".dropdown-controls-container #filter-text-box"
+        );
+        if (!currentInput) return;
+        var descriptor = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype,
+          "value"
+        );
+        descriptor.set.call(currentInput, proxy.value);
+        currentInput.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      proxy.addEventListener("focus", function () {
+        proxy.style.borderColor = "#007c89";
+      });
+      proxy.addEventListener("blur", function () {
+        proxy.style.borderColor = "#d9d9d9";
+      });
+
+      var headerControls = header.querySelector(".header-controls");
+      header.insertBefore(proxy, headerControls || header.lastChild);
+    });
+  }
+
   /**
    * Coloca un buscador proxy inmediatamente antes del menú de tres puntos.
    * El input real permanece en AG Grid para conservar su lógica React, pero su
@@ -904,6 +1041,7 @@
     hideResumenHeaderChrome();
     bumpProbabilidadChartFonts();
     placeProyectosSearchInHeader();
+    placeGastosSearchInHeader();
     // Inicializar persistencia de anchos en el chart Proyectos (idempotente)
     var proyCharts = document.querySelectorAll('[data-test-chart-name*="Proyectos"]');
     Array.prototype.forEach.call(proyCharts, function (chart) {
@@ -914,6 +1052,16 @@
       var api = findAgGridApi(agTheme);
       // La guardia está en la instancia de API para sobrevivir recreaciones del DOM
       if (api && !api.__psColPersistInit) initProyectosColPersist(chart, api);
+    });
+    var gastosCharts = document.querySelectorAll('[data-test-chart-name*="Gastos"]');
+    Array.prototype.forEach.call(gastosCharts, function (chart) {
+      if (!isGastosChart(chart)) return;
+      var agTheme = chart.querySelector('[class*="ag-theme"]');
+      if (!agTheme) return;
+      var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
+      if (!rows.length) return;
+      var api = findAgGridApi(agTheme);
+      if (api && !api.__psGastosColPersistInit) initGastosColPersist(chart, api);
     });
   }, 800);
 

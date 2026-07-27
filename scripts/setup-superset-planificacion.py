@@ -60,6 +60,7 @@ DATASETS = [
     "bi_v_evolucion_mensual",
     "bi_v_facturacion_probabilidad",
     "bi_v_resumen_proyectos",
+    "bi_v_unidad",
 ]
 
 
@@ -412,6 +413,59 @@ def resumen_proyectos_params() -> dict[str, Any]:
     }
 
 
+def gastos_unidad_params() -> dict[str, Any]:
+    """Tabla PBI Unidad/Gastos: Concepto × meses 01-12 + Total (coste, Structure)."""
+    month_cols = [
+        ("m01", "01"),
+        ("m02", "02"),
+        ("m03", "03"),
+        ("m04", "04"),
+        ("m05", "05"),
+        ("m06", "06"),
+        ("m07", "07"),
+        ("m08", "08"),
+        ("m09", "09"),
+        ("m10", "10"),
+        ("m11", "11"),
+        ("m12", "12"),
+        ("total", "Total"),
+    ]
+    column_config: dict[str, Any] = {
+        "concepto_analitico": {
+            "customColumnName": "Concepto Analitico",
+            "truncateLongCells": True,
+            "columnWidth": 280,
+        },
+    }
+    metrics: list[dict[str, Any]] = []
+    for col, label in month_cols:
+        metrics.append(metric_sum(col, label))
+        column_config[label] = {
+            "d3NumberFormat": ",.0f",
+            "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
+            "showCellBars": False,
+            "truncateLongCells": True,
+            "columnWidth": 110 if label == "Total" else 90,
+        }
+    return {
+        "adhoc_filters": dim_adhoc_filters("tipo"),
+        "query_mode": "aggregate",
+        "groupby": ["concepto_analitico"],
+        "metrics": metrics,
+        "percent_metrics": [],
+        "order_by_cols": ['["concepto_analitico", true]'],
+        "row_limit": 5000,
+        "server_pagination": False,
+        "show_totals": True,
+        "include_search": True,
+        "show_cell_bars": False,
+        "color_pn": False,
+        "align_pn": False,
+        "table_timestamp_format": "smart_date",
+        "column_config": column_config,
+    }
+
+
 def big_number_params(metric: dict[str, Any], fmt: str, *, currency: bool = False) -> dict[str, Any]:
     # header_font_size es factor × 16px; 1.25 ≈ 20px (Segoe UI solicitado)
     # subheader = etiqueta bajo el valor (Facturación, Margen, etc.) como en Power BI
@@ -444,22 +498,49 @@ def persist_dashboard_config(
     client: SupersetClient,
     dash_id: int,
     dataset_ids: dict[str, int],
-    chart_ids: list[int],
+    charts: list[dict[str, Any]],
 ) -> None:
     # KPI cards (bi_v_planificacion_kpi) exponen year/empresa/department_code vía
     # adhoc_filters IS NOT NULL (ver dim_adhoc_filters). Valores de filtro Tipo
     # siguen en bi_v_evolucion_mensual.
     detail_ds = dataset_ids["bi_v_planificacion_kpi"]
     evo_ds = dataset_ids["bi_v_evolucion_mensual"]
-    kpi_chart_ids = chart_ids[:8]  # 8 tarjetas Obj/Plan
-    # order: resumen mensual, proyectos, prob, evo, margen
-    table_id = chart_ids[8]
-    projects_id = chart_ids[9]
-    prob_chart_ids = [chart_ids[10]] if len(chart_ids) > 10 else []
-    evo_chart_ids = chart_ids[11:13]  # Evolución + Margen (filtro Tipo)
-    filter_scope_all = (
-        kpi_chart_ids + [table_id, projects_id] + evo_chart_ids + prob_chart_ids
+    by_name = {c["name"]: c["id"] for c in charts}
+    kpi_chart_ids = [
+        by_name[n]
+        for n in (
+            "Obj · Facturación",
+            "Obj · Margen",
+            "Obj · Crecimiento",
+            "Obj · Beneficio",
+            "Plan · Facturación",
+            "Plan · Margen",
+            "Plan · Crecimiento",
+            "Plan · Beneficio",
+        )
+        if n in by_name
+    ]
+    table_id = by_name["Resumen mensual"]
+    projects_id = by_name["Proyectos"]
+    gastos_id = by_name.get("Gastos")
+    prob_chart_ids = (
+        [by_name["Facturación por Probabilidad"]]
+        if "Facturación por Probabilidad" in by_name
+        else []
     )
+    evo_chart_ids = [
+        by_name[n]
+        for n in ("Evolución mensual", "Margen acumulado")
+        if n in by_name
+    ]
+    filter_scope_all = (
+        kpi_chart_ids
+        + [table_id, projects_id]
+        + ([gastos_id] if gastos_id else [])
+        + evo_chart_ids
+        + prob_chart_ids
+    )
+    tabs_all = ["TAB-RESUMEN", "TAB-GRAFICOS", "TAB-UNIDAD"]
 
     dashboard_css = (
         "/* Power BI look: Segoe UI 20px en valor KPI */\n"
@@ -529,13 +610,17 @@ def persist_dashboard_config(
         "}\n"
         "/* Tablas: padding uniforme sin alterar el layout nativo del card */\n"
         ".dashboard-component-chart-holder[data-test-chart-name*='Resumen mensual'],\n"
-        ".dashboard-component-chart-holder[data-test-chart-name*='Proyectos'] {\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Proyectos'],\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Gastos'] {\n"
         "  padding: 8px !important;\n"
         "}\n"
         "/* ⋮ visible alineado con el titulo — Superset 6.x usa data-test=slice-header */\n"
         ".dashboard-component-chart-holder[data-test-chart-name*='Resumen mensual']"
         " [data-test='slice-header'] .header-controls,\n"
         ".dashboard-component-chart-holder[data-test-chart-name*='Proyectos']"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Gastos']"
+        " [data-test='slice-header'] .header-controls,\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Gastos']"
         " [data-test='slice-header'] .header-controls {\n"
         "  display: flex !important;\n"
         "  align-items: center !important;\n"
@@ -727,18 +812,26 @@ def persist_dashboard_config(
         "[data-test-chart-name*='Resumen mensual'] select[aria-label*='page'],\n"
         "[data-test-chart-name*='Resumen mensual'] .row-count-container,\n"
         "[data-test-chart-name*='Proyectos'] .dt-length,\n"
+        "[data-test-chart-name*='Gastos'] .dt-length,\n"
         "[data-test-chart-name*='Proyectos'] .dataTables_length,\n"
+        "[data-test-chart-name*='Gastos'] .dataTables_length,\n"
         "[data-test-chart-name*='Proyectos'] .ant-pagination,\n"
+        "[data-test-chart-name*='Gastos'] .ant-pagination,\n"
         "[data-test-chart-name*='Proyectos'] .pagination-container,\n"
+        "[data-test-chart-name*='Gastos'] .pagination-container,\n"
         "[data-test-chart-name*='Proyectos'] select[aria-label*='page'],\n"
-        "[data-test-chart-name*='Proyectos'] .row-count-container {\n"
+        "[data-test-chart-name*='Gastos'] select[aria-label*='page'],\n"
+        "[data-test-chart-name*='Proyectos'] .row-count-container,\n"
+        "[data-test-chart-name*='Gastos'] .row-count-container {\n"
         "  display: none !important;\n"
         "}\n"
         "/* Cabeceras: sin wrap + borde inferior + fuente (1.56em × 0.85 → 1.33em) */\n"
         "[data-test-chart-name*='Resumen mensual'] thead th,\n"
         "[data-test-chart-name*='Proyectos'] thead th,\n"
+        "[data-test-chart-name*='Gastos'] thead th,\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-header-cell,\n"
-        "[data-test-chart-name*='Proyectos'] .ag-header-cell {\n"
+        "[data-test-chart-name*='Proyectos'] .ag-header-cell,\n"
+        "[data-test-chart-name*='Gastos'] .ag-header-cell {\n"
         "  white-space: nowrap !important;\n"
         "  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;\n"
         "  font-size: 1.26em !important;\n"
@@ -748,16 +841,20 @@ def persist_dashboard_config(
         "/* Celdas: font 1.33em (table + AG Grid) */\n"
         "[data-test-chart-name*='Resumen mensual'] td,\n"
         "[data-test-chart-name*='Proyectos'] td,\n"
+        "[data-test-chart-name*='Gastos'] td,\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-cell,\n"
-        "[data-test-chart-name*='Proyectos'] .ag-cell {\n"
+        "[data-test-chart-name*='Proyectos'] .ag-cell,\n"
+        "[data-test-chart-name*='Gastos'] .ag-cell {\n"
         "  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;\n"
         "  font-size: 1.26em !important;\n"
         "}\n"
         "/* Tablas: altura completa — propagar height por toda la cadena */\n"
         "[data-test-chart-name*='Resumen mensual'] .slice_container,\n"
         "[data-test-chart-name*='Proyectos'] .slice_container,\n"
+        "[data-test-chart-name*='Gastos'] .slice_container,\n"
         "[data-test-chart-name*='Resumen mensual'] .chart-container,\n"
-        "[data-test-chart-name*='Proyectos'] .chart-container {\n"
+        "[data-test-chart-name*='Proyectos'] .chart-container,\n"
+        "[data-test-chart-name*='Gastos'] .chart-container {\n"
         "  height: calc(100% - 8px) !important;\n"
         "  overflow: hidden !important;\n"
         "  display: flex !important;\n"
@@ -765,49 +862,61 @@ def persist_dashboard_config(
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] .slice_container > div,\n"
         "[data-test-chart-name*='Proyectos'] .slice_container > div,\n"
+        "[data-test-chart-name*='Gastos'] .slice_container > div,\n"
         "[data-test-chart-name*='Resumen mensual'] .chart-container > div,\n"
-        "[data-test-chart-name*='Proyectos'] .chart-container > div {\n"
+        "[data-test-chart-name*='Proyectos'] .chart-container > div,\n"
+        "[data-test-chart-name*='Gastos'] .chart-container > div {\n"
         "  height: 100% !important;\n"
         "  flex: 1 1 auto !important;\n"
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] [class*='ag-theme'],\n"
-        "[data-test-chart-name*='Proyectos'] [class*='ag-theme'] {\n"
+        "[data-test-chart-name*='Proyectos'] [class*='ag-theme'],\n"
+        "[data-test-chart-name*='Gastos'] [class*='ag-theme'] {\n"
         "  height: 100% !important;\n"
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-root-wrapper,\n"
-        "[data-test-chart-name*='Proyectos'] .ag-root-wrapper {\n"
+        "[data-test-chart-name*='Proyectos'] .ag-root-wrapper,\n"
+        "[data-test-chart-name*='Gastos'] .ag-root-wrapper {\n"
         "  height: 100% !important;\n"
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-root-wrapper-body,\n"
-        "[data-test-chart-name*='Proyectos'] .ag-root-wrapper-body {\n"
+        "[data-test-chart-name*='Proyectos'] .ag-root-wrapper-body,\n"
+        "[data-test-chart-name*='Gastos'] .ag-root-wrapper-body {\n"
         "  height: 100% !important;\n"
         "  flex: 1 1 auto !important;\n"
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-root,\n"
-        "[data-test-chart-name*='Proyectos'] .ag-root {\n"
+        "[data-test-chart-name*='Proyectos'] .ag-root,\n"
+        "[data-test-chart-name*='Gastos'] .ag-root {\n"
         "  height: 100% !important;\n"
         "}\n"
         "/* Ocultar barras internas */\n"
         "[data-test-chart-name*='Resumen mensual'] .cell-bar,\n"
         "[data-test-chart-name*='Resumen mensual'] .cell-bars,\n"
         "[data-test-chart-name*='Proyectos'] .cell-bar,\n"
-        "[data-test-chart-name*='Proyectos'] .cell-bars {\n"
+        "[data-test-chart-name*='Gastos'] .cell-bar,\n"
+        "[data-test-chart-name*='Proyectos'] .cell-bars,\n"
+        "[data-test-chart-name*='Gastos'] .cell-bars {\n"
         "  display: none !important;\n"
         "}\n"
         "/* Totales AG Grid: ocultar etiqueta Summary/Resumen + icono info */\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-floating-bottom .ag-cell[col-id='ano_mes'],\n"
-        "[data-test-chart-name*='Proyectos'] .ag-floating-bottom .ag-cell[col-id='proyecto'] {\n"
+        "[data-test-chart-name*='Proyectos'] .ag-floating-bottom .ag-cell[col-id='proyecto'],\n"
+        "[data-test-chart-name*='Gastos'] .ag-floating-bottom .ag-cell[col-id='concepto_analitico'] {\n"
         "  visibility: hidden !important;\n"
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-floating-bottom .anticon,\n"
-        "[data-test-chart-name*='Proyectos'] .ag-floating-bottom .anticon {\n"
+        "[data-test-chart-name*='Proyectos'] .ag-floating-bottom .anticon,\n"
+        "[data-test-chart-name*='Gastos'] .ag-floating-bottom .anticon {\n"
         "  display: none !important;\n"
         "}\n"
         "/* Sin scroll horizontal fantasma (anchos se ajustan por JS) */\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-body-horizontal-scroll,\n"
         "[data-test-chart-name*='Proyectos'] .ag-body-horizontal-scroll,\n"
+        "[data-test-chart-name*='Gastos'] .ag-body-horizontal-scroll,\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-body-horizontal-scroll-viewport,\n"
-        "[data-test-chart-name*='Proyectos'] .ag-body-horizontal-scroll-viewport {\n"
+        "[data-test-chart-name*='Proyectos'] .ag-body-horizontal-scroll-viewport,\n"
+        "[data-test-chart-name*='Gastos'] .ag-body-horizontal-scroll-viewport {\n"
         "  display: none !important;\n"
         "  height: 0 !important;\n"
         "  min-height: 0 !important;\n"
@@ -816,8 +925,10 @@ def persist_dashboard_config(
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-center-cols-viewport,\n"
         "[data-test-chart-name*='Proyectos'] .ag-center-cols-viewport,\n"
+        "[data-test-chart-name*='Gastos'] .ag-center-cols-viewport,\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-header-viewport,\n"
-        "[data-test-chart-name*='Proyectos'] .ag-header-viewport {\n"
+        "[data-test-chart-name*='Proyectos'] .ag-header-viewport,\n"
+        "[data-test-chart-name*='Gastos'] .ag-header-viewport {\n"
         "  overflow-x: hidden !important;\n"
         "}\n"
         "/* Resumen mensual: ocultar year/month (solo sirven para orden cronológico) */\n"
@@ -877,7 +988,7 @@ def persist_dashboard_config(
                 "cascadeParentIds": [],
                 "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
                 "chartsInScope": filter_scope_all,
-                "tabsInScope": ["TAB-RESUMEN", "TAB-GRAFICOS"],
+                "tabsInScope": tabs_all,
             },
             {
                 "id": "NATIVE_FILTER-EMPRESA",
@@ -901,7 +1012,7 @@ def persist_dashboard_config(
                 "cascadeParentIds": [],
                 "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
                 "chartsInScope": filter_scope_all,
-                "tabsInScope": ["TAB-RESUMEN", "TAB-GRAFICOS"],
+                "tabsInScope": tabs_all,
             },
             {
                 "id": "NATIVE_FILTER-DEPT",
@@ -920,7 +1031,7 @@ def persist_dashboard_config(
                 "cascadeParentIds": [],
                 "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
                 "chartsInScope": filter_scope_all,
-                "tabsInScope": ["TAB-RESUMEN", "TAB-GRAFICOS"],
+                "tabsInScope": tabs_all,
             },
             {
                 "id": "NATIVE_FILTER-TIPO",
@@ -932,8 +1043,10 @@ def persist_dashboard_config(
                 "controlValues": {"multiSelect": False, "enableEmptyFilter": False},
                 "cascadeParentIds": [],
                 "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
-                "chartsInScope": evo_chart_ids + [table_id, projects_id],
-                "tabsInScope": ["TAB-RESUMEN", "TAB-GRAFICOS"],
+                "chartsInScope": evo_chart_ids
+                + [table_id, projects_id]
+                + ([gastos_id] if gastos_id else []),
+                "tabsInScope": tabs_all,
             },
         ],
     }
@@ -952,11 +1065,12 @@ def persist_dashboard_config(
 
 
 def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
-    """Layout con pestañas: Resumen (KPI+tablas) | Gráficos (evolución)."""
+    """Layout: Resumen | Gráficos | Unidad (Gastos Structure)."""
     obj_keys = [c["key"] for c in charts if c["section"] == "obj"]
     plan_keys = [c["key"] for c in charts if c["section"] == "plan"]
     table_keys = [c["key"] for c in charts if c["section"] == "table"]
     projects_keys = [c["key"] for c in charts if c["section"] == "projects"]
+    unidad_keys = [c["key"] for c in charts if c["section"] == "unidad"]
     prob_keys = [c["key"] for c in charts if c["section"] == "prob"]
     chart_keys = [c["key"] for c in charts if c["section"] == "chart"]
     prob_key = prob_keys[0] if prob_keys else None
@@ -965,6 +1079,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
     kpi_col_width = 6
     tab_resumen = ["ROOT_ID", "GRID_ID", "TABS-MAIN", "TAB-RESUMEN"]
     tab_graficos = ["ROOT_ID", "GRID_ID", "TABS-MAIN", "TAB-GRAFICOS"]
+    tab_unidad = ["ROOT_ID", "GRID_ID", "TABS-MAIN", "TAB-UNIDAD"]
     col_parents = tab_resumen + ["ROW-KPI-BAND", "COLUMN-KPIS"]
     position: dict[str, Any] = {
         "DASHBOARD_VERSION": "v2",
@@ -978,7 +1093,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         "TABS-MAIN": {
             "type": "TABS",
             "id": "TABS-MAIN",
-            "children": ["TAB-RESUMEN", "TAB-GRAFICOS"],
+            "children": ["TAB-RESUMEN", "TAB-GRAFICOS", "TAB-UNIDAD"],
             "parents": ["ROOT_ID", "GRID_ID"],
             "meta": {},
         },
@@ -995,6 +1110,13 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "children": ["ROW-CHARTS"],
             "parents": ["ROOT_ID", "GRID_ID", "TABS-MAIN"],
             "meta": {"text": "Gráficos", "defaultText": "Gráficos"},
+        },
+        "TAB-UNIDAD": {
+            "type": "TAB",
+            "id": "TAB-UNIDAD",
+            "children": ["ROW-UNIDAD"],
+            "parents": ["ROOT_ID", "GRID_ID", "TABS-MAIN"],
+            "meta": {"text": "Unidad", "defaultText": "Unidad"},
         },
         "ROW-KPI-BAND": {
             "type": "ROW",
@@ -1064,6 +1186,12 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "parents": list(tab_graficos),
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
+        "ROW-UNIDAD": {
+            "type": "ROW", "id": "ROW-UNIDAD",
+            "children": unidad_keys,
+            "parents": list(tab_unidad),
+            "meta": {"background": "BACKGROUND_TRANSPARENT"},
+        },
     }
     sizes = {
         # Alturas UI: KPI 10; tablas Resumen/Proyectos misma altura; charts 36.
@@ -1071,6 +1199,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         "plan": (1, 10),
         "table": (4, 53),
         "projects": (8, 53),
+        "unidad": (12, 70),
         "prob": (6, 36),
         "chart": (6, 36),
     }
@@ -1093,6 +1222,9 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             if c["section"] == "projects":
                 display_name = "Proyectos"
             parents = tab_resumen + ["ROW-TABLES"]
+        elif c["section"] == "unidad":
+            display_name = "Gastos"
+            parents = tab_unidad + ["ROW-UNIDAD"]
         else:
             parents = tab_graficos + ["ROW-CHARTS"]
         position[c["key"]] = {
@@ -1126,13 +1258,14 @@ def main() -> int:
     evo_ds = dataset_ids["bi_v_evolucion_mensual"]
     prob_ds = dataset_ids["bi_v_facturacion_probabilidad"]
     proy_ds = dataset_ids["bi_v_resumen_proyectos"]
+    unidad_ds = dataset_ids["bi_v_unidad"]
 
     print("==> 3/4 Creando charts...")
     existing = {c["slice_name"]: c["id"] for c in client.list_charts()}
     stale_names = set(existing) - {
         "Obj · Facturación", "Obj · Margen", "Obj · Crecimiento", "Obj · Beneficio",
         "Plan · Facturación", "Plan · Margen", "Plan · Crecimiento", "Plan · Beneficio",
-        "Resumen mensual", "Proyectos", "Evolución mensual", "Margen acumulado",
+        "Resumen mensual", "Proyectos", "Gastos", "Evolución mensual", "Margen acumulado",
         "Facturación por Probabilidad",
         "Facturación", "Margen", "Crecimiento", "Beneficio", "Δ %",
     }
@@ -1173,6 +1306,8 @@ def main() -> int:
         ("Resumen mensual", "table", evo_ds, "ag-grid-table", resumen_mensual_params()),
         # PBI Resumen Proyectos: Operational + estado Completed/Open/Planning
         ("Proyectos", "projects", proy_ds, "ag-grid-table", resumen_proyectos_params()),
+        # PBI Unidad: coste por concepto×mes (Structure fijo en bi_v_unidad)
+        ("Gastos", "unidad", unidad_ds, "ag-grid-table", gastos_unidad_params()),
         ("Facturación por Probabilidad", "prob", prob_ds, "echarts_timeseries_bar",
          probabilidad_bar_params()),
         ("Evolución mensual", "chart", evo_ds, "echarts_timeseries_line",
@@ -1221,9 +1356,7 @@ def main() -> int:
         })["id"]
 
     client.attach_charts(dash_id, [c["id"] for c in charts])
-    persist_dashboard_config(
-        client, dash_id, dataset_ids, [c["id"] for c in charts]
-    )
+    persist_dashboard_config(client, dash_id, dataset_ids, charts)
 
     print(f"\n✅ Dashboard listo: {SUPERSET_URL}/superset/dashboard/{DASHBOARD_SLUG}/")
     print(f"   Año por defecto: {CURRENT_YEAR}")
