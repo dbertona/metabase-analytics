@@ -2,11 +2,25 @@
 
 ## [Unreleased]
 
-### Added
+## [2026-07-27f] — Cierre rama `feat/pestana-unidad-gastos`
 
-- Pestaña **Unidad** en dashboard `planificacion-ps-analytics` con tabla AG Grid **Gastos**
-  (concepto analítico × meses 01–12 + Total; métrica coste; `tipo_proyecto=Structure` fijo).
-- Vista `bi_v_unidad` en capa BI; filtros nativos Año/Empresa/Dept/Tipo también en Unidad.
+### Summary
+
+- Pestaña **Unidad** con tabla AG Grid **Gastos** y vista `bi_v_unidad`.
+- Dashboard fit-to-viewport por CSS (`100dvh` − offsets), sin motores JS de altura.
+- Totales AG Grid visibles: `ag-theme` anclado al card (`position: absolute; inset: 0`).
+- Quita reaplicación conflictiva de alturas al cambiar Resumen ↔ Unidad.
+
+### Fixed
+
+- Pie de totales recortado por `overflow` al forzar alto de tablas.
+- Hueco gris / scroll vertical por altura fija del layout JSON en la fila de tabs.
+- Flash y pelea de layouts entre Gastos y Resumen/Proyectos.
+
+### Note
+
+- El layout de tablas ya no se recalcula en bucle por JS; solo se publican
+  offsets CSS (`--ps-dash-top`, `--ps-tables-top`, `--ps-unidad-top`).
 
 ## [2026-07-27e] — Filtro nativo Proyectos
 
