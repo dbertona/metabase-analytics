@@ -131,7 +131,9 @@
     var chartContainer = chart.querySelector(".chart-container");
     var agTheme = chart.querySelector('[class*="ag-theme"]');
     var headerH = header ? header.getBoundingClientRect().height : 28;
-    var available = Math.max(80, Math.floor(target - headerH - 8));
+    // Padding card + margen para que la fila de totales (floating-bottom) no
+    // quede recortada por overflow:hidden del holder (como en Proyectos).
+    var available = Math.max(80, Math.floor(target - headerH - 24));
 
     [sliceContainer, chartContainer, agTheme].forEach(function (el) {
       if (!el) return;
@@ -140,10 +142,30 @@
       el.style.setProperty("min-height", available + "px", "important");
       el.style.setProperty("overflow", "hidden", "important");
     });
+    // Wrappers intermedios (ag_grid_table, etc.) a veces se quedan cortos y el
+    // floating-bottom se pinta fuera del card → totales “invisible”.
     if (agTheme) {
+      var walk = agTheme.parentElement;
+      while (walk && walk !== chart) {
+        walk.style.setProperty("height", available + "px", "important");
+        walk.style.setProperty("max-height", available + "px", "important");
+        walk.style.setProperty("min-height", "0", "important");
+        walk = walk.parentElement;
+      }
       var root = agTheme.querySelector(".ag-root-wrapper");
       if (root) {
         root.style.setProperty("height", available + "px", "important");
+        root.style.setProperty("max-height", available + "px", "important");
+      }
+      var rootBody = agTheme.querySelector(".ag-root-wrapper-body");
+      if (rootBody) {
+        rootBody.style.setProperty("height", available + "px", "important");
+        rootBody.style.setProperty("max-height", available + "px", "important");
+      }
+      var agRoot = agTheme.querySelector(".ag-root");
+      if (agRoot) {
+        agRoot.style.setProperty("height", available + "px", "important");
+        agRoot.style.setProperty("max-height", available + "px", "important");
       }
       if (typeof agTheme.__psApiResize === "function") {
         try { agTheme.__psApiResize(); } catch (e) { /* ignore */ }
@@ -153,7 +175,7 @@
 
   function computeGastosTargetHeight() {
     var chromeBottom = measureGastosChromeBottom();
-    var bottomPad = 10;
+    var bottomPad = 16;
     var target = Math.floor(window.innerHeight - chromeBottom - bottomPad);
     if (target < 280) target = 280;
     return target;
