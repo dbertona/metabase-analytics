@@ -966,6 +966,8 @@ def persist_dashboard_config(
         "[data-test-chart-name*='Proyectos'] [class*='ag-theme'],\n"
         "[data-test-chart-name*='Gastos'] [class*='ag-theme'] {\n"
         "  height: 100% !important;\n"
+        "  min-height: 100% !important;\n"
+        "  flex: 1 1 auto !important;\n"
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-root-wrapper,\n"
         "[data-test-chart-name*='Proyectos'] .ag-root-wrapper,\n"

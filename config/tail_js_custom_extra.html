@@ -259,6 +259,7 @@
         }
         var header = chart.querySelector("[data-test='slice-header']");
         var sliceContainer = chart.querySelector(".slice_container");
+        var chartContainer = chart.querySelector(".chart-container");
         var agTheme = chart.querySelector('[class*="ag-theme"]');
         if (!sliceContainer || !agTheme) return;
 
@@ -267,13 +268,79 @@
         var available = Math.floor(holderH - headerH - 8);
         if (available < 80) return;
 
-        var current = parseInt(sliceContainer.style.height, 10);
-        if (Math.abs(current - available) < 4) return;
-
-        sliceContainer.style.setProperty("height", available + "px", "important");
-        sliceContainer.style.setProperty("overflow", "hidden", "important");
-        agTheme.style.setProperty("height", available + "px", "important");
+        [sliceContainer, chartContainer, agTheme].forEach(function (el) {
+          if (!el) return;
+          el.style.setProperty("height", available + "px", "important");
+          el.style.setProperty("max-height", available + "px", "important");
+          el.style.setProperty("min-height", available + "px", "important");
+          el.style.setProperty("overflow", "hidden", "important");
+        });
+        var root = agTheme.querySelector(".ag-root-wrapper");
+        if (root) {
+          root.style.setProperty("height", available + "px", "important");
+        }
       });
+    });
+    syncResumenProyectosEqualHeight();
+  }
+
+  /**
+   * Resumen mensual y Proyectos deben compartir el mismo alto de card y de grid.
+   * Antes el AG de Resumen quedaba más bajo (auto-size a ~12 filas) aunque el
+   * holder midiera igual.
+   */
+  function syncResumenProyectosEqualHeight() {
+    var resumen = document.querySelector(
+      '[data-test-chart-name*="Resumen mensual"]'
+    );
+    var proyectos = document.querySelector(
+      '[data-test-chart-name*="Proyectos"]'
+    );
+    if (!resumen || !proyectos) return;
+    if (resumen.offsetParent === null || proyectos.offsetParent === null) return;
+
+    var hR = resumen.getBoundingClientRect().height;
+    var hP = proyectos.getBoundingClientRect().height;
+    var target = Math.max(Math.floor(hR), Math.floor(hP));
+    if (target < 120) return;
+
+    [resumen, proyectos].forEach(function (chart) {
+      chart.style.setProperty("height", target + "px", "important");
+      chart.style.setProperty("max-height", target + "px", "important");
+      chart.style.setProperty("min-height", target + "px", "important");
+
+      var node = chart.parentElement;
+      for (var i = 0; i < 6 && node && node !== document.body; i++) {
+        var cls = node.className || "";
+        if (
+          cls.indexOf("resizable-container") !== -1 ||
+          cls.indexOf("dashboard-component") !== -1 ||
+          cls.indexOf("dragdroppable") !== -1 ||
+          cls.indexOf("grid-row") !== -1
+        ) {
+          node.style.setProperty("height", target + "px", "important");
+          node.style.setProperty("min-height", target + "px", "important");
+          node.style.setProperty("max-height", target + "px", "important");
+        }
+        node = node.parentElement;
+      }
+
+      var header = chart.querySelector("[data-test='slice-header']");
+      var headerH = header ? header.getBoundingClientRect().height : 28;
+      var available = Math.max(80, Math.floor(target - headerH - 8));
+      var sliceContainer = chart.querySelector(".slice_container");
+      var chartContainer = chart.querySelector(".chart-container");
+      var agTheme = chart.querySelector('[class*="ag-theme"]');
+      [sliceContainer, chartContainer, agTheme].forEach(function (el) {
+        if (!el) return;
+        el.style.setProperty("height", available + "px", "important");
+        el.style.setProperty("max-height", available + "px", "important");
+        el.style.setProperty("min-height", available + "px", "important");
+      });
+      if (agTheme) {
+        var root = agTheme.querySelector(".ag-root-wrapper");
+        if (root) root.style.setProperty("height", available + "px", "important");
+      }
     });
   }
 
