@@ -180,7 +180,7 @@ El bloque canónico para cualquier tabla AG Grid:
 [data-test-chart-name*='Nombre del chart'] .ag-header-cell {
   white-space: nowrap !important;
   font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;
-  font-size: 1.26em !important;
+  font-size: 1.197em !important;
   border-bottom: 2px solid #d1d5db !important;
   box-shadow: none !important;
 }
@@ -189,7 +189,7 @@ El bloque canónico para cualquier tabla AG Grid:
 [data-test-chart-name*='Nombre del chart'] td,
 [data-test-chart-name*='Nombre del chart'] .ag-cell {
   font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;
-  font-size: 1.26em !important;
+  font-size: 1.197em !important;
 }
 
 /* ══ OCULTAR PAGINACIÓN Y BARRAS ══ */

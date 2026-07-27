@@ -1406,7 +1406,7 @@
   /**
    * Facturación por Probabilidad (ECharts):
    * - título = mismo tamaño que otros charts (CSS global 16px)
-   * - ejes/valores = mismo px que celdas AG Grid (1.26em)
+   * - ejes/valores = mismo px que celdas AG Grid (1.197em)
    * Nota: en Superset 6 no existe window.echarts → hay que hallar la instancia en el DOM.
    */
   function getTableFontPx() {
@@ -1417,7 +1417,7 @@
       var fs = parseFloat(window.getComputedStyle(cell).fontSize);
       if (fs && fs >= 10) return Math.round(fs);
     }
-    // Probe 1.26em (misma regla CSS de tablas) dentro del tema AG Grid
+    // Probe 1.197em (misma regla CSS de tablas) dentro del tema AG Grid
     var host =
       document.querySelector(
         "[data-test-chart-name*='Resumen mensual'] [class*='ag-theme']"
@@ -1425,7 +1425,7 @@
     var probe = document.createElement("span");
     probe.style.cssText =
       "font-family:'Segoe UI',-apple-system,Roboto,Helvetica,Arial,sans-serif;" +
-      "font-size:1.26em;position:absolute;left:-9999px;visibility:hidden;";
+      "font-size:1.197em;position:absolute;left:-9999px;visibility:hidden;";
     probe.textContent = "Ag";
     host.appendChild(probe);
     var px = Math.round(parseFloat(window.getComputedStyle(probe).fontSize) || 0);
