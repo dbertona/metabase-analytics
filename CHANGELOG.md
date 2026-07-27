@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Pestaña **Unidad** en dashboard `planificacion-ps-analytics` con tabla AG Grid **Gastos**
+  (concepto analítico × meses 01–12 + Total; métrica coste; `tipo_proyecto=Structure` fijo).
+- Vista `bi_v_unidad` en capa BI; filtros nativos Año/Empresa/Dept/Tipo también en Unidad.
+
 ## [2026-07-27b] — Cierre rama `fix/probabilidad-formato-euro-porcentaje`
 
 ### Summary
