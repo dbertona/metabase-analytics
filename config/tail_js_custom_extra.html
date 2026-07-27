@@ -624,6 +624,36 @@
   }
 
   /**
+   * Lee los anchos compartidos de la configuración del gráfico.
+   * Solo acepta el estado cuando contiene las cuatro columnas; así, el
+   * columnWidth inicial de Proyectos no se confunde con un ajuste guardado.
+   */
+  function loadWidthsFromSuperset() {
+    var base = window.location.pathname.indexOf("/analytics/") === 0 ? "/analytics" : "";
+    return fetch(base + "/api/v1/chart/" + PS_CHART_ID, {
+      credentials: "same-origin",
+    })
+      .then(function (r) {
+        if (!r.ok) return null;
+        return r.json();
+      })
+      .then(function (chartData) {
+        if (!chartData) return null;
+        var params = JSON.parse((chartData.result || {}).params || "{}");
+        var config = params.column_config || {};
+        var ids = ["proyecto", "Fact.", "Coste", "Margen %"];
+        var map = {};
+        for (var i = 0; i < ids.length; i += 1) {
+          var width = Number((config[ids[i]] || {}).columnWidth);
+          if (!width || width <= 0) return null;
+          map[ids[i]] = width;
+        }
+        return map;
+      })
+      .catch(function () { return null; });
+  }
+
+  /**
    * Llama a PUT /api/v1/chart/:id para actualizar columnWidth en column_config.
    * Usa la sesión del usuario logueado (cookie HTTPS + CSRF).
    * Si el usuario no tiene permisos de escritura, falla silenciosamente.
@@ -701,6 +731,14 @@
     // ── 2. Restaurar anchos guardados ahora ───────────────────────────────
     var saved = loadWidthsLocal();
     applyColWidthMap(api, saved || getDefaultProyectosWidths(chart));
+    if (!saved) {
+      // Un navegador nuevo obtiene el último estado compartido del gráfico.
+      loadWidthsFromSuperset().then(function (shared) {
+        if (!shared) return;
+        saveWidthsLocal(shared);
+        applyColWidthMap(api, shared);
+      });
+    }
     // Re-aplicar tras 500ms por si Superset aún no terminó de renderizar.
     setTimeout(function () {
       var s = loadWidthsLocal();
