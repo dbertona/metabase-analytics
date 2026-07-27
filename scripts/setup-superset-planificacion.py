@@ -356,27 +356,30 @@ def resumen_proyectos_params() -> dict[str, Any]:
         "color_pn": True,
         "align_pn": False,
         "table_timestamp_format": "smart_date",
-        # truncateLongCells=True → AG Grid: wrapText=false + autoHeight=false en todas las cols.
-        # Sin esto, el plugin pone wrapText=true por defecto y el texto siempre se parte.
-        "truncateLongCells": True,
         "column_config": {
             "proyecto": {
                 "customColumnName": "Proyectos",
-                # Sin columnWidth fijo: auto-size al contenido vía tail_js (autoSizeAllColumns)
+                # truncateLongCells en column_config → AG Grid: wrapText=false + autoHeight=false.
+                # El plugin ag-grid-table lee z.truncateLongCells (z = column config), sin esto
+                # pone wrapText=true por defecto y el texto siempre se parte en varias líneas.
+                "truncateLongCells": True,
             },
             "Fact.": {
                 "d3NumberFormat": ",.0f",
                 "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
                 "showCellBars": False,
+                "truncateLongCells": True,
             },
             "Coste": {
                 "d3NumberFormat": ",.0f",
                 "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
                 "showCellBars": False,
+                "truncateLongCells": True,
             },
             "Margen %": {
                 "d3NumberFormat": ".2f",
                 "showCellBars": False,
+                "truncateLongCells": True,
             },
         },
     }
