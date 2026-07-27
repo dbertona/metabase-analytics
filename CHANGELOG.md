@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [2026-07-27] — Cierre rama `feat/ag-grid-autosize-columns`
+
+### Added / Changed
+
+- Patrón canónico de tablas AG Grid (Proyectos): autosize, buscador en cabecera, altura completa del card, persistencia de anchos (localStorage + API compartida), sin scroll horizontal fantasma.
+- Documentación integral en `docs/TABLAS_AG_GRID.md` y regla `.cursor/rules/superset-table-ag-grid.mdc`.
+- Métrica «Fact.» en Resumen/Proyectos; orden cronológico en Resumen mensual; tipografía alineada en Facturación por Probabilidad.
+
+### Fixed
+
+- Snapback de columnas, truncateLongCells, CSRF al recrear chart, permisos de escritura compartida (`dbertona`), altura Proyectos = Resumen.
+
 ## [2026-07-26ay] — Resumen: fallback de orden cronológico forzado
 
 ### Fixed
