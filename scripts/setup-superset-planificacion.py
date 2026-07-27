@@ -83,6 +83,13 @@ class SupersetClient:
             raise RuntimeError(f"{method} {path} -> {exc.code}: {exc.read().decode()}") from exc
 
     def login(self) -> None:
+        # Inicializar sesión Flask antes de pedir el CSRF token.
+        # Sin esta llamada, Superset no guarda cookie de sesión y el token CSRF
+        # no puede validarse → todas las PUT/POST/DELETE fallan con 400 CSRF missing.
+        try:
+            self._request("GET", "/", auth=False)
+        except Exception:
+            pass
         res = self._request(
             "POST",
             "/api/v1/security/login",
@@ -103,8 +110,11 @@ class SupersetClient:
         items = res.get("result") or []
         if items:
             db_id = items[0]["id"]
-            self._request("PUT", f"/api/v1/database/{db_id}", PS_DB)
-            print(f"BD actualizada: {PS_DB['database_name']} (id={db_id})")
+            try:
+                self._request("PUT", f"/api/v1/database/{db_id}", PS_DB)
+                print(f"BD actualizada: {PS_DB['database_name']} (id={db_id})")
+            except RuntimeError as e:
+                print(f"BD sin cambios (CSRF/permisos, se usa existente): {PS_DB['database_name']} (id={db_id})")
             return db_id
         db_id = self._request("POST", "/api/v1/database/", PS_DB)["id"]
         print(f"BD creada: {PS_DB['database_name']} (id={db_id})")
