@@ -8,6 +8,19 @@
   (concepto analítico × meses 01–12 + Total; métrica coste; `tipo_proyecto=Structure` fijo).
 - Vista `bi_v_unidad` en capa BI; filtros nativos Año/Empresa/Dept/Tipo también en Unidad.
 
+## [2026-07-27e] — Filtro nativo Proyectos
+
+### Added
+
+- Filtro `NATIVE_FILTER-PROYECTO` (multi-select) sobre `proyecto`.
+- Scope: Resumen mensual, Proyectos, Evolución, Margen acumulado, Probabilidad.
+- Vistas `bi_v_evolucion_mensual` y `bi_v_facturacion_probabilidad` con grano por
+  proyecto (sin mostrar la columna en esos charts).
+
+### Note
+
+- KPIs Obj/Plan y Gastos (Unidad) quedan fuera del filtro proyecto.
+
 ## [2026-07-27d] — Sin scroll vertical de página (panel filtros)
 
 ### Fixed

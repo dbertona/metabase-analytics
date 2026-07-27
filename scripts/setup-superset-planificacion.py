@@ -135,17 +135,35 @@ class SupersetClient:
     def ensure_dataset(self, db_id: int, table_name: str) -> int:
         q = {"filters": [{"col": "table_name", "opr": "eq", "value": table_name}]}
         res = self._request("GET", f"/api/v1/dataset/?q={urllib.parse.quote(json.dumps(q))}")
+        ds_id: int | None = None
         for item in res.get("result") or []:
             if item.get("database", {}).get("id") == db_id:
-                print(f"Dataset: {table_name} (id={item['id']})")
-                return item["id"]
-        ds_id = self._request(
-            "POST",
-            "/api/v1/dataset/",
-            {"database": db_id, "schema": "public", "table_name": table_name},
-        )["id"]
-        print(f"Dataset creado: {table_name} (id={ds_id})")
+                ds_id = int(item["id"])
+                break
+        if ds_id is None:
+            ds_id = int(
+                self._request(
+                    "POST",
+                    "/api/v1/dataset/",
+                    {"database": db_id, "schema": "public", "table_name": table_name},
+                )["id"]
+            )
+            print(f"Dataset creado: {table_name} (id={ds_id})")
+        else:
+            print(f"Dataset: {table_name} (id={ds_id})")
+        # Sincronizar columnas tras ALTER de vistas BI (p. ej. +proyecto).
+        self.refresh_dataset(ds_id)
         return ds_id
+
+    def refresh_dataset(self, ds_id: int) -> None:
+        for method in ("PUT", "POST"):
+            try:
+                self._request(method, f"/api/v1/dataset/{ds_id}/refresh")
+                print(f"  columnas refrescadas (dataset id={ds_id})")
+                return
+            except RuntimeError:
+                continue
+        print(f"  aviso: no se pudo refrescar columnas dataset id={ds_id}")
 
     def list_charts(self) -> list[dict[str, Any]]:
         res = self._request(
@@ -286,8 +304,7 @@ def probabilidad_bar_params() -> dict[str, Any]:
     No usar x_axis_title '%' (queda flotando).
     """
     return {
-        "adhoc_filters": dim_adhoc_filters(),
-        "x_axis": "probabilidad",
+        "adhoc_filters": dim_adhoc_filters("proyecto"),
         "metrics": [metric_sum("facturacion", "Facturación")],
         "groupby": [],
         "orientation": "horizontal",
@@ -312,7 +329,7 @@ def resumen_mensual_params() -> dict[str, Any]:
     """Tabla PBI Resumen: AñoMes | Fact. | Coste | Margen % (agregada)."""
     # Orden backend robusto: year+month ASC (evita orden erróneo por Fact. DESC).
     return {
-        "adhoc_filters": dim_adhoc_filters("tipo"),
+        "adhoc_filters": dim_adhoc_filters("tipo", "proyecto"),
         "query_mode": "aggregate",
         "groupby": ["year", "month", "ano_mes"],
         "metrics": [
@@ -361,7 +378,7 @@ def resumen_mensual_params() -> dict[str, Any]:
 def resumen_proyectos_params() -> dict[str, Any]:
     """Tabla PBI Resumen Proyectos: Proyecto | Fact. | Coste | Margen %."""
     return {
-        "adhoc_filters": dim_adhoc_filters("tipo"),
+        "adhoc_filters": dim_adhoc_filters("tipo", "proyecto"),
         "query_mode": "aggregate",
         "groupby": ["proyecto"],
         "metrics": [
@@ -518,9 +535,10 @@ def persist_dashboard_config(
 ) -> None:
     # KPI cards (bi_v_planificacion_kpi) exponen year/empresa/department_code vía
     # adhoc_filters IS NOT NULL (ver dim_adhoc_filters). Valores de filtro Tipo
-    # siguen en bi_v_evolucion_mensual.
+    # siguen en bi_v_evolucion_mensual; Proyectos en bi_v_resumen_proyectos.
     detail_ds = dataset_ids["bi_v_planificacion_kpi"]
     evo_ds = dataset_ids["bi_v_evolucion_mensual"]
+    proy_ds = dataset_ids["bi_v_resumen_proyectos"]
     by_name = {c["name"]: c["id"] for c in charts}
     kpi_chart_ids = [
         by_name[n]
@@ -549,6 +567,10 @@ def persist_dashboard_config(
         for n in ("Evolución mensual", "Margen acumulado")
         if n in by_name
     ]
+    # Filtro proyecto: tablas/gráficos con columna proyecto (no KPIs ni Gastos).
+    project_filter_charts = (
+        [table_id, projects_id] + evo_chart_ids + prob_chart_ids
+    )
     filter_scope_all = (
         kpi_chart_ids
         + [table_id, projects_id]
@@ -1162,6 +1184,24 @@ def persist_dashboard_config(
                 + ([gastos_id] if gastos_id else []),
                 "tabsInScope": tabs_all,
             },
+            {
+                "id": "NATIVE_FILTER-PROYECTO",
+                "name": "Proyectos",
+                "filterType": "filter_select",
+                "type": "NATIVE_FILTER",
+                "targets": [{"datasetId": proy_ds, "column": {"name": "proyecto"}}],
+                "defaultDataMask": {"filterState": {"value": None}},
+                "controlValues": {
+                    "multiSelect": True,
+                    "enableEmptyFilter": False,
+                    "sortAscending": True,
+                    "searchAllOptions": True,
+                },
+                "cascadeParentIds": [],
+                "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
+                "chartsInScope": project_filter_charts,
+                "tabsInScope": tabs_all,
+            },
         ],
     }
     client._request(
@@ -1174,7 +1214,7 @@ def persist_dashboard_config(
     )
     print(
         f"Dashboard config persistida vía API "
-        f"(filtros evo_ds={evo_ds} + KPI detail_ds={detail_ds})"
+        f"(filtros evo_ds={evo_ds} + KPI detail_ds={detail_ds} + proy_ds={proy_ds})"
     )
 
 
@@ -1427,13 +1467,18 @@ def main() -> int:
         ("Facturación por Probabilidad", "prob", prob_ds, "echarts_timeseries_bar",
          probabilidad_bar_params()),
         ("Evolución mensual", "chart", evo_ds, "echarts_timeseries_line",
-         {"adhoc_filters": dim_adhoc_filters("tipo"),
+         {"adhoc_filters": dim_adhoc_filters("tipo", "proyecto"),
           "x_axis": "ano_mes", "metrics": [metric_sum("facturacion", "Facturación")],
           "groupby": [], "row_limit": 1000}),
         ("Margen acumulado", "chart", evo_ds, "echarts_timeseries_line",
-         {"adhoc_filters": dim_adhoc_filters("tipo"),
+         {"adhoc_filters": dim_adhoc_filters("tipo", "proyecto"),
           "x_axis": "ano_mes",
-          "metrics": [metric_sql("AVG(margen_pct)", "Margen %")],
+          "metrics": [
+              metric_sql(
+                  "(SUM(facturacion) - SUM(coste)) / NULLIF(SUM(facturacion), 0) * 100",
+                  "Margen %",
+              )
+          ],
           "row_limit": 1000}),
     ]
 
