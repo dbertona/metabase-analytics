@@ -1037,6 +1037,73 @@
   // ─── Persistencia / layout — chart Gastos (pestaña Unidad) ──────────────────
   var PS_GASTOS_COL_STORAGE_KEY = "ps-gastos-col-widths-v1";
 
+  /**
+   * AG Grid Table (Superset) ignora order_by_cols de dimensión y manda
+   * ORDER BY primer metric (m01/"01" DESC). Reescribimos el body de /chart/data
+   * para forzar ORDER BY concepto_analitico ASC — datos llegan ya ordenados,
+   * sin reordenado client-side (refresh feo).
+   */
+  (function patchGastosChartDataOrder() {
+    if (window.__psGastosOrderPatch) return;
+    window.__psGastosOrderPatch = true;
+
+    function rewriteBody(bodyStr) {
+      if (!bodyStr || typeof bodyStr !== "string") return bodyStr;
+      try {
+        var body = JSON.parse(bodyStr);
+        var queries = body.queries;
+        if (!Array.isArray(queries)) return bodyStr;
+        var changed = false;
+        for (var i = 0; i < queries.length; i++) {
+          var q = queries[i];
+          if (!q) continue;
+          var cols = q.columns || [];
+          var hasConcepto = false;
+          for (var j = 0; j < cols.length; j++) {
+            var c = cols[j];
+            if (c === "concepto_analitico") hasConcepto = true;
+            else if (c && typeof c === "object" && (c.label === "concepto_analitico" || c.sqlExpression === "concepto_analitico")) {
+              hasConcepto = true;
+            }
+          }
+          if (!hasConcepto) continue;
+          q.orderby = [["concepto_analitico", true]];
+          changed = true;
+        }
+        return changed ? JSON.stringify(body) : bodyStr;
+      } catch (e) {
+        return bodyStr;
+      }
+    }
+
+    if (typeof window.fetch === "function") {
+      var origFetch = window.fetch;
+      window.fetch = function (input, init) {
+        var url = String(input && input.url ? input.url : input);
+        if (url.indexOf("chart/data") !== -1 && init && init.body) {
+          var next = rewriteBody(init.body);
+          if (next !== init.body) {
+            init = Object.assign({}, init, { body: next });
+          }
+        }
+        return origFetch.call(this, input, init);
+      };
+    }
+
+    var XO = XMLHttpRequest.prototype.open;
+    var XS = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function (method, url) {
+      this.__psUrl = url;
+      return XO.apply(this, arguments);
+    };
+    XMLHttpRequest.prototype.send = function (body) {
+      if (this.__psUrl && String(this.__psUrl).indexOf("chart/data") !== -1 && body) {
+        body = rewriteBody(body);
+      }
+      return XS.call(this, body);
+    };
+  })();
+
   function isGastosChart(chart) {
     var name = chart.getAttribute("data-test-chart-name") || "";
     if (name.indexOf("Gastos") !== -1) return true;
