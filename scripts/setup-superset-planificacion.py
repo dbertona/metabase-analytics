@@ -638,7 +638,32 @@ def persist_dashboard_config(
         "  width: 100% !important;\n"
         "  max-width: 100% !important;\n"
         "}\n"
+        "/*\n"
+        " * Altura ESTABLE al abrir Unidad (sin flash corto→alto).\n"
+        " * CSS :has aplica en el mismo frame que Ant activa el tabpane;\n"
+        " * no depende del JS tardío. --ps-gastos-h lo afina el JS si hace falta.\n"
+        " */\n"
+        ":root { --ps-gastos-h: calc(100dvh - 210px); }\n"
+        ".ant-tabs-tabpane-active:has([data-test-chart-name*='Gastos'])\n"
+        " .dashboard-component-chart-holder[data-test-chart-name*='Gastos'],\n"
+        ".ant-tabs-tabpane-active:has([data-test-chart-name*='Gastos'])\n"
+        " .dragdroppable-row:has([data-test-chart-name*='Gastos']),\n"
+        ".ant-tabs-tabpane-active:has([data-test-chart-name*='Gastos'])\n"
+        " .grid-row:has([data-test-chart-name*='Gastos']),\n"
+        ".ant-tabs-tabpane-active:has([data-test-chart-name*='Gastos'])\n"
+        " .dashboard-component:has([data-test-chart-name*='Gastos']) {\n"
+        "  height: var(--ps-gastos-h) !important;\n"
+        "  max-height: var(--ps-gastos-h) !important;\n"
+        "  min-height: var(--ps-gastos-h) !important;\n"
+        "  overflow: hidden !important;\n"
+        "}\n"
         "/* Pestaña Unidad activa: sin scroll vertical del dashboard */\n"
+        "body:has(.ant-tabs-tabpane-active [data-test-chart-name*='Gastos']),\n"
+        "body:has(.ant-tabs-tabpane-active [data-test-chart-name*='Gastos']) .dashboard,\n"
+        "body:has(.ant-tabs-tabpane-active [data-test-chart-name*='Gastos']) .dashboard-content,\n"
+        "body:has(.ant-tabs-tabpane-active [data-test-chart-name*='Gastos']) .grid-content,\n"
+        "body:has(.ant-tabs-tabpane-active [data-test-chart-name*='Gastos']) .dashboard-builder-view,\n"
+        "body:has(.ant-tabs-tabpane-active [data-test-chart-name*='Gastos']) #dashboard-view,\n"
         "body.ps-unidad-gastos-active,\n"
         "body.ps-unidad-gastos-active .dashboard,\n"
         "body.ps-unidad-gastos-active .dashboard-content,\n"
@@ -1233,7 +1258,9 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         "plan": (1, 10),
         "table": (4, 53),
         "projects": (8, 53),
-        "unidad": (12, 55),  # base; JS ajusta al viewport sin crear scroll de página
+        # Altura layout alta: el CSS :has fija calc(100dvh-210px) al activar tab;
+        # este valor evita que el grid React pinte un card enano el primer frame.
+        "unidad": (12, 78),
         "prob": (6, 36),
         "chart": (6, 36),
     }

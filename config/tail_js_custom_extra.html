@@ -140,13 +140,25 @@
     }
   }
 
-  function fillGastosViewportHeight() {
-    var charts = document.querySelectorAll('[data-test-chart-name*="Gastos"]');
-    var anyVisible = false;
+  function computeGastosTargetHeight() {
     var chromeBottom = measureGastosChromeBottom();
     var bottomPad = 10;
     var target = Math.floor(window.innerHeight - chromeBottom - bottomPad);
     if (target < 280) target = 280;
+    return target;
+  }
+
+  /** Publica --ps-gastos-h ANTES del paint del tab (evita flash corto→alto). */
+  function publishGastosCssHeight(target) {
+    var px = (typeof target === "number" ? target : computeGastosTargetHeight()) + "px";
+    document.documentElement.style.setProperty("--ps-gastos-h", px);
+  }
+
+  function fillGastosViewportHeight() {
+    var charts = document.querySelectorAll('[data-test-chart-name*="Gastos"]');
+    var anyVisible = false;
+    var target = computeGastosTargetHeight();
+    publishGastosCssHeight(target);
 
     Array.prototype.forEach.call(charts, function (chart) {
       if (!isGastosChartVisible(chart)) return;
@@ -157,14 +169,16 @@
     return anyVisible;
   }
 
-  /** Tras abrir Unidad: varios pases hasta que el layout de Ant Tabs se estabiliza. */
+  /** Tras abrir Unidad: pases cortos; la altura ya viene del CSS :has + --ps-gastos-h. */
   var _psGastosHeightBurstTimer = null;
   function burstFillGastosHeight() {
     if (_psGastosHeightBurstTimer) {
       clearTimeout(_psGastosHeightBurstTimer);
       _psGastosHeightBurstTimer = null;
     }
-    var delays = [0, 16, 50, 100, 200, 350, 550, 900];
+    publishGastosCssHeight();
+    fillGastosViewportHeight();
+    var delays = [0, 16, 50, 120, 300];
     delays.forEach(function (ms) {
       setTimeout(function () {
         fillGastosViewportHeight();
@@ -225,6 +239,23 @@
       lastUnidad = isUnidad;
     }
 
+    // pointerdown: publicar altura CSS ANTES de que Ant active el tabpane
+    document.addEventListener(
+      "pointerdown",
+      function (ev) {
+        var t = ev.target;
+        if (!t || !t.closest) return;
+        var tab = t.closest(".ant-tabs-tab, [role='tab']");
+        if (!tab) return;
+        var label = (tab.textContent || "").replace(/\s+/g, " ").trim();
+        if (/unidad/i.test(label)) {
+          publishGastosCssHeight();
+          document.body.classList.add("ps-unidad-gastos-active");
+        }
+      },
+      true
+    );
+
     document.addEventListener(
       "click",
       function (ev) {
@@ -238,6 +269,9 @@
       },
       true
     );
+
+    // Altura CSS lista desde el primer load (Resumen también)
+    publishGastosCssHeight();
 
     window.addEventListener("resize", function () {
       if (document.body.classList.contains("ps-unidad-gastos-active")) {
