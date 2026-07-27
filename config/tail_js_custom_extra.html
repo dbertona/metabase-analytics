@@ -400,6 +400,15 @@
     hideResumenDropdownControls();
     placeProyectosSearchInHeader();
     labelAllAgGridTotals();
+    var charts = document.querySelectorAll(
+      '[data-test-chart-name*="Resumen mensual"], [data-test-chart-name*="Proyectos"]'
+    );
+    Array.prototype.forEach.call(charts, function (chart) {
+      keepResumenProyectosFooterVisible(chart);
+      setTimeout(function () {
+        keepResumenProyectosFooterVisible(chart);
+      }, 120);
+    });
   }
 
   function applyUnidadLayout() {
@@ -473,6 +482,42 @@
     }
     labelAgGridTotalsRow(chart);
     ensureFloatingBottomVisible(chart);
+    keepResumenProyectosFooterVisible(chart);
+  }
+
+  function isResumenOrProyectosChart(chart) {
+    if (!chart || !chart.getAttribute) return false;
+    var name = chart.getAttribute("data-test-chart-name") || "";
+    return name.indexOf("Resumen mensual") !== -1 || name.indexOf("Proyectos") !== -1;
+  }
+
+  /**
+   * Parche mínimo anti-carrera: si AG Grid recalcula body y empuja el pie fuera
+   * del card tras cambiar de pestaña, recorta solo el body viewport.
+   */
+  function keepResumenProyectosFooterVisible(chart) {
+    if (!isResumenOrProyectosChart(chart)) return;
+    var bottom = chart.querySelector(".ag-floating-bottom");
+    var holder = chart.closest('[data-test="dashboard-component-chart-holder"]');
+    var body = chart.querySelector(".ag-body-viewport");
+    var root = chart.querySelector(".ag-root");
+    var header = chart.querySelector(".ag-header");
+    if (!bottom || !holder || !body || !root) return;
+
+    var br = bottom.getBoundingClientRect();
+    var hr = holder.getBoundingClientRect();
+    if (br.bottom <= hr.bottom + 1) return;
+
+    var rootH = root.getBoundingClientRect().height;
+    if (!(rootH > 80)) return;
+    var headerH = header ? header.getBoundingClientRect().height : 36;
+    var footerH = Math.max(36, Math.min(64, Math.round(br.height) || 40));
+    var bodyH = Math.max(80, Math.floor(rootH - headerH - footerH - 4));
+
+    body.style.setProperty("height", bodyH + "px", "important");
+    body.style.setProperty("max-height", bodyH + "px", "important");
+    body.style.setProperty("min-height", "0", "important");
+    body.style.setProperty("flex", "0 0 " + bodyH + "px", "important");
   }
 
   /**
