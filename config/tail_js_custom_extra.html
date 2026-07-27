@@ -126,52 +126,92 @@
     }
 
     // Propagar al grid interno YA (también sin ag-theme: estado "Esperando…")
-    var header = chart.querySelector("[data-test='slice-header']");
     var sliceContainer = chart.querySelector(".slice_container");
     var chartContainer = chart.querySelector(".chart-container");
     var agTheme = chart.querySelector('[class*="ag-theme"]');
-    var headerH = header ? header.getBoundingClientRect().height : 28;
-    // Padding card + margen para que la fila de totales (floating-bottom) no
-    // quede recortada por overflow:hidden del holder (como en Proyectos).
-    var available = Math.max(80, Math.floor(target - headerH - 40));
+    // Misma fórmula que el CSS (:has → calc(var(--ps-gastos-h) - 56px)).
+    // Si JS usa otro margen, ag-theme queda más bajo que .ag-root y recorta
+    // la fila de totales (ag-floating-bottom).
+    var available = Math.max(80, Math.floor(target - 56));
 
-    [sliceContainer, chartContainer, agTheme].forEach(function (el) {
+    [sliceContainer, chartContainer].forEach(function (el) {
       if (!el) return;
       el.style.setProperty("height", available + "px", "important");
       el.style.setProperty("max-height", available + "px", "important");
       el.style.setProperty("min-height", available + "px", "important");
-      el.style.setProperty("overflow", "hidden", "important");
+      // visible: el holder ya recorta; hidden aquí comía el pie de totales
+      el.style.setProperty("overflow", "visible", "important");
     });
-    // Wrappers intermedios (ag_grid_table, etc.) a veces se quedan cortos y el
-    // floating-bottom se pinta fuera del card → totales “invisible”.
     if (agTheme) {
+      agTheme.style.setProperty("height", available + "px", "important");
+      agTheme.style.setProperty("max-height", available + "px", "important");
+      agTheme.style.setProperty("min-height", available + "px", "important");
+      agTheme.style.setProperty("overflow", "visible", "important");
       var walk = agTheme.parentElement;
       while (walk && walk !== chart) {
         walk.style.setProperty("height", available + "px", "important");
         walk.style.setProperty("max-height", available + "px", "important");
         walk.style.setProperty("min-height", "0", "important");
+        walk.style.setProperty("overflow", "visible", "important");
         walk = walk.parentElement;
       }
-      var root = agTheme.querySelector(".ag-root-wrapper");
-      if (root) {
-        root.style.setProperty("height", available + "px", "important");
-        root.style.setProperty("max-height", available + "px", "important");
-      }
-      var rootBody = agTheme.querySelector(".ag-root-wrapper-body");
-      if (rootBody) {
-        rootBody.style.setProperty("height", available + "px", "important");
-        rootBody.style.setProperty("max-height", available + "px", "important");
-      }
-      var agRoot = agTheme.querySelector(".ag-root");
-      if (agRoot) {
-        agRoot.style.setProperty("height", available + "px", "important");
-        agRoot.style.setProperty("max-height", available + "px", "important");
-      }
+      [
+        ".ag-root-wrapper",
+        ".ag-root-wrapper-body",
+        ".ag-root",
+      ].forEach(function (sel) {
+        var el = agTheme.querySelector(sel);
+        if (!el) return;
+        el.style.setProperty("height", available + "px", "important");
+        el.style.setProperty("max-height", available + "px", "important");
+        el.style.setProperty("min-height", available + "px", "important");
+      });
       if (typeof agTheme.__psApiResize === "function") {
-        try { agTheme.__psApiResize(); } catch (e) { /* ignore */ }
+        try {
+          agTheme.__psApiResize();
+        } catch (e) {
+          /* ignore */
+        }
       }
     }
     labelAgGridTotalsRow(chart);
+    ensureFloatingBottomVisible(chart);
+  }
+
+  /**
+   * Si algún ancestro con overflow:hidden recorta ag-floating-bottom,
+   * amplia ese contenedor lo mínimo para que el pie quede dentro.
+   */
+  function ensureFloatingBottomVisible(chart) {
+    if (!chart) return;
+    var bottom = chart.querySelector(".ag-floating-bottom");
+    if (!bottom) return;
+    var br = bottom.getBoundingClientRect();
+    if (!(br.height > 0)) return;
+    var el = bottom.parentElement;
+    var guard = 0;
+    while (el && el !== document.body && guard < 14) {
+      guard += 1;
+      var cs = window.getComputedStyle(el);
+      var clips =
+        cs.overflow === "hidden" ||
+        cs.overflowY === "hidden" ||
+        cs.overflow === "clip" ||
+        cs.overflowY === "clip";
+      if (clips) {
+        var er = el.getBoundingClientRect();
+        if (br.bottom > er.bottom + 1) {
+          var need = Math.ceil(br.bottom - er.bottom) + 6;
+          var nextH = Math.ceil(er.height + need);
+          el.style.setProperty("height", nextH + "px", "important");
+          el.style.setProperty("max-height", nextH + "px", "important");
+          el.style.setProperty("min-height", nextH + "px", "important");
+          br = bottom.getBoundingClientRect();
+        }
+      }
+      if (el === chart) break;
+      el = el.parentElement;
+    }
   }
 
   function computeGastosTargetHeight() {
@@ -330,7 +370,7 @@
       el.style.setProperty("height", available + "px", "important");
       el.style.setProperty("max-height", available + "px", "important");
       el.style.setProperty("min-height", available + "px", "important");
-      el.style.setProperty("overflow", "hidden", "important");
+      el.style.setProperty("overflow", "visible", "important");
     });
     if (agTheme) {
       var walk = agTheme.parentElement;
@@ -338,6 +378,7 @@
         walk.style.setProperty("height", available + "px", "important");
         walk.style.setProperty("max-height", available + "px", "important");
         walk.style.setProperty("min-height", "0", "important");
+        walk.style.setProperty("overflow", "visible", "important");
         walk = walk.parentElement;
       }
       [" .ag-root-wrapper", " .ag-root-wrapper-body", " .ag-root"].forEach(
@@ -357,6 +398,7 @@
       }
     }
     labelAgGridTotalsRow(chart);
+    ensureFloatingBottomVisible(chart);
   }
 
   /**
