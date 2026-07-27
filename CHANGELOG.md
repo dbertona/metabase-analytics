@@ -13,7 +13,8 @@
 ### Fixed
 
 - El panel de filtros izquierdo ensanchaba el documento (~80px); CSS con
-  `overflow-y: auto` en `[data-test=dashboard-filters-panel]`.
+  `overflow-y: auto` solo en `[data-test=dashboard-filters-panel]` (no en el
+  hijo sticky: eso ocultaba los controles).
 
 ## [2026-07-27c] — Probabilidad: importes en K€
 
