@@ -543,7 +543,7 @@ def persist_dashboard_config(
         + evo_chart_ids
         + prob_chart_ids
     )
-    tabs_all = ["TAB-RESUMEN", "TAB-GRAFICOS", "TAB-UNIDAD"]
+    tabs_all = ["TAB-RESUMEN", "TAB-UNIDAD", "TAB-GRAFICOS"]
 
     dashboard_css = (
         "/* Power BI look: Segoe UI 20px en valor KPI */\n"
@@ -1127,7 +1127,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         "TABS-MAIN": {
             "type": "TABS",
             "id": "TABS-MAIN",
-            "children": ["TAB-RESUMEN", "TAB-GRAFICOS", "TAB-UNIDAD"],
+            "children": ["TAB-RESUMEN", "TAB-UNIDAD", "TAB-GRAFICOS"],
             "parents": ["ROOT_ID", "GRID_ID"],
             "meta": {},
         },
