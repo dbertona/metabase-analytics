@@ -71,56 +71,116 @@
   ];
 
   /**
-   * Fuerza que el AG Grid llene todo el espacio disponible dentro del card.
-   * Calcula en píxeles: altura del holder − altura del header − 8px margen.
-   * Aplica inline style a .slice_container y al div ag-theme-* para bypasear
-   * cualquier inline style que React pueda estar poniendo.
+   * Altura estable de Gastos (pestaña Unidad).
+   * Ancla en la base de la barra de pestañas (no en rect.top del chart, que
+   * cambia mientras redimensionamos y provoca corto→alto→corto).
    */
+  function measureGastosChromeBottom() {
+    var nav = document.querySelector(
+      ".dashboard-component-tabs .ant-tabs-nav, .ant-tabs-nav"
+    );
+    if (nav) {
+      var nr = nav.getBoundingClientRect();
+      if (nr.bottom > 40) return nr.bottom;
+    }
+    var filterBar = document.querySelector(
+      ".filter-bar, .dashboard-header, [class*='FilterBar'], .native-filters-container"
+    );
+    if (filterBar) {
+      var fr = filterBar.getBoundingClientRect();
+      if (fr.bottom > 40) return fr.bottom + 40; // + tabs approx
+    }
+    return 160;
+  }
+
+  function isGastosChartVisible(chart) {
+    if (!chart || !chart.getBoundingClientRect) return false;
+    if (chart.offsetParent === null) return false;
+    var rect = chart.getBoundingClientRect();
+    // Tab activa: ancho real y dentro/near viewport
+    return rect.width > 40 && rect.bottom > 0 && rect.top < window.innerHeight + 40;
+  }
+
+  function applyGastosHeightToChart(chart, target) {
+    chart.style.setProperty("height", target + "px", "important");
+    chart.style.setProperty("max-height", target + "px", "important");
+    chart.style.removeProperty("min-height");
+
+    var node = chart.parentElement;
+    for (var i = 0; i < 8 && node && node !== document.body; i++) {
+      var cls = node.className || "";
+      if (
+        cls.indexOf("dragdroppable") !== -1 ||
+        cls.indexOf("dashboard-component") !== -1 ||
+        cls.indexOf("grid-row") !== -1 ||
+        (node.getAttribute &&
+          node.getAttribute("data-test") === "dashboard-component-chart-holder")
+      ) {
+        node.style.setProperty("height", target + "px", "important");
+        node.style.setProperty("max-height", target + "px", "important");
+        node.style.removeProperty("min-height");
+        node.style.setProperty("overflow", "hidden", "important");
+      }
+      node = node.parentElement;
+    }
+
+    // Propagar al grid interno ya (no esperar al siguiente tick)
+    var header = chart.querySelector("[data-test='slice-header']");
+    var sliceContainer = chart.querySelector(".slice_container");
+    var agTheme = chart.querySelector('[class*="ag-theme"]');
+    if (sliceContainer && agTheme) {
+      var headerH = header ? header.getBoundingClientRect().height : 0;
+      var available = Math.max(80, Math.floor(target - headerH - 8));
+      sliceContainer.style.setProperty("height", available + "px", "important");
+      sliceContainer.style.setProperty("overflow", "hidden", "important");
+      agTheme.style.setProperty("height", available + "px", "important");
+      if (typeof agTheme.__psApiResize === "function") {
+        try { agTheme.__psApiResize(); } catch (e) { /* ignore */ }
+      }
+    }
+  }
+
   function fillGastosViewportHeight() {
     var charts = document.querySelectorAll('[data-test-chart-name*="Gastos"]');
     var anyVisible = false;
+    var chromeBottom = measureGastosChromeBottom();
+    var bottomPad = 10;
+    var target = Math.floor(window.innerHeight - chromeBottom - bottomPad);
+    if (target < 280) target = 280;
+
     Array.prototype.forEach.call(charts, function (chart) {
-      if (!chart.getBoundingClientRect) return;
-      var rect = chart.getBoundingClientRect();
-      // Tab inactiva o no montado
-      if (!rect.width || rect.height === 0) return;
-      if (chart.offsetParent === null) return;
+      if (!isGastosChartVisible(chart)) return;
       anyVisible = true;
-
-      // Encajar exactamente en el viewport: evita scroll de página
-      var bottomPad = 12;
-      var target = Math.floor(window.innerHeight - rect.top - bottomPad);
-      if (target < 280) return;
-      if (Math.abs(rect.height - target) < 4) return;
-
-      chart.style.setProperty("height", target + "px", "important");
-      chart.style.removeProperty("min-height");
-
-      var node = chart.parentElement;
-      for (var i = 0; i < 8 && node && node !== document.body; i++) {
-        var cls = node.className || "";
-        if (
-          cls.indexOf("dragdroppable") !== -1 ||
-          cls.indexOf("dashboard-component") !== -1 ||
-          cls.indexOf("grid-row") !== -1 ||
-          (node.getAttribute &&
-            node.getAttribute("data-test") === "dashboard-component-chart-holder")
-        ) {
-          node.style.setProperty("height", target + "px", "important");
-          node.style.removeProperty("min-height");
-          node.style.setProperty("overflow", "hidden", "important");
-        }
-        node = node.parentElement;
-      }
+      applyGastosHeightToChart(chart, target);
     });
     document.body.classList.toggle("ps-unidad-gastos-active", anyVisible);
+    return anyVisible;
   }
 
-  function fixAgGridHeight() {
-    fillGastosViewportHeight();
+  /** Tras abrir Unidad: varios pases hasta que el layout de Ant Tabs se estabiliza. */
+  var _psGastosHeightBurstTimer = null;
+  function burstFillGastosHeight() {
+    if (_psGastosHeightBurstTimer) {
+      clearTimeout(_psGastosHeightBurstTimer);
+      _psGastosHeightBurstTimer = null;
+    }
+    var delays = [0, 16, 50, 100, 200, 350, 550, 900];
+    delays.forEach(function (ms) {
+      setTimeout(function () {
+        fillGastosViewportHeight();
+        fixAgGridHeightInner();
+      }, ms);
+    });
+  }
+
+  function fixAgGridHeightInner() {
     AG_GRID_HEIGHT_SELECTORS.forEach(function (sel) {
       var charts = document.querySelectorAll(sel);
       Array.prototype.forEach.call(charts, function (chart) {
+        // Gastos ya se ajusta en applyGastosHeightToChart
+        if ((chart.getAttribute("data-test-chart-name") || "").indexOf("Gastos") !== -1) {
+          return;
+        }
         var header = chart.querySelector("[data-test='slice-header']");
         var sliceContainer = chart.querySelector(".slice_container");
         var agTheme = chart.querySelector('[class*="ag-theme"]');
@@ -129,10 +189,10 @@
         var holderH = chart.getBoundingClientRect().height;
         var headerH = header ? header.getBoundingClientRect().height : 0;
         var available = Math.floor(holderH - headerH - 8);
-        if (available < 80) return; // aún no renderizado
+        if (available < 80) return;
 
         var current = parseInt(sliceContainer.style.height, 10);
-        if (Math.abs(current - available) < 4) return; // ya correcto, no reasignar
+        if (Math.abs(current - available) < 4) return;
 
         sliceContainer.style.setProperty("height", available + "px", "important");
         sliceContainer.style.setProperty("overflow", "hidden", "important");
@@ -140,6 +200,75 @@
       });
     });
   }
+
+  function fixAgGridHeight() {
+    fillGastosViewportHeight();
+    fixAgGridHeightInner();
+  }
+
+  function bindGastosTabHeightListeners() {
+    if (document.documentElement.__psGastosTabHeightBound) return;
+    document.documentElement.__psGastosTabHeightBound = true;
+
+    var lastUnidad = false;
+    function onTabMaybeChanged() {
+      var active = document.querySelector(
+        ".dashboard-component-tabs .ant-tabs-tab-active, .ant-tabs-tab-active"
+      );
+      var label = active ? (active.textContent || "").replace(/\s+/g, " ").trim() : "";
+      var isUnidad = /unidad/i.test(label);
+      if (isUnidad && !lastUnidad) {
+        burstFillGastosHeight();
+      } else if (!isUnidad && lastUnidad) {
+        document.body.classList.remove("ps-unidad-gastos-active");
+      }
+      lastUnidad = isUnidad;
+    }
+
+    document.addEventListener(
+      "click",
+      function (ev) {
+        var t = ev.target;
+        if (!t || !t.closest) return;
+        var tab = t.closest(".ant-tabs-tab, [role='tab']");
+        if (!tab) return;
+        // Tras el click Ant Design cambia la tab en el siguiente frame
+        setTimeout(onTabMaybeChanged, 0);
+        setTimeout(onTabMaybeChanged, 50);
+      },
+      true
+    );
+
+    window.addEventListener("resize", function () {
+      if (document.body.classList.contains("ps-unidad-gastos-active")) {
+        fillGastosViewportHeight();
+        fixAgGridHeightInner();
+      }
+    });
+
+    // Observar solo la barra de pestañas (no todo el body: evita bucles)
+    function watchTabsNav() {
+      var nav = document.querySelector(
+        ".dashboard-component-tabs .ant-tabs-nav, .dashboard-component-tabs"
+      );
+      if (!nav || nav.__psGastosTabObs) return;
+      nav.__psGastosTabObs = true;
+      try {
+        var obs = new MutationObserver(function () {
+          onTabMaybeChanged();
+        });
+        obs.observe(nav, {
+          subtree: true,
+          attributes: true,
+          attributeFilter: ["class", "aria-selected"],
+        });
+      } catch (e) { /* ignore */ }
+    }
+    watchTabsNav();
+    setInterval(watchTabsNav, 2000);
+  }
+
+  bindGastosTabHeightListeners();
 
   /**
    * Localiza GridApi de AG Grid (fiber React + hooks del root DOM).
