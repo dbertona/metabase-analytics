@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [2026-07-27g] — Cierre rama `fix/gastos-llenar-alto-disponible`
+
+### Fixed
+
+- Card **Gastos** (Unidad) alineado con Resumen: margen inferior ~8–9px
+  midiendo `--ps-unidad-top` desde el chart-slice (no el holder).
+- AG Grid rellena el card: `.dashboard-chart` en flex para eliminar el hueco
+  blanco bajo la fila Total.
+
+### Changed
+
+- Fuente de grillas AG Grid: `1.26em` → `1.077em` (−~14,5%).
+
+### Note
+
+- Wrappers internos de Gastos usan `height: 100%` como Resumen/Proyectos;
+  solo fila + holder usan `calc(100dvh − offset)`.
+
 ## [2026-07-27f] — Cierre rama `feat/pestana-unidad-gastos`
 
 ### Summary
