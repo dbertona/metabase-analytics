@@ -305,6 +305,7 @@ def probabilidad_bar_params() -> dict[str, Any]:
     """
     return {
         "adhoc_filters": dim_adhoc_filters("proyecto"),
+        "x_axis": "probabilidad",
         "metrics": [metric_sum("facturacion", "Facturación")],
         "groupby": [],
         "orientation": "horizontal",
