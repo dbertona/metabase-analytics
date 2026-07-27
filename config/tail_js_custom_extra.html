@@ -89,7 +89,10 @@
     }
     var gastos = document.querySelector('[data-test-chart-name*="Gastos"]');
     if (gastos && gastos.offsetParent !== null) {
-      var gt = gastos.getBoundingClientRect().top;
+      var gHolder =
+        gastos.closest('[data-test="dashboard-component-chart-holder"]') ||
+        gastos;
+      var gt = gHolder.getBoundingClientRect().top;
       if (gt > 60 && gt < window.innerHeight - 120) {
         document.documentElement.style.setProperty(
           "--ps-unidad-top",
