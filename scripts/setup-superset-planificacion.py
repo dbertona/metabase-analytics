@@ -20,9 +20,17 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
-from http.cookiejar import CookieJar
+from http.cookiejar import CookieJar, DefaultCookiePolicy
 from pathlib import Path
 from typing import Any
+
+
+class _AllowSecureCookiesOverHttp(DefaultCookiePolicy):
+    """Superset marca cookies Secure; en LAN usamos http:// y hay que reenviarlas."""
+
+    def return_ok_secure(self, cookie, request):  # type: ignore[no-untyped-def]
+        return True
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SUPERSET_URL = os.environ.get("SUPERSET_URL", "http://localhost:8088/analytics").rstrip("/")
@@ -60,6 +68,7 @@ class SupersetClient:
         self.token: str | None = None
         self.csrf: str | None = None
         self.jar = CookieJar()
+        self.jar.set_policy(_AllowSecureCookiesOverHttp())
         self.opener = urllib.request.build_opener(
             urllib.request.HTTPCookieProcessor(self.jar)
         )
@@ -272,6 +281,8 @@ def dim_adhoc_filters(*extra_cols: str) -> list[dict[str, Any]]:
 def probabilidad_bar_params() -> dict[str, Any]:
     """Barras PBI: probabilidad (100..10) × facturación P+R.
     Superset 6.1: dist_bar legacy no está registrado → echarts_timeseries_bar.
+    Importes en € vía currency_format; el % en etiquetas de categoría lo aplica
+    tail_js (formatter ECharts) — no usar x_axis_title '%' (queda flotando).
     """
     return {
         "adhoc_filters": dim_adhoc_filters(),
@@ -282,7 +293,8 @@ def probabilidad_bar_params() -> dict[str, Any]:
         "seriesType": "bar",
         "show_value": True,
         "y_axis_format": ",.0f",
-        "x_axis_title": "%",
+        "currency_format": {"symbol": "EUR", "symbolPosition": "suffix"},
+        "x_axis_title": "",
         "y_axis_title": "",
         "rich_tooltip": True,
         "show_legend": False,

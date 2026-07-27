@@ -30,9 +30,17 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
-from http.cookiejar import CookieJar
+from http.cookiejar import CookieJar, DefaultCookiePolicy
 from pathlib import Path
 from typing import Any
+
+
+class _AllowSecureCookiesOverHttp(DefaultCookiePolicy):
+    """Superset marca cookies Secure; en LAN usamos http:// y hay que reenviarlas."""
+
+    def return_ok_secure(self, cookie, request):  # type: ignore[no-untyped-def]
+        return True
+
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPORT_ROOT = ROOT / "exports" / "superset-dashboard"
@@ -69,6 +77,7 @@ class SupersetClient:
         self.token: str | None = None
         self.csrf: str | None = None
         self.jar = CookieJar()
+        self.jar.set_policy(_AllowSecureCookiesOverHttp())
         self.opener = urllib.request.build_opener(
             urllib.request.HTTPCookieProcessor(self.jar)
         )

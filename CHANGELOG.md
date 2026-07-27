@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [2026-07-27b] — Cierre rama `fix/probabilidad-formato-euro-porcentaje`
+
+### Summary
+
+- Formato `%` / `€` en Facturación por Probabilidad + fix CSRF cookies Secure por HTTP.
+
+## [2026-07-27a] — Facturación por Probabilidad: % y €
+
+### Changed
+
+- Etiquetas de probabilidad a la izquierda con sufijo `%` (p. ej. `100%`).
+- Importes del eje, barras y tooltip con sufijo `€`.
+- Eliminado el título de eje flotante `%` (quedaba suelto en el medio).
+
+### Fixed
+
+- API setup/pull: reenviar cookies `Secure` por HTTP LAN (CSRF session token missing).
+
 ## [2026-07-27] — Cierre rama `feat/ag-grid-autosize-columns`
 
 ### Added / Changed

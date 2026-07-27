@@ -1023,6 +1023,30 @@
     return null;
   }
 
+  /** Formatea importe con miles y sufijo € (paridad con currency_format EUR). */
+  function formatEuroAmount(val) {
+    if (val == null || val === "") return "";
+    var n = typeof val === "number" ? val : Number(String(val).replace(/,/g, ""));
+    if (!isFinite(n)) return String(val);
+    return (
+      Math.round(n).toLocaleString("en-US", {
+        maximumFractionDigits: 0,
+      }) + " €"
+    );
+  }
+
+  /** Categoría probabilidad: 100 → 100% (sin tocar si ya lleva %). */
+  function formatProbPct(val) {
+    if (val == null || val === "") return "";
+    var s = String(val).trim();
+    if (s.charAt(s.length - 1) === "%") return s;
+    return s + "%";
+  }
+
+  /**
+   * Horizontal bar: eje categoría = yAxis (izq.), valores = xAxis (abajo).
+   * Añade % a la izquierda y € en importes (eje, labels, tooltip).
+   */
   function applyProbabilidadFont(inst, fontPx) {
     if (!inst || typeof inst.setOption !== "function") return;
     var color = "#0f172a";
@@ -1038,31 +1062,84 @@
       var series = opt.series || [];
       for (var s = 0; s < series.length; s++) {
         seriesPatch.push({
-          label: Object.assign({ show: true }, labelStyle),
+          label: Object.assign(
+            { show: true, formatter: function (p) {
+              var v =
+                p && p.value != null
+                  ? Array.isArray(p.value)
+                    ? p.value[p.value.length - 1]
+                    : p.value
+                  : p && p.data;
+              return formatEuroAmount(v);
+            } },
+            labelStyle
+          ),
         });
       }
       if (!seriesPatch.length) {
-        seriesPatch = [{ label: Object.assign({ show: true }, labelStyle) }];
+        seriesPatch = [
+          {
+            label: Object.assign(
+              {
+                show: true,
+                formatter: function (p) {
+                  var v =
+                    p && p.value != null
+                      ? Array.isArray(p.value)
+                        ? p.value[p.value.length - 1]
+                        : p.value
+                      : "";
+                  return formatEuroAmount(v);
+                },
+              },
+              labelStyle
+            ),
+          },
+        ];
       }
       inst.setOption(
         {
           textStyle: labelStyle,
+          // Valor (importes) en horizontal → xAxis
           xAxis: [
             {
-              axisLabel: labelStyle,
+              name: "",
+              axisLabel: Object.assign(
+                {
+                  formatter: function (v) {
+                    return formatEuroAmount(v);
+                  },
+                },
+                labelStyle
+              ),
               nameTextStyle: labelStyle,
             },
           ],
+          // Categoría (probabilidad) en horizontal → yAxis
           yAxis: [
             {
-              axisLabel: labelStyle,
+              name: "",
+              axisLabel: Object.assign(
+                {
+                  formatter: function (v) {
+                    return formatProbPct(v);
+                  },
+                },
+                labelStyle
+              ),
               nameTextStyle: labelStyle,
             },
           ],
+          tooltip: {
+            valueFormatter: function (v) {
+              return formatEuroAmount(v);
+            },
+          },
           series: seriesPatch,
         },
         false
       );
+      inst.__psProbFmt = fontPx;
     } catch (err) {
       /* remount */
     }
@@ -1076,24 +1153,15 @@
     Array.prototype.forEach.call(roots, function (root) {
       var inst = findEchartsInstance(root);
       if (!inst) return;
-      var opt = {};
-      try {
-        opt = inst.getOption() || {};
-      } catch (e) {
-        return;
-      }
-      var y0 = (opt.yAxis && opt.yAxis[0]) || {};
-      var cur = (y0.axisLabel && y0.axisLabel.fontSize) || 0;
-      var s0 = (opt.series && opt.series[0] && opt.series[0].label) || {};
-      var curLabel = s0.fontSize || 0;
-      if (cur === fontPx && curLabel === fontPx) return;
+      // Reaplicar: Superset puede pisar formatters en refresh sin recrear la instancia
       applyProbabilidadFont(inst, fontPx);
     });
   }
 
   /**
    * Fallback fiable: al dibujar texto en el canvas de Probabilidad,
-   * sustituir el px de la fuente por el de las tablas (Superset no expone echarts global).
+   * sustituir el px de la fuente por el de las tablas (Superset no expone echarts global)
+   * y añadir % / € si el texto aún no los trae.
    */
   function patchProbabilidadCanvasFonts() {
     if (window.__psProbCanvasFontPatched) return;
@@ -1101,6 +1169,19 @@
     var proto = CanvasRenderingContext2D.prototype;
     var origFill = proto.fillText;
     var origStroke = proto.strokeText;
+    var PROB_RE = /^(100|90|70|50|30|10|0)$/;
+    var AMOUNT_RE = /^-?[\d,]+(\.\d+)?$/;
+    function rewriteText(raw) {
+      var t = String(raw == null ? "" : raw).trim();
+      if (!t) return raw;
+      if (PROB_RE.test(t)) return t + "%";
+      if (AMOUNT_RE.test(t) && t.indexOf("%") === -1 && t.indexOf("€") === -1) {
+        // Eje/valores grandes (p. ej. 2000000 o 2,000,000); no tocar 0–100 del eje cat.
+        var n = Number(t.replace(/,/g, ""));
+        if (isFinite(n) && Math.abs(n) > 100) return formatEuroAmount(n);
+      }
+      return raw;
+    }
     function boost(ctx) {
       try {
         var canvas = ctx.canvas;
@@ -1138,13 +1219,17 @@
         /* ignore */
       }
     }
-    proto.fillText = function () {
+    proto.fillText = function (text) {
       boost(this);
-      return origFill.apply(this, arguments);
+      var args = Array.prototype.slice.call(arguments);
+      args[0] = rewriteText(text);
+      return origFill.apply(this, args);
     };
-    proto.strokeText = function () {
+    proto.strokeText = function (text) {
       boost(this);
-      return origStroke.apply(this, arguments);
+      var args = Array.prototype.slice.call(arguments);
+      args[0] = rewriteText(text);
+      return origStroke.apply(this, args);
     };
   }
 
