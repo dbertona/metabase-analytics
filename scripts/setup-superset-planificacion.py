@@ -369,10 +369,11 @@ def resumen_proyectos_params() -> dict[str, Any]:
         "column_config": {
             "proyecto": {
                 "customColumnName": "Proyectos",
-                # truncateLongCells en column_config → AG Grid: wrapText=false + autoHeight=false.
-                # El plugin ag-grid-table lee z.truncateLongCells (z = column config), sin esto
-                # pone wrapText=true por defecto y el texto siempre se parte en varias líneas.
+                # truncateLongCells → AG Grid: wrapText=false + autoHeight=false (texto en 1 línea).
+                # columnWidth → AG Grid minWidth para la columna (el bundle lee z.columnWidth → minWidth).
+                # Con 280px de minWidth + sizeColumnsToFit, la columna queda ancha sin scroll horizontal.
                 "truncateLongCells": True,
+                "columnWidth": 280,
             },
             "Fact.": {
                 "d3NumberFormat": ",.0f",
