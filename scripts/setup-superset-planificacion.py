@@ -1301,8 +1301,8 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         # Alturas UI: KPI 10; tablas Resumen/Proyectos misma altura; charts 36.
         "obj": (1, 10),
         "plan": (1, 10),
-        "table": (4, 53),
-        "projects": (8, 53),
+        "table": (4, 68),
+        "projects": (8, 68),
         # Altura layout alta: el CSS :has fija calc(100dvh-210px) al activar tab;
         # este valor evita que el grid React pinte un card enano el primer frame.
         "unidad": (12, 78),

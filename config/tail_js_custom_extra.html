@@ -285,11 +285,17 @@
   }
 
   /**
-   * Resumen mensual y Proyectos deben compartir el mismo alto de card y de grid.
-   * Antes el AG de Resumen quedaba más bajo (auto-size a ~12 filas) aunque el
-   * holder midiera igual.
+   * Resumen mensual y Proyectos: mismo alto, llenando hasta el pie del viewport
+   * (aprovecha el espacio gris inferior en pantallas altas).
    */
   function syncResumenProyectosEqualHeight() {
+    var active = document.querySelector(
+      ".dashboard-component-tabs .ant-tabs-tab-active, .ant-tabs-tab-active"
+    );
+    var label = active ? (active.textContent || "").replace(/\s+/g, " ").trim() : "";
+    // No tocar en Unidad/Gráficos
+    if (/unidad|gráficos|graficos/i.test(label)) return;
+
     var resumen = document.querySelector(
       '[data-test-chart-name*="Resumen mensual"]'
     );
@@ -299,10 +305,20 @@
     if (!resumen || !proyectos) return;
     if (resumen.offsetParent === null || proyectos.offsetParent === null) return;
 
-    var hR = resumen.getBoundingClientRect().height;
-    var hP = proyectos.getBoundingClientRect().height;
-    var target = Math.max(Math.floor(hR), Math.floor(hP));
-    if (target < 120) return;
+    var top = Math.min(
+      resumen.getBoundingClientRect().top,
+      proyectos.getBoundingClientRect().top
+    );
+    var bottomPad = 12;
+    var viewportTarget = Math.floor(window.innerHeight - top - bottomPad);
+    var layoutH = Math.max(
+      Math.floor(resumen.getBoundingClientRect().height),
+      Math.floor(proyectos.getBoundingClientRect().height)
+    );
+    // Preferir llenar viewport; no encoger por debajo del layout base
+    var target = Math.max(viewportTarget, layoutH, 280);
+    // Tope suave: no pedir más del viewport
+    if (viewportTarget >= 200) target = viewportTarget;
 
     [resumen, proyectos].forEach(function (chart) {
       chart.style.setProperty("height", target + "px", "important");
@@ -360,10 +376,18 @@
       );
       var label = active ? (active.textContent || "").replace(/\s+/g, " ").trim() : "";
       var isUnidad = /unidad/i.test(label);
+      var isResumen = /^Resumen$/i.test(label) || /^Resumen\b/i.test(label);
       if (isUnidad && !lastUnidad) {
         burstFillGastosHeight();
       } else if (!isUnidad && lastUnidad) {
         document.body.classList.remove("ps-unidad-gastos-active");
+        // Al volver a Resumen: llenar pie del viewport
+        setTimeout(syncResumenProyectosEqualHeight, 0);
+        setTimeout(syncResumenProyectosEqualHeight, 100);
+        setTimeout(syncResumenProyectosEqualHeight, 400);
+      } else if (isResumen) {
+        setTimeout(syncResumenProyectosEqualHeight, 0);
+        setTimeout(syncResumenProyectosEqualHeight, 200);
       }
       lastUnidad = isUnidad;
     }
@@ -406,6 +430,8 @@
       if (document.body.classList.contains("ps-unidad-gastos-active")) {
         fillGastosViewportHeight();
         fixAgGridHeightInner();
+      } else {
+        syncResumenProyectosEqualHeight();
       }
     });
 
