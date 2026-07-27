@@ -1708,16 +1708,47 @@
     return null;
   }
 
-  /** Formatea importe con miles y sufijo € (paridad con currency_format EUR). */
+  /**
+   * Importe en miles con sufijo K€ (p. ej. 90000 → «90 K€»).
+   * Evita el número completo y el «90 €» cuando el valor era la categoría.
+   */
   function formatEuroAmount(val) {
     if (val == null || val === "") return "";
-    var n = typeof val === "number" ? val : Number(String(val).replace(/,/g, ""));
+    var raw = String(val).replace(/[^\d.-]/g, "");
+    var n = typeof val === "number" ? val : Number(raw);
     if (!isFinite(n)) return String(val);
+    var k = Math.round(n / 1000);
     return (
-      Math.round(n).toLocaleString("en-US", {
+      k.toLocaleString("es-ES", {
         maximumFractionDigits: 0,
-      }) + " €"
+      }) + " K€"
     );
+  }
+
+  /**
+   * En barra horizontal ECharts el value suele ser [importe, categoría] o
+   * [categoría, importe]. Elegimos el de mayor magnitud (facturación ≫ 0–100).
+   */
+  function pickSeriesAmount(p) {
+    var v =
+      p && p.value != null
+        ? p.value
+        : p && p.data != null
+          ? p.data
+          : null;
+    if (v && typeof v === "object" && !Array.isArray(v) && v.value != null) {
+      v = v.value;
+    }
+    if (Array.isArray(v)) {
+      var best = null;
+      for (var i = 0; i < v.length; i++) {
+        var n = typeof v[i] === "number" ? v[i] : Number(v[i]);
+        if (!isFinite(n)) continue;
+        if (best == null || Math.abs(n) > Math.abs(best)) best = n;
+      }
+      return best != null ? best : v[v.length - 1];
+    }
+    return v;
   }
 
   /** Categoría probabilidad: 100 → 100% (sin tocar si ya lleva %). */
@@ -1730,7 +1761,7 @@
 
   /**
    * Horizontal bar: eje categoría = yAxis (izq.), valores = xAxis (abajo).
-   * Añade % a la izquierda y € en importes (eje, labels, tooltip).
+   * Añade % a la izquierda e importes en K€ (eje, labels, tooltip).
    */
   function applyProbabilidadFont(inst, fontPx) {
     if (!inst || typeof inst.setOption !== "function") return;
@@ -1748,15 +1779,12 @@
       for (var s = 0; s < series.length; s++) {
         seriesPatch.push({
           label: Object.assign(
-            { show: true, formatter: function (p) {
-              var v =
-                p && p.value != null
-                  ? Array.isArray(p.value)
-                    ? p.value[p.value.length - 1]
-                    : p.value
-                  : p && p.data;
-              return formatEuroAmount(v);
-            } },
+            {
+              show: true,
+              formatter: function (p) {
+                return formatEuroAmount(pickSeriesAmount(p));
+              },
+            },
             labelStyle
           ),
         });
@@ -1768,13 +1796,7 @@
               {
                 show: true,
                 formatter: function (p) {
-                  var v =
-                    p && p.value != null
-                      ? Array.isArray(p.value)
-                        ? p.value[p.value.length - 1]
-                        : p.value
-                      : "";
-                  return formatEuroAmount(v);
+                  return formatEuroAmount(pickSeriesAmount(p));
                 },
               },
               labelStyle
@@ -1855,14 +1877,25 @@
     var origFill = proto.fillText;
     var origStroke = proto.strokeText;
     var PROB_RE = /^(100|90|70|50|30|10|0)$/;
-    var AMOUNT_RE = /^-?[\d,]+(\.\d+)?$/;
+    var AMOUNT_RE = /^-?[\d.,]+$/;
+    var EURO_RE = /^(-?[\d.,]+)\s*€$/;
     function rewriteText(raw) {
       var t = String(raw == null ? "" : raw).trim();
       if (!t) return raw;
+      if (t.indexOf("K€") !== -1) return raw;
       if (PROB_RE.test(t)) return t + "%";
-      if (AMOUNT_RE.test(t) && t.indexOf("%") === -1 && t.indexOf("€") === -1) {
+      var euroM = t.match(EURO_RE);
+      if (euroM) {
+        var nEuro = Number(String(euroM[1]).replace(/[^\d.-]/g, ""));
+        // Solo reconvertir importes reales; «90 €» erróneo (=categoría) no → K€
+        if (isFinite(nEuro) && Math.abs(nEuro) > 100) {
+          return formatEuroAmount(nEuro);
+        }
+        return raw;
+      }
+      if (AMOUNT_RE.test(t) && t.indexOf("%") === -1) {
         // Eje/valores grandes (p. ej. 2000000 o 2,000,000); no tocar 0–100 del eje cat.
-        var n = Number(t.replace(/,/g, ""));
+        var n = Number(t.replace(/[^\d.-]/g, ""));
         if (isFinite(n) && Math.abs(n) > 100) return formatEuroAmount(n);
       }
       return raw;

@@ -8,6 +8,12 @@
   (concepto analítico × meses 01–12 + Total; métrica coste; `tipo_proyecto=Structure` fijo).
 - Vista `bi_v_unidad` en capa BI; filtros nativos Año/Empresa/Dept/Tipo también en Unidad.
 
+## [2026-07-27c] — Probabilidad: importes en K€
+
+### Fixed
+
+- Etiquetas de Facturación por Probabilidad: importe real en `K€` (p. ej. `5.900 K€`), no la categoría con `€` ni el número completo.
+
 ## [2026-07-27b] — Cierre rama `fix/probabilidad-formato-euro-porcentaje`
 
 ### Summary

@@ -282,8 +282,8 @@ def dim_adhoc_filters(*extra_cols: str) -> list[dict[str, Any]]:
 def probabilidad_bar_params() -> dict[str, Any]:
     """Barras PBI: probabilidad (100..10) × facturación P+R.
     Superset 6.1: dist_bar legacy no está registrado → echarts_timeseries_bar.
-    Importes en € vía currency_format; el % en etiquetas de categoría lo aplica
-    tail_js (formatter ECharts) — no usar x_axis_title '%' (queda flotando).
+    Importes en K€ vía tail_js (formatter ECharts); el % en categorías también.
+    No usar x_axis_title '%' (queda flotando).
     """
     return {
         "adhoc_filters": dim_adhoc_filters(),
