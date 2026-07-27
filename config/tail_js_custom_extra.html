@@ -549,6 +549,144 @@
     return vp.scrollWidth > vp.clientWidth + 2;
   }
 
+  // ─── Persistencia de anchos de columna — chart Proyectos ────────────────────
+  //
+  // Cuando el usuario termina de redimensionar una columna:
+  //  1. Guarda en localStorage (respuesta inmediata, solo este browser).
+  //  2. Llama a la API de Superset para actualizar column_config en la BD
+  //     → todos los usuarios/dispositivos reciben el nuevo ancho en la próxima carga.
+  //
+  // La API usa la cookie de sesión (HTTPS) + token CSRF: no requiere credenciales
+  // adicionales; funciona para cualquier usuario con rol Alpha/Admin en Superset.
+
+  var PS_COL_STORAGE_KEY = "ps-proyectos-col-widths-v2";
+  var PS_CHART_ID = 21;
+
+  function isProyectosChart(chart) {
+    var name = chart.getAttribute("data-test-chart-name") || "";
+    if (name.indexOf("Proyectos") !== -1) return true;
+    var title = chart.querySelector(
+      '[data-test="slice-header"] .header-title, [data-test="slice-header"] .editable-title'
+    );
+    var t = title ? (title.textContent || "").replace(/\s+/g, " ").trim() : "";
+    return t === "Proyectos" || t.indexOf("Proyectos") === 0;
+  }
+
+  /** Devuelve {colId: width, ...} del estado actual del grid. */
+  function getColWidthMap(api) {
+    var state = api.getColumnState ? api.getColumnState() : null;
+    if (!state) return null;
+    var map = {};
+    state.forEach(function (col) {
+      if (col.colId && col.width && col.width > 0) map[col.colId] = col.width;
+    });
+    return Object.keys(map).length ? map : null;
+  }
+
+  /** Aplica un mapa {colId: width} al grid sin tocar orden ni visibilidad. */
+  function applyColWidthMap(api, map) {
+    if (!map || !api.applyColumnState) return;
+    var state = Object.keys(map).map(function (id) {
+      return { colId: id, width: map[id] };
+    });
+    try { api.applyColumnState({ state: state, applyOrder: false }); } catch (e) { /* ignore */ }
+  }
+
+  /** Guarda en localStorage (fallback inmediato). */
+  function saveWidthsLocal(map) {
+    try { localStorage.setItem(PS_COL_STORAGE_KEY, JSON.stringify(map)); } catch (e) { /* ignore */ }
+  }
+
+  /** Lee de localStorage. */
+  function loadWidthsLocal() {
+    try {
+      var raw = localStorage.getItem(PS_COL_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  /**
+   * Llama a PUT /api/v1/chart/:id para actualizar columnWidth en column_config.
+   * Usa la sesión del usuario logueado (cookie HTTPS + CSRF).
+   * Si el usuario no tiene permisos de escritura, falla silenciosamente.
+   */
+  function saveWidthsToSuperset(map) {
+    var base = window.location.pathname.indexOf("/analytics/") === 0 ? "/analytics" : "";
+    // Paso 1: obtener token CSRF (la sesión ya está en la cookie)
+    fetch(base + "/api/v1/security/csrf_token/", { credentials: "same-origin" })
+      .then(function (r) { return r.json(); })
+      .then(function (csrfData) {
+        var csrf = csrfData.result;
+        if (!csrf) return;
+        // Paso 2: leer params actuales del chart
+        return fetch(base + "/api/v1/chart/" + PS_CHART_ID, {
+          credentials: "same-origin",
+          headers: { "X-CSRFToken": csrf },
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (chartData) {
+            var params = JSON.parse((chartData.result || {}).params || "{}");
+            var cc = params.column_config || {};
+            // Actualizar columnWidth por columna
+            Object.keys(map).forEach(function (colId) {
+              cc[colId] = cc[colId] || {};
+              cc[colId].columnWidth = map[colId];
+            });
+            params.column_config = cc;
+            // Paso 3: guardar
+            return fetch(base + "/api/v1/chart/" + PS_CHART_ID, {
+              method: "PUT",
+              credentials: "same-origin",
+              headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrf,
+                "Referer": window.location.origin + base + "/",
+              },
+              body: JSON.stringify({ params: JSON.stringify(params) }),
+            });
+          })
+          .then(function (r) {
+            if (r && r.ok) {
+              console.log("[PS] Anchos de Proyectos guardados en Superset (todos los usuarios).");
+            }
+          });
+      })
+      .catch(function () { /* fallo silencioso: localStorage es el fallback */ });
+  }
+
+  var _psColSaveTimer = null;
+
+  /**
+   * Registra el listener de resize en el grid de Proyectos.
+   * Se inicializa una vez por instancia de chart.
+   */
+  function initProyectosColPersist(chart, api) {
+    if (chart.__psColPersistInit) return;
+    chart.__psColPersistInit = true;
+
+    // Restaurar anchos guardados (localStorage → respuesta inmediata)
+    var saved = loadWidthsLocal();
+    if (saved) applyColWidthMap(api, saved);
+
+    // Escuchar resize manual
+    try {
+      api.addEventListener("columnResized", function (e) {
+        if (!e || !e.finished) return;
+        var map = getColWidthMap(api);
+        if (!map) return;
+        // Guardar en localStorage inmediatamente
+        saveWidthsLocal(map);
+        // Guardar en Superset con debounce 1s (evita llamadas durante drag)
+        if (_psColSaveTimer) clearTimeout(_psColSaveTimer);
+        _psColSaveTimer = setTimeout(function () {
+          saveWidthsToSuperset(map);
+        }, 1000);
+      });
+    } catch (err) { /* grid aún montando */ }
+  }
+
+  // ─── Fin persistencia Proyectos ─────────────────────────────────────────────
+
   /**
    * Resumen mensual: columnas al contenido, alineadas a la izquierda (sin flex).
    */
@@ -612,6 +750,16 @@
     autoSizeAgGridColumns();
     hideResumenHeaderChrome();
     bumpProbabilidadChartFonts();
+    // Inicializar persistencia de anchos en el chart Proyectos (idempotente)
+    var proyCharts = document.querySelectorAll('[data-test-chart-name*="Proyectos"]');
+    Array.prototype.forEach.call(proyCharts, function (chart) {
+      var agTheme = chart.querySelector('[class*="ag-theme"]');
+      if (!agTheme) return;
+      var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
+      if (!rows.length) return;
+      var api = findAgGridApi(agTheme);
+      if (api) initProyectosColPersist(chart, api);
+    });
   }, 800);
 
   /**
