@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-28c] — Fix sync Departamento en ConfiguracionUsuarios
+
+### Fixed
+
+- Transform 004 leía solo `r.Departamento`; la API BC devuelve `departamento`
+  (camelCase) → `bc_user_configuration.departamento` quedaba vacío.
+- `$select` alineado a `departamento`; Transform acepta ambos casings.
+
 ## [2026-07-28b] — Rol PS_Testing para combo simulación
 
 ### Added
