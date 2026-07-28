@@ -510,7 +510,7 @@ def big_number_params(metric: dict[str, Any], fmt: str, *, currency: bool = Fals
         "metric": metric,
         "header_font_size": 0.58,  # ~35% más compacto (antes 0.9)
         "subheader": label,
-        "subheader_font_size": 0.9,  # CSS fuerza 1.077em (= tablas); param alineado
+        "subheader_font_size": 0.7,  # CSS fija 11px; caben en card height 8
 
         "y_axis_format": fmt,
     }
@@ -837,12 +837,12 @@ def persist_dashboard_config(
         "  box-sizing: border-box !important;\n"
         "  overflow: hidden !important;\n"
         "}\n"
-        "/* KPI: barra lateral de acento + más padding */\n"
+        "/* KPI: barra lateral + padding compacto (etiqueta no se recorta) */\n"
         ".dashboard-component-chart-holder:has(.superset-legacy-chart-big-number) {\n"
         "  border-left-width: 4px !important;\n"
         "  border-left-style: solid !important;\n"
         "  border-left-color: #143b41 !important;\n"
-        "  padding: 6px 9px !important;\n"
+        "  padding: 4px 8px !important;\n"
         "  box-shadow: 0 1px 3px rgba(20, 59, 65, 0.08) !important;\n"
         "}\n"
         ".dashboard-component-chart-holder:has(.superset-legacy-chart-big-number)"
@@ -1019,14 +1019,20 @@ def persist_dashboard_config(
         "  padding: 0 !important;\n"
         "  overflow: hidden !important;\n"
         "}\n"
-        "/* Etiqueta KPI = misma fuente que celdas AG Grid (Resumen/Proyectos) */\n"
+        "/* Etiqueta KPI: legible y sin recorte (1.077em no cabe en card bajo) */\n"
         ".superset-legacy-chart-big-number .subheader-line {\n"
-        "  font-size: 1.077em !important; font-weight: 600 !important;\n"
+        "  font-size: 11px !important; font-weight: 600 !important;\n"
         "  letter-spacing: 0.02em !important;\n"
         "  text-transform: uppercase !important;\n"
         "  color: #64748b !important;\n"
         "  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;\n"
-        "  text-align: left !important; margin-top: 2px !important;\n"
+        "  text-align: left !important;\n"
+        "  margin-top: 1px !important;\n"
+        "  margin-bottom: 0 !important;\n"
+        "  line-height: 1.15 !important;\n"
+        "  overflow: visible !important;\n"
+        "  white-space: nowrap !important;\n"
+        "  flex-shrink: 0 !important;\n"
         "}\n"
         "/* Titulos charts/tablas: teal bold estilo Timesheet (Lista de Notas) */\n"
         ".dashboard-component-chart-holder .header-title,\n"
@@ -1062,9 +1068,18 @@ def persist_dashboard_config(
         "  justify-content: flex-start !important;\n"
         "  height: 100% !important;\n"
         "  max-height: 100% !important;\n"
+        "  min-height: 0 !important;\n"
         "  margin: 0 !important;\n"
-        "  padding: 0 8px !important;\n"
+        "  padding: 0 4px !important;\n"
         "  box-sizing: border-box !important;\n"
+        "}\n"
+        "/* Menos hueco entre «Objetivos Anuales» / Planificación y la fila KPI */\n"
+        ".grid-row:has(> .dashboard-component-header),\n"
+        ".dragdroppable-row:has(.dashboard-component-header),\n"
+        ".resizable-container:has(> .dashboard-component-header) {\n"
+        "  margin: 0 !important;\n"
+        "  padding: 0 !important;\n"
+        "  min-height: 0 !important;\n"
         "}\n"
         ".dashboard-component-header *::-webkit-scrollbar {\n"
         "  width: 0 !important; height: 0 !important; display: none !important;\n"
@@ -1126,14 +1141,20 @@ def persist_dashboard_config(
         "  flex-direction: column !important;\n"
         "  justify-content: center !important;\n"
         "  align-items: flex-start !important;\n"
+        "  gap: 2px !important;\n"
         "  height: 100% !important;\n"
         "  width: 100% !important;\n"
-        "  overflow: hidden !important;\n"
+        "  overflow: visible !important;\n"
         "}\n"
-        ".superset-legacy-chart-big-number .header-line,\n"
-        ".superset-legacy-chart-big-number .subheader-line {\n"
+        ".superset-legacy-chart-big-number .header-line {\n"
         "  text-align: left !important;\n"
         "  overflow: hidden !important;\n"
+        "  line-height: 1.15 !important;\n"
+        "  flex-shrink: 0 !important;\n"
+        "}\n"
+        ".superset-legacy-chart-big-number .subheader-line {\n"
+        "  text-align: left !important;\n"
+        "  overflow: visible !important;\n"
         "}\n"
         "/* Tablas: estilo mínimo — usa el nativo Ant Design de Superset */\n"
         "/* Ocultar selector Show N entries per page */\n"
@@ -1570,7 +1591,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
                 "text": "Objetivos Anuales",
                 "headerSize": "SMALL_HEADER",
                 "width": kpi_col_width,
-                "height": 3,
+                "height": 2,
             },
         },
         "HEADER-PLAN": {
@@ -1580,7 +1601,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
                 "text": "Planificación Actual",
                 "headerSize": "SMALL_HEADER",
                 "width": kpi_col_width,
-                "height": 3,
+                "height": 2,
             },
         },
         "ROW-OBJ": {
@@ -1617,8 +1638,8 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
     sizes = {
         # Alturas UI: KPI 10; tablas Resumen/Proyectos misma altura; charts 36.
         # Probabilidad: altura sync UI pull 2026-07-28 (28).
-        "obj": (1, 7),
-        "plan": (1, 7),
+        "obj": (1, 8),
+        "plan": (1, 8),
         "table": (4, 68),
         "projects": (8, 68),
         # Altura layout alta: el CSS :has fija calc(100dvh-210px) al activar tab;

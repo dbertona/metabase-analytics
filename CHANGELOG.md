@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-28q] — KPI: menos hueco + etiquetas sin recorte
+
+### Fixed
+- Headers Objetivos/Planificación: height **3→2** (menos espacio vacío bajo el título).
+- Cards KPI: height **7→8**, padding más bajo; etiquetas **11px** (1.077em recortaba).
+- CSS: overflow visible en subheader + line-height compacto.
+
 ## [2026-07-28p] — KPI: etiquetas = fuente tablas
 
 ### Changed

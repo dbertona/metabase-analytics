@@ -53,8 +53,8 @@ Debajo: Resumen mensual (ancho 12) · Evolución + Margen (6+6).
 
 | Pieza | Alturas layout (grid units) | Notas |
 |-------|----------------------------|-------|
-| KPI cards Obj/Plan | height **7** | Antes 10; padding/fuentes compactas |
-| Headers Objetivos / Planificación | height **3**, `SMALL_HEADER` | Antes 4 / MEDIUM |
+| KPI cards Obj/Plan | height **8** | Etiquetas 11px sin recorte |
+| Headers Objetivos / Planificación | height **2**, `SMALL_HEADER` | Menos hueco bajo el título |
 | Facturación por Probabilidad | height **28** | Sync UI; chart llena el card con margen inferior |
 | Pieza | Dataset | Motivo |
 |-------|---------|--------|
