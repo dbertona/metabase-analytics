@@ -1907,9 +1907,118 @@
     );
   }
 
+  // ─── Chrome dashboard: ocultar navbar global (modo informe) ─────────────
+  var PS_DASH_CHROME_STYLE_ID = "ps-dashboard-chrome-style";
+  var PS_DASH_CHROME_CLASS = "ps-dashboard-chrome";
+
+  function ensureDashboardChromeStyles() {
+    if (document.getElementById(PS_DASH_CHROME_STYLE_ID)) return;
+    var style = document.createElement("style");
+    style.id = PS_DASH_CHROME_STYLE_ID;
+    style.textContent =
+      /* Solo menú global; NO tocar cabecera del dashboard */
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " > #app > header," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " #app > div > header.top," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " header.top:not(.dashboard-header)," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " .navbar," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " nav.navbar," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " #main-menu," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " [data-test='menu']," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " .main-nav," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " .ant-layout-header:has([data-test='menu'])," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " .ant-layout-header:has(.navbar)," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " .ant-layout-header:has(a[href*='superset/welcome'])," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " .ant-layout-header:has(.menu){" +
+      "display:none!important;height:0!important;min-height:0!important;" +
+      "overflow:hidden!important;padding:0!important;margin:0!important;" +
+      "border:none!important;" +
+      "}" +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " #app," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " .app," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " .dashboard{" +
+      "padding-top:0!important;" +
+      "}" +
+      "#ps-dash-sim-host{" +
+      "display:inline-flex;align-items:center;margin-right:8px;flex-shrink:0;" +
+      "}";
+    document.head.appendChild(style);
+  }
+
+  function hideGlobalNavbarByScan() {
+    if (!isDashboardPage()) return;
+    var candidates = document.querySelectorAll(
+      "header, nav, .ant-layout-header, [role='banner']"
+    );
+    Array.prototype.forEach.call(candidates, function (el) {
+      if (el.getAttribute("data-ps-hidden-nav") === "1") return;
+      // No tocar la cabecera del propio dashboard
+      if (
+        el.getAttribute("data-test") === "dashboard-header" ||
+        (el.className &&
+          String(el.className).indexOf("dashboard-header") !== -1) ||
+        el.querySelector('[data-test="dashboard-header"]')
+      ) {
+        return;
+      }
+      var t = (el.textContent || "").replace(/\s+/g, " ");
+      var looksGlobal =
+        (/Paneles de control|Dashboards/i.test(t) ||
+          /\/superset\/welcome|Superset/i.test(t)) &&
+        (/Ajustes|Settings|Settings/i.test(t) ||
+          /idioma|language|Ctrl\+k|Ctrl\+K/i.test(t));
+      if (!looksGlobal) return;
+      el.style.setProperty("display", "none", "important");
+      el.style.setProperty("height", "0", "important");
+      el.setAttribute("data-ps-hidden-nav", "1");
+    });
+  }
+
+  function applyDashboardChromeMode() {
+    if (!isDashboardPage()) {
+      document.body.classList.remove(PS_DASH_CHROME_CLASS);
+      return;
+    }
+    ensureDashboardChromeStyles();
+    document.body.classList.add(PS_DASH_CHROME_CLASS);
+    hideGlobalNavbarByScan();
+    setTimeout(publishDashboardViewportVars, 50);
+    setTimeout(publishDashboardViewportVars, 400);
+  }
+
   // ─── Simulación de usuario (Admin/Alpha) — solo identidad visual ─────────
   var PS_SIM_STORAGE_KEY = "psSimulatedUserEmail";
   var PS_SIM_MOUNT_ID = "ps-user-simulator";
+  var PS_SIM_HOST_ID = "ps-dash-sim-host";
 
   function formatBcDisplayName(bcName, email) {
     var full = (bcName || "").trim();
@@ -2016,25 +2125,26 @@
   }
 
   function ensureSimulatorStyles() {
-    if (document.getElementById("ps-user-simulator-style")) return;
-    var style = document.createElement("style");
+    var style = document.getElementById("ps-user-simulator-style");
+    if (style) style.remove();
+    style = document.createElement("style");
     style.id = "ps-user-simulator-style";
     style.textContent =
       "#" +
       PS_SIM_MOUNT_ID +
       "{" +
-      "position:fixed;top:8px;right:160px;z-index:2100;" +
-      "display:flex;align-items:center;gap:6px;padding:3px 8px;" +
+      "position:relative;top:auto;right:auto;z-index:20;" +
+      "display:inline-flex;align-items:center;gap:6px;padding:2px 8px;" +
       "background:#fff3cd;border:1px solid #ffc107;border-radius:4px;" +
-      "font-size:12px;color:#856404;box-shadow:0 1px 4px rgba(0,0,0,.12);" +
+      "font-size:12px;color:#856404;box-shadow:none;max-width:min(320px,42vw);" +
       "}" +
       "#" +
       PS_SIM_MOUNT_ID +
-      " input{padding:3px 6px;border:1px solid #ccc;border-radius:4px;" +
-      "font-size:12px;width:220px;box-sizing:border-box;background:#fff;}" +
+      " input{padding:2px 6px;border:1px solid #ccc;border-radius:4px;" +
+      "font-size:12px;width:180px;max-width:28vw;box-sizing:border-box;background:#fff;}" +
       "#" +
       PS_SIM_MOUNT_ID +
-      " .ps-sim-list{position:absolute;top:100%;left:28px;right:8px;" +
+      " .ps-sim-list{position:absolute;top:100%;left:0;right:0;min-width:220px;" +
       "max-height:220px;overflow:auto;background:#fff;border:1px solid #ccc;" +
       "border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.15);z-index:2200;}" +
       "#" +
@@ -2046,18 +2156,88 @@
       " .ps-sim-item:hover{background:#f5f5f5;}" +
       "#" +
       PS_SIM_MOUNT_ID +
-      " .ps-sim-item.active{background:#e3f2fd;}" +
-      // Split selector id para que Jinja no abra comentario de plantilla
-      "@media (max-width:900px){" +
-      "#" +
-      PS_SIM_MOUNT_ID +
-      "{right:8px;top:48px;}}";
+      " .ps-sim-item.active{background:#e3f2fd;}";
     document.head.appendChild(style);
   }
 
+  function findDashboardSimulatorHost() {
+    if (!isDashboardPage()) return null;
+
+    // Preferir la fila de metadatos (usuario + «hace …»)
+    var nodes = Array.prototype.slice.call(
+      document.querySelectorAll("span,div,a")
+    );
+    var agoNode = nodes.find(function (el) {
+      var t = (el.textContent || "").trim().toLowerCase();
+      if (!t || t.length > 40) return false;
+      return /(\bago\b|\bhace\b)/.test(t);
+    });
+    if (agoNode) {
+      var meta = agoNode.parentElement;
+      while (
+        meta &&
+        meta.parentElement &&
+        meta.parentElement !== document.body &&
+        meta.childElementCount < 2
+      ) {
+        meta = meta.parentElement;
+      }
+      var row = meta && meta.parentElement ? meta.parentElement : meta;
+      if (row) {
+        var host = document.getElementById(PS_SIM_HOST_ID);
+        if (!host) {
+          host = document.createElement("div");
+          host.id = PS_SIM_HOST_ID;
+        }
+        if (host.parentElement !== row) {
+          // Insertar antes del pill de usuario / metadatos
+          if (meta && meta.parentElement === row) {
+            row.insertBefore(host, meta);
+          } else {
+            row.insertBefore(host, row.firstChild);
+          }
+        }
+        return host;
+      }
+    }
+
+    var header =
+      document.querySelector('[data-test="dashboard-header"]') ||
+      document.querySelector(".dashboard-header") ||
+      document.querySelector(".header-with-actions");
+    if (!header) return null;
+    var host2 = document.getElementById(PS_SIM_HOST_ID);
+    if (!host2) {
+      host2 = document.createElement("div");
+      host2.id = PS_SIM_HOST_ID;
+    }
+    if (host2.parentElement !== header) {
+      header.appendChild(host2);
+    }
+    return host2;
+  }
+
+  function placeSimulatorInDashboard(root) {
+    var host = findDashboardSimulatorHost();
+    if (host) {
+      if (root.parentElement !== host) host.appendChild(root);
+      return true;
+    }
+    if (root.parentElement !== document.body) {
+      document.body.appendChild(root);
+    }
+    return false;
+  }
+
   function mountUserSimulator(me, resources) {
-    if (document.getElementById(PS_SIM_MOUNT_ID)) return;
     ensureSimulatorStyles();
+    applyDashboardChromeMode();
+
+    var existing = document.getElementById(PS_SIM_MOUNT_ID);
+    if (existing) {
+      placeSimulatorInDashboard(existing);
+      return;
+    }
 
     var realEmail = (me.email || me.username || "").trim().toLowerCase();
     var realLocal = realEmail.split("@")[0] || "?";
@@ -2074,7 +2254,7 @@
 
     var root = document.createElement("div");
     root.id = PS_SIM_MOUNT_ID;
-    root.title = "Simular usuario (solo nombre; no filtra datos)";
+    root.title = "Simular usuario (Admin/Alpha/PS_Testing)";
 
     var label = document.createElement("span");
     label.textContent = "🧪";
@@ -2185,10 +2365,18 @@
     });
 
     root.appendChild(wrap);
-    document.body.appendChild(root);
+    placeSimulatorInDashboard(root);
     console.log(
       "[PS] Combo simulación listo (" + resources.length + " recursos, Admin/Alpha/PS_Testing)"
     );
+
+    // SPA: reubicar si la cabecera se re-renderiza
+    var tries = 0;
+    var relocate = setInterval(function () {
+      tries += 1;
+      placeSimulatorInDashboard(root);
+      if (tries > 40) clearInterval(relocate);
+    }, 500);
   }
 
   async function initUserSimulator() {
@@ -2256,7 +2444,7 @@
     var ban = document.createElement("div");
     ban.id = "ps-dept-scope-banner";
     ban.style.cssText =
-      "position:fixed;top:48px;left:12px;z-index:2050;padding:4px 10px;" +
+      "position:fixed;top:8px;left:12px;z-index:2050;padding:4px 10px;" +
       "background:#e3f2fd;border:1px solid #90caf9;border-radius:4px;" +
       "font-size:12px;color:#0d47a1;box-shadow:0 1px 3px rgba(0,0,0,.1);";
     ban.textContent = "Ámbito departamento: " + deptLabel + " (como PBI)";
@@ -2342,6 +2530,7 @@
   }
 
   async function runPatch() {
+    applyDashboardChromeMode();
     // Restaurar simulación guardada antes de pintar el nombre
     var saved = readSimulatedEmail();
     if (saved) {
@@ -2353,6 +2542,12 @@
     refreshDisplayedUserName();
     await applyDepartmentScope();
     initUserSimulator();
+    // Reaplicar chrome/host tras pintados SPA
+    setTimeout(applyDashboardChromeMode, 300);
+    setTimeout(function () {
+      var el = document.getElementById(PS_SIM_MOUNT_ID);
+      if (el) placeSimulatorInDashboard(el);
+    }, 600);
   }
 
   if (document.readyState === "loading") {

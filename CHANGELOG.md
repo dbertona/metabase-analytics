@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [2026-07-28f] — Dashboard sin navbar + combo en cabecera
+
+### Changed
+
+- En rutas de dashboard se oculta la navbar global de Superset (logo / Paneles /
+  idioma / Ajustes) — modo informe.
+- El combo 🧪 de simulación de usuario se monta en la cabecera del dashboard
+  (junto a usuario / «hace …»), no fixed sobre la navbar.
+
 ## [2026-07-28e] — Query IDs AL exactos en docs sync 004
 
 ### Fixed
