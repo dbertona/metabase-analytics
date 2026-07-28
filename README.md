@@ -84,6 +84,8 @@ Réplica del panel **Resumen** de Power BI (slug estable `planificacion-ps-analy
 - Gráficos de evolución mensual y facturación por probabilidad
 
 **Filtros nativos (diseño canónico):** [`docs/FILTROS_DASHBOARD_PLANIFICACION.md`](docs/FILTROS_DASHBOARD_PLANIFICACION.md)  
+**Tablas AG Grid (agentes):** [`docs/TABLAS_AG_GRID.md`](docs/TABLAS_AG_GRID.md) — receta §0 + regla
+[`.cursor/rules/superset-table-ag-grid.mdc`](.cursor/rules/superset-table-ag-grid.mdc)  
 **Changelog:** [`CHANGELOG.md`](CHANGELOG.md) — Apply filters es **manual** (sin auto-apply en 6.1).
 
 **Datos:**

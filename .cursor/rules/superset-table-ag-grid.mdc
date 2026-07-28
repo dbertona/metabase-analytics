@@ -3,58 +3,72 @@ alwaysApply: true
 description: Patrón obligatorio para crear o modificar tablas AG Grid en Superset
 ---
 
-# Tablas AG Grid en Superset — patrón canónico
+# Tablas AG Grid en Superset — patrón canónico (agentes)
 
-> **Referencia completa:** `docs/TABLAS_AG_GRID.md`
-> **Última actualización:** 2026-07-27
+> **Guía completa (OBLIGATORIA):** `docs/TABLAS_AG_GRID.md`  
+> **Última actualización:** 2026-07-28
 
-## Regla obligatoria
+## Antes de tocar nada
 
-Cuando un agente cree o modifique una tabla Superset, debe usar **Proyectos**
-como patrón funcional completo. No basta con que la tabla renderice.
+1. Leer `.cursor/DOCUMENTATION_INDEX.md` → sección Analytics.
+2. Leer `docs/TABLAS_AG_GRID.md` completo (empezar por §0 Receta).
+3. Pull UI: `.cursor/rules/superset-dashboard-ui-sync.mdc`.
+4. Confirmar con el usuario: chart, columnas, buscador, persistencia.
+5. Trabajar en rama `feat/` o `fix/` — nunca en `main`.
 
-Antes de editar/regenerar:
+**Patrón de referencia:** chart **Proyectos** (`id=21`).  
+**Tabla ancha de referencia:** **Gastos** (`id=22`) — scroll horizontal permitido.
 
-1. Leer `.cursor/DOCUMENTATION_INDEX.md`.
-2. Leer `docs/TABLAS_AG_GRID.md` completo.
-3. Ejecutar el pull UI obligatorio descrito en
-   `.cursor/rules/superset-dashboard-ui-sync.mdc`.
-4. Confirmar con el usuario el chart, columnas, buscador y persistencia.
-
-## Requisito previo
-
-`superset_config.py` debe tener:
-```python
-FEATURE_FLAGS = {
-    "AG_GRID_TABLE_ENABLED": True,
-}
-```
-Sin este flag, el tipo `ag-grid-table` no está disponible.
+Una tabla “lista” = **Python + CSS + JS**. Renderizar el chart no basta.
 
 ---
 
-## Parámetros mínimos en el script Python
+## URL y comandos (copiar tal cual)
+
+```bash
+# SIEMPRE con /analytics
+export SUPERSET_URL=http://192.168.36.100:8088/analytics
+
+# Pull + regenerar (aplica params + CSS)
+SKIP_APPLY_BI_VIEWS=1 SUPERSET_URL=$SUPERSET_URL \
+  python3 scripts/setup-superset-planificacion.py
+
+# Si cambió config/tail_js_custom_extra.html → reiniciar Superset
+```
+
+❌ Sin `/analytics` → login API 404.
+
+---
+
+## Archivos a modificar
+
+| Cambio | Archivo |
+|--------|---------|
+| Params, layout, `dashboard_css`, owners | `scripts/setup-superset-planificacion.py` |
+| Altura, columnas, buscador, persistencia | `config/tail_js_custom_extra.html` |
+| Feature flag | `config/superset_config.py` → `AG_GRID_TABLE_ENABLED: True` |
+| Datos nuevos | `scripts/sql/bi_dashboard_planificacion_views.sql` |
+
+---
+
+## Parámetros mínimos
 
 ```python
 def mi_tabla_params() -> dict:
     return {
-        "query_mode": "aggregate",           # o "raw"
+        "query_mode": "aggregate",
         "groupby": ["campo_dimension"],
-        "metrics": [
-            metric_sum("campo", "Etiqueta"),
-        ],
+        "metrics": [metric_sum("campo", "Etiqueta")],
         "row_limit": 5000,
-        "server_pagination": False,          # True solo si >10k filas
-        "show_totals": True,                 # fila Resumen al final
-        "include_search": True,              # buscador en la cabecera
-        "show_cell_bars": False,             # sin barras de progreso
-        "color_pn": False,
-        "align_pn": False,
+        "server_pagination": False,
+        "show_totals": True,
+        "include_search": True,
+        "show_cell_bars": False,
         "column_config": {
             "campo_dimension": {
-                "customColumnName": "Nombre visible",
+                "customColumnName": "Nombre",
                 "truncateLongCells": True,
-                "columnWidth": 280,  # fallback; JS usa el espacio restante
+                "columnWidth": 280,
             },
             "Etiqueta": {
                 "d3NumberFormat": ",.0f",
@@ -66,133 +80,66 @@ def mi_tabla_params() -> dict:
     }
 ```
 
-En `charts_config` usar `"ag-grid-table"` como `viz_type`:
-```python
-("Nombre chart", "slug", dataset_id, "ag-grid-table", mi_tabla_params()),
-```
+`viz_type` en `charts_config`: **`"ag-grid-table"`** (nunca `"table"` legacy).
 
 ---
 
-## CSS de dashboard (en `dashboard_css`)
+## CSS — obligatorio + scroll
 
-Añadir siempre estos bloques para las tablas AG Grid:
+Añadir bloque de altura/fuente de `docs/TABLAS_AG_GRID.md` §4.
+
+### 🔴 PROHIBIDO (causa del calvario del scroll)
 
 ```css
-/* ── Fuente y cabeceras ── */
-[data-test-chart-name*='Mi Tabla'] thead th,
-[data-test-chart-name*='Mi Tabla'] .ag-header-cell {
-  white-space: nowrap !important;
-  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;
-  font-size: 1.077em !important;
-  border-bottom: 2px solid #d1d5db !important;
-  box-shadow: none !important;
-}
-[data-test-chart-name*='Mi Tabla'] td,
-[data-test-chart-name*='Mi Tabla'] .ag-cell {
-  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;
-  font-size: 1.077em !important;
-}
-
-/* ── Ocultar paginación y barras ── */
-[data-test-chart-name*='Mi Tabla'] .dt-length,
-[data-test-chart-name*='Mi Tabla'] .ant-pagination,
-[data-test-chart-name*='Mi Tabla'] .row-count-container,
-[data-test-chart-name*='Mi Tabla'] .cell-bar,
-[data-test-chart-name*='Mi Tabla'] .cell-bars {
-  display: none !important;
-}
-
-/* ── Totales: ocultar Resumen/Summary + icono info ── */
-[data-test-chart-name*='Mi Tabla'] .ag-floating-bottom .ag-cell[col-id='ano_mes'],
-[data-test-chart-name*='Mi Tabla'] .ag-floating-bottom .ag-cell[col-id='proyecto'] {
-  visibility: hidden !important;
-}
-[data-test-chart-name*='Mi Tabla'] .ag-floating-bottom .anticon {
-  display: none !important;
-}
-
-/* ── Altura completa del card ── */
-[data-test-chart-name*='Mi Tabla'] .chart-slice {
-  display: flex !important;
-  flex-direction: column !important;
-  height: 100% !important;
-  overflow: hidden !important;
-}
-[data-test-chart-name*='Mi Tabla'] .slice_container {
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  overflow: hidden !important;
-}
-[data-test-chart-name*='Mi Tabla'] .chart-container,
-[data-test-chart-name*='Mi Tabla'] .slice_container > div {
-  height: 100% !important;
-}
-[data-test-chart-name*='Mi Tabla'] [class*='ag-theme'],
-[data-test-chart-name*='Mi Tabla'] .ag-root-wrapper,
-[data-test-chart-name*='Mi Tabla'] .ag-root-wrapper-body,
-[data-test-chart-name*='Mi Tabla'] .ag-root {
-  height: 100% !important;
-  flex: 1 1 auto !important;
-}
+/* NO hacer nunca esto */
+.ag-body-horizontal-scroll { display: none !important; height: 0 !important; }
+.ag-center-cols-viewport { overflow-x: hidden !important; }
+.ag-header-viewport { overflow-x: hidden !important; }
 ```
 
-> **Nota:** el CSS solo propaga los contenedores; el ajuste fino de píxeles
-> lo hace el JS `fixAgGridHeight` (ver abajo).
+### ✅ Correcto
+
+```css
+[data-test-chart-name*='Mi Tabla'] .ag-center-cols-viewport,
+[data-test-chart-name*='Mi Tabla'] .ag-header-viewport {
+  overflow-x: auto !important;
+}
+/* Dejar que AG Grid muestre la barra solo si hay overflow real */
+```
+
+Regla: si las columnas **caben**, el JS las ajusta y no hay barra; si **no caben**
+(pantalla estrecha / muchas columnas tipo Gastos), la barra debe ser usable.
+No aplastar columnas hasta hacerlas ilegibles solo para evitar scroll.
 
 ---
 
-## JS en `tail_js_custom_extra.html`
+## JS — obligatorio por tabla
 
-Toda tabla nueva debe registrarse en los helpers necesarios y usar IDs propios.
+En `tail_js_custom_extra.html`, con **IDs y storage keys propios**:
 
-- **Altura:** el grid debe ocupar todo el card. Si se oculta la fila del
-  buscador, aplicar `height:100% !important` a su wrapper padre.
-- **Columnas:** dimensión textual = espacio restante; métricas con anchos
-  compactos. Interceptar `sizeColumnsToFit` para impedir *snapback*.
-- **Resize:** persistir solo `columnResized` con
-  `source="uiColumnResized"`.
-- **Estado:** usar key `localStorage` única por chart.
-- **Compartido:** guardar/leer los cuatro `columnWidth` mediante API del chart.
-- **Idempotencia:** marcar la instancia `GridApi`, no depender solo del DOM.
+- Altura completa del card (y `height:100%` si se oculta la fila del buscador).
+- Anchos: texto = resto del viewport; métricas compactas.
+- Parchear `sizeColumnsToFit` (anti-snapback).
+- Persistencia solo en `columnResized` / `source="uiColumnResized"`.
+- Buscador: proxy nativo antes de ⋮; no mover el input React.
+- Idempotencia en la instancia `GridApi`.
 
 ---
 
-## Buscador en la cabecera
+## Checklist final (no declarar listo sin esto)
 
-Si `include_search: True`, el buscador por defecto aparece a la derecha
-debajo del header. El patrón obligatorio:
-
-1. Crear un proxy nativo con clase y `aria-label` únicos.
-2. Insertarlo antes de `.header-controls` (a la izquierda de ⋮).
-3. No mover el input React real.
-4. Buscar el input real en cada evento y reenviar `value` + evento `input`.
-5. Ocultar `.dropdown-controls-container`.
-6. Devolver al grid la altura reservada por Superset.
-
----
-
-## Checklist al crear una tabla nueva
-
-- [ ] Pull UI ejecutado antes de editar/regenerar
-- [ ] `AG_GRID_TABLE_ENABLED: True` en `superset_config.py`
-- [ ] `viz_type = "ag-grid-table"` en el script Python
-- [ ] `truncateLongCells: True` en dimensión y métricas
-- [ ] Dimensión textual usa el espacio restante; métricas compactas
-- [ ] `show_cell_bars: False` y paginación decidida según volumen
-- [ ] CSS del bloque «Altura completa» añadido al `dashboard_css`
-- [ ] Helpers JS registrados con selector/chart ID y storage key propios
-- [ ] Buscador antes de ⋮, funcional y sin fila adicional
-- [ ] Grid termina a la misma altura que tablas equivalentes
-- [ ] Resize manual sin *snapback*
-- [ ] Refresco conserva anchos localmente
-- [ ] Navegador sin `localStorage` recupera anchos compartidos
-- [ ] Editor compartido es propietario y tiene rol mínimo `can_write Chart`
-- [ ] API GET/PUT chart devuelve 200; no ocultar 403/400
-- [ ] Sintaxis JS/Python y `git diff --check` correctos
-- [ ] Commit + push a `gitea` antes de aplicar
-- [ ] Superset reiniciado si cambió plantilla Jinja
-- [ ] `/analytics/health` OK y navegador sin errores nuevos
+- [ ] Pull UI ejecutado
+- [ ] `AG_GRID_TABLE_ENABLED: True`
+- [ ] `viz_type = "ag-grid-table"`
+- [ ] CSS altura + **scroll condicional** (sin ocultar barra H)
+- [ ] JS propio (no reutilizar keys de Proyectos/Gastos)
+- [ ] Buscador en cabecera si aplica
+- [ ] Probar ventana ancha **y** estrecha
+- [ ] Commit + push `gitea` **antes** de regenerar
+- [ ] Regenerar con `SUPERSET_URL=…/analytics`
+- [ ] Restart si cambió `tail_js`
+- [ ] `/analytics/health` OK; consola sin errores nuevos
 
 ---
 
-**Última actualización:** 2026-07-27
+**Última actualización:** 2026-07-28

@@ -7,6 +7,14 @@
 - Scroll horizontal en grillas AG Grid (Resumen, Proyectos, Gastos): ya no se
   oculta la barra; aparece solo cuando el contenido supera el ancho del card.
 
+### Docs
+
+- Guía operativa de tablas AG Grid reescrita para agentes
+  (`docs/TABLAS_AG_GRID.md` §0 Receta + anti-patrones + scroll).
+- Regla `.cursor/rules/superset-table-ag-grid.mdc` con prohibiciones explícitas
+  y comandos con `SUPERSET_URL=…/analytics`.
+- Índice: Doc Router Analytics + URLs corregidas con `/analytics`.
+
 ## [2026-07-27g] — Cierre rama `fix/gastos-llenar-alto-disponible`
 
 ### Fixed
