@@ -145,7 +145,7 @@ class PsAppInitializer(SupersetAppInitializer):
     def _register_ps_simulation_routes(self) -> None:
         """API para combo simular usuario (solo Admin/Alpha; no filtra datos)."""
         from flask import jsonify
-        from flask_login import current_user, login_required
+        from flask_login import current_user
 
         app = self.superset_app
 
@@ -156,8 +156,10 @@ class PsAppInitializer(SupersetAppInitializer):
             return bool(roles & {"Admin", "Alpha"})
 
         @app.get("/api/v1/ps/resources")
-        @login_required
         def ps_list_resources_for_simulation():  # type: ignore[no-untyped-def]
+            # JSON 401 (no @login_required): evita BuildError del redirect a 'login'
+            if not current_user or not getattr(current_user, "is_authenticated", False):
+                return jsonify({"message": "Unauthorized", "can_simulate": False}), 401
             if not _can_simulate():
                 return jsonify({"message": "Forbidden", "can_simulate": False}), 403
             resources = list_resources_for_simulation()
@@ -170,7 +172,6 @@ class PsAppInitializer(SupersetAppInitializer):
             )
 
         logger.info("PS: ruta /api/v1/ps/resources (simulación Admin/Alpha) registrada")
-
 APP_INITIALIZER = PsAppInitializer
 
 ENABLE_PROXY_FIX = True
