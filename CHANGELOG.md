@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-28j] — Compactar banda KPI+Prob ~−35%
+
+### Changed
+- Layout superior: KPI height **10→7**, headers **4→3** (`SMALL_HEADER`), Probabilidad **34→22**.
+- Tipografía KPI: euros **14px**, % **11px**, etiquetas **8px**; `header_font_size` 0.58 / subheader 0.4.
+- Títulos de sección Objetivos/Planificación **12px**; título Probabilidad **12px**.
+- `tail_js`: fuentes ECharts de Probabilidad a ~65% del tamaño de tablas.
+
 ## [2026-07-28i] — Probabilidad height 34 desde UI
 
 ### Changed

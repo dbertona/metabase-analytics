@@ -508,9 +508,10 @@ def big_number_params(metric: dict[str, Any], fmt: str, *, currency: bool = Fals
     params: dict[str, Any] = {
         "adhoc_filters": dim_adhoc_filters(),
         "metric": metric,
-        "header_font_size": 0.9,
+        "header_font_size": 0.58,  # ~35% más compacto (antes 0.9)
         "subheader": label,
-        "subheader_font_size": 0.6,
+        "subheader_font_size": 0.4,  # antes 0.6
+
         "y_axis_format": fmt,
     }
     if currency:
@@ -823,7 +824,7 @@ def persist_dashboard_config(
         "  border-left-width: 4px !important;\n"
         "  border-left-style: solid !important;\n"
         "  border-left-color: #143b41 !important;\n"
-        "  padding: 10px 14px !important;\n"
+        "  padding: 6px 9px !important;\n"
         "  box-shadow: 0 1px 3px rgba(20, 59, 65, 0.08) !important;\n"
         "}\n"
         ".dashboard-component-chart-holder:has(.superset-legacy-chart-big-number)"
@@ -904,6 +905,17 @@ def persist_dashboard_config(
         "  display: flex !important;\n"
         "  align-items: center !important;\n"
         "}\n"
+        "/* Probabilidad compacta (−35%): título más pequeño */\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
+        " .header-title,\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
+        " .editable-title,\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
+        " .editable-title a,\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
+        " .editable-title span {\n"
+        "  font-size: 12px !important;\n"
+        "}\n"
         "/* Valor KPI base */\n"
         ".superset-legacy-chart-big-number .header-line {\n"
         "  font-weight: 700 !important; color: #0f172a;\n"
@@ -915,16 +927,16 @@ def persist_dashboard_config(
         ".dashboard-component-chart-holder:has(.superset-legacy-chart-big-number)"
         "[data-test-chart-name*='Beneficio'] .header-line,\n"
         ".superset-legacy-chart-big-number .header-line {\n"
-        "  font-size: 22px !important;\n"
+        "  font-size: 14px !important;\n"
         "}\n"
-        "/* Porcentajes (Margen, Crecimiento): 17px -5% → 16px */\n"
+        "/* Porcentajes (Margen, Crecimiento): compact −35% → 11px */\n"
         ".dashboard-component-chart-holder:has(.superset-legacy-chart-big-number)"
         "[data-test-chart-name*='Margen'] .header-line,\n"
         ".dashboard-component-chart-holder:has(.superset-legacy-chart-big-number)"
         "[data-test-chart-name*='Crecimiento'] .header-line {\n"
-        "  font-size: 16px !important;\n"
+        "  font-size: 11px !important;\n"
         "}\n"
-        "/* Ocultar botón/badge de filtros y controles extra en charts */\n"
+        "/* Ocultar botón/badge de filtros por chart (barra nativa sí se muestra) */\n"
         ".dashboard-component-chart-holder .filter-counts,\n"
         ".dashboard-component-chart-holder .filters-badge,\n"
         ".dashboard-component-chart-holder [data-test='filter-counts'],\n"
@@ -968,12 +980,12 @@ def persist_dashboard_config(
         "}\n"
         "/* Etiqueta bajo el valor: 16px -5% → 15px */\n"
         ".superset-legacy-chart-big-number .subheader-line {\n"
-        "  font-size: 11px !important; font-weight: 600 !important;\n"
+        "  font-size: 8px !important; font-weight: 600 !important;\n"
         "  letter-spacing: 0.02em !important;\n"
         "  text-transform: uppercase !important;\n"
         "  color: #64748b !important;\n"
         "  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;\n"
-        "  text-align: left !important; margin-top: 4px !important;\n"
+        "  text-align: left !important; margin-top: 2px !important;\n"
         "}\n"
         "/* Titulos charts/tablas: teal bold estilo Timesheet (Lista de Notas) */\n"
         ".dashboard-component-chart-holder .header-title,\n"
@@ -1023,7 +1035,7 @@ def persist_dashboard_config(
         ".dashboard-component-header h2,\n"
         ".dashboard-component-header h3 {\n"
         "  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;\n"
-        "  font-size: 18px !important; font-weight: 700 !important; color: #007c89 !important;\n"
+        "  font-size: 12px !important; font-weight: 700 !important; color: #007c89 !important;\n"
         "  margin: 0 !important; padding: 0 !important;\n"
         "  line-height: 1.15 !important;\n"
         "  height: auto !important;\n"
@@ -1515,9 +1527,9 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "parents": col_parents + ["ROW-HDR-OBJ"],
             "meta": {
                 "text": "Objetivos Anuales",
-                "headerSize": "MEDIUM_HEADER",
+                "headerSize": "SMALL_HEADER",
                 "width": kpi_col_width,
-                "height": 4,
+                "height": 3,
             },
         },
         "HEADER-PLAN": {
@@ -1525,9 +1537,9 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "parents": col_parents + ["ROW-HDR-PLAN"],
             "meta": {
                 "text": "Planificación Actual",
-                "headerSize": "MEDIUM_HEADER",
+                "headerSize": "SMALL_HEADER",
                 "width": kpi_col_width,
-                "height": 4,
+                "height": 3,
             },
         },
         "ROW-OBJ": {
@@ -1563,15 +1575,15 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
     }
     sizes = {
         # Alturas UI: KPI 10; tablas Resumen/Proyectos misma altura; charts 36.
-        # Probabilidad: altura traída de UI Superset (pull 2026-07-28) = 34.
-        "obj": (1, 10),
-        "plan": (1, 10),
+        # Banda KPI+Prob ~−35% vs UI previa (KPI 10/hdr 4/prob 34 → 7/3/22).
+        "obj": (1, 7),
+        "plan": (1, 7),
         "table": (4, 68),
         "projects": (8, 68),
         # Altura layout alta: el CSS :has fija calc(100dvh-210px) al activar tab;
         # este valor evita que el grid React pinte un card enano el primer frame.
         "unidad": (12, 78),
-        "prob": (6, 34),
+        "prob": (6, 22),
         "chart": (6, 36),
     }
     # Importes grandes (euros) más anchos; % compactos
