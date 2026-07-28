@@ -2565,20 +2565,7 @@
   var PS_DEPT_LOCK_STYLE_ID = "ps-dept-lock-style";
   var _deptLockObserver = null;
   var _deptLockActive = false;
-
-  function _isDeptFilterNode(el) {
-    if (!el || el.nodeType !== 1) return false;
-    var name = (
-      el.getAttribute("name") ||
-      el.getAttribute("aria-label") ||
-      el.getAttribute("data-test") ||
-      el.id ||
-      ""
-    );
-    if (name.indexOf(PS_DEPT_FILTER_ID) !== -1) return true;
-    if (name === "Departamentos" || name === "Departamento") return true;
-    return false;
-  }
+  var _deptHideRunning = false;
 
   function _findDeptFilterContainers() {
     var found = [];
@@ -2695,11 +2682,20 @@
   function _hideDeptFilterItems() {
     if (!_deptLockActive) return;
     _injectDeptLockCss();
-    _findDeptFilterContainers().forEach(function (el) {
-      el.classList.add("ps-dept-filter-hidden");
-      el.style.setProperty("display", "none", "important");
-      el.setAttribute("data-ps-dept-hidden", "1");
-    });
+    // Evitar reentrada: setear class/style dispara MutationObserver si observa
+    // attributes → bucle infinito → UI congelada en "Loading…".
+    if (_deptHideRunning) return;
+    _deptHideRunning = true;
+    try {
+      _findDeptFilterContainers().forEach(function (el) {
+        if (el.getAttribute("data-ps-dept-hidden") === "1") return;
+        el.classList.add("ps-dept-filter-hidden");
+        el.style.setProperty("display", "none", "important");
+        el.setAttribute("data-ps-dept-hidden", "1");
+      });
+    } finally {
+      _deptHideRunning = false;
+    }
   }
 
   function _startDeptLockObserver() {
@@ -2712,13 +2708,13 @@
       document.querySelector(".dashboard-filters-panel") ||
       document.body;
     _deptLockObserver = new MutationObserver(function () {
-      if (_deptLockActive) _hideDeptFilterItems();
+      if (!_deptLockActive || _deptHideRunning) return;
+      // Solo childList: NO observar attributes (class/style) — provoca bucle.
+      _hideDeptFilterItems();
     });
     _deptLockObserver.observe(panel, {
       childList: true,
       subtree: true,
-      attributes: true,
-      attributeFilter: ["class", "style"],
     });
     // Reintentos: el panel de filtros a veces pinta tarde
     [300, 800, 1600, 3000].forEach(function (ms) {
