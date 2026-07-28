@@ -1675,21 +1675,18 @@ def main() -> int:
 
     print("==> 4/4 Configurando dashboard...")
     existing_dash = client.find_dashboard()
+    dash_payload = {
+        "dashboard_title": DASHBOARD_TITLE,
+        "slug": DASHBOARD_SLUG,
+        "published": True,
+        "position_json": json.dumps(build_layout(charts)),
+        "owners": PROYECTOS_OWNER_IDS,  # admin + dbertona: editar layout en UI
+    }
     if existing_dash:
         dash_id = existing_dash["id"]
-        client._request("PUT", f"/api/v1/dashboard/{dash_id}", {
-            "dashboard_title": DASHBOARD_TITLE,
-            "slug": DASHBOARD_SLUG,
-            "published": True,
-            "position_json": json.dumps(build_layout(charts)),
-        })
+        client._request("PUT", f"/api/v1/dashboard/{dash_id}", dash_payload)
     else:
-        dash_id = client._request("POST", "/api/v1/dashboard/", {
-            "dashboard_title": DASHBOARD_TITLE,
-            "slug": DASHBOARD_SLUG,
-            "published": True,
-            "position_json": json.dumps(build_layout(charts)),
-        })["id"]
+        dash_id = client._request("POST", "/api/v1/dashboard/", dash_payload)["id"]
 
     client.attach_charts(dash_id, [c["id"] for c in charts])
     persist_dashboard_config(client, dash_id, dataset_ids, charts)
