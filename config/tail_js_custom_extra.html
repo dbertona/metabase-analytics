@@ -2751,6 +2751,7 @@
   }
 
   function markDeptFilterLocked(locked, label, mode) {
+    // Sin banner UI: el RLS ya restringe; solo ocultamos el filtro Departamentos.
     var existing = document.getElementById("ps-dept-scope-banner");
     if (existing) existing.remove();
 
@@ -2758,25 +2759,7 @@
       _stopDeptLockObserver();
       return;
     }
-
     _startDeptLockObserver();
-
-    var ban = document.createElement("div");
-    ban.id = "ps-dept-scope-banner";
-    ban.style.cssText =
-      "position:fixed;top:8px;left:12px;z-index:2050;padding:4px 10px;" +
-      "background:#e3f2fd;border:1px solid #90caf9;border-radius:4px;" +
-      "font-size:12px;color:#0d47a1;box-shadow:0 1px 3px rgba(0,0,0,.1);";
-    if (mode === "project_team") {
-      ban.textContent =
-        "Ámbito: proyectos del equipo" +
-        (label ? " (" + label + ")" : "") +
-        " — fijado por servidor";
-    } else {
-      ban.textContent =
-        "Departamento: " + label + " (fijado por servidor — no editable)";
-    }
-    document.body.appendChild(ban);
   }
 
   async function fetchUserScope(email) {
