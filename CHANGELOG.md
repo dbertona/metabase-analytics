@@ -1,5 +1,16 @@
 # Changelog — superset-analytics
 
+## [Unreleased]
+
+## [2026-07-28a] — Combo simular usuario (Admin/Alpha)
+
+### Added
+
+- Combo de recursos (como Apps) para simular el usuario mostrado en la barra.
+  Solo **Admin/Alpha**; cambia el nombre visual, **no filtra** datos del dashboard.
+- API `GET /api/v1/ps/resources` (bc_resource activos con email).
+- Persistencia en `localStorage` (`psSimulatedUserEmail`).
+
 ## [2026-07-28] — Cierre rama `fix/scroll-horizontal-ag-grid`
 
 ### Fixed

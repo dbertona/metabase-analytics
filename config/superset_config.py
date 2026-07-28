@@ -140,6 +140,36 @@ class PsAppInitializer(SupersetAppInitializer):
             if session.get("locale") != "es":
                 session["locale"] = "es"
 
+        self._register_ps_simulation_routes()
+
+    def _register_ps_simulation_routes(self) -> None:
+        """API para combo simular usuario (solo Admin/Alpha; no filtra datos)."""
+        from flask import jsonify
+        from flask_login import current_user, login_required
+
+        app = self.superset_app
+
+        def _can_simulate() -> bool:
+            if not current_user or not getattr(current_user, "is_authenticated", False):
+                return False
+            roles = {getattr(r, "name", "") for r in (current_user.roles or [])}
+            return bool(roles & {"Admin", "Alpha"})
+
+        @app.get("/api/v1/ps/resources")
+        @login_required
+        def ps_list_resources_for_simulation():  # type: ignore[no-untyped-def]
+            if not _can_simulate():
+                return jsonify({"message": "Forbidden", "can_simulate": False}), 403
+            resources = list_resources_for_simulation()
+            return jsonify(
+                {
+                    "result": resources,
+                    "count": len(resources),
+                    "can_simulate": True,
+                }
+            )
+
+        logger.info("PS: ruta /api/v1/ps/resources (simulación Admin/Alpha) registrada")
 
 APP_INITIALIZER = PsAppInitializer
 
@@ -168,20 +198,25 @@ PS_ANALYTICS_PASSWORD = os.environ.get(
 ).strip()
 
 
+def _analytics_connect():
+    """Conexión corta a Analytics DB (bc_resource)."""
+    return psycopg2.connect(
+        host=PS_ANALYTICS_HOST,
+        port=PS_ANALYTICS_PORT,
+        dbname=PS_ANALYTICS_DB,
+        user=PS_ANALYTICS_USER,
+        password=PS_ANALYTICS_PASSWORD,
+        connect_timeout=5,
+    )
+
+
 def lookup_resource_name(email: str) -> str | None:
     """Nombre completo en bc_resource por email (como Timesheet)."""
     email = (email or "").strip().lower()
     if not email or "@" not in email:
         return None
     try:
-        with psycopg2.connect(
-            host=PS_ANALYTICS_HOST,
-            port=PS_ANALYTICS_PORT,
-            dbname=PS_ANALYTICS_DB,
-            user=PS_ANALYTICS_USER,
-            password=PS_ANALYTICS_PASSWORD,
-            connect_timeout=5,
-        ) as conn:
+        with _analytics_connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -200,6 +235,45 @@ def lookup_resource_name(email: str) -> str | None:
     except Exception:
         logger.exception("No se pudo leer bc_resource para email=%s", email)
     return None
+
+
+def list_resources_for_simulation() -> list[dict[str, str]]:
+    """Recursos activos con email (misma lógica que UserSimulatorSelector en Apps)."""
+    try:
+        with _analytics_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT code, name, email
+                    FROM public.bc_resource
+                    WHERE email IS NOT NULL
+                      AND trim(email) <> ''
+                      AND fecha_de_baja IS NULL
+                      AND code NOT LIKE %s
+                    ORDER BY name NULLS LAST, email
+                    """,
+                    ("REC.%",),
+                )
+                rows = cur.fetchall()
+    except Exception:
+        logger.exception("No se pudo listar bc_resource para simulación")
+        return []
+
+    seen: set[str] = set()
+    out: list[dict[str, str]] = []
+    for code, name, email in rows:
+        email_n = (email or "").strip().lower()
+        if not email_n or email_n in seen:
+            continue
+        seen.add(email_n)
+        out.append(
+            {
+                "code": str(code or "").strip(),
+                "name": str(name or "").strip() or email_n,
+                "email": email_n,
+            }
+        )
+    return out
 
 
 def split_resource_display_name(full_name: str, email: str) -> tuple[str, str]:

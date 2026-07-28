@@ -1907,18 +1907,87 @@
     );
   }
 
-  async function fetchLoggedUserName() {
+  // ─── Simulación de usuario (Admin/Alpha) — solo identidad visual ─────────
+  var PS_SIM_STORAGE_KEY = "psSimulatedUserEmail";
+  var PS_SIM_MOUNT_ID = "ps-user-simulator";
+
+  function formatBcDisplayName(bcName, email) {
+    var full = (bcName || "").trim();
+    if (!full) return (email || "").split("@")[0] || "usuario";
+    if (full.indexOf(",") !== -1) {
+      var parts = full.split(",");
+      var last = parts[0].trim();
+      var first = parts.slice(1).join(",").trim();
+      if (first) return (first + " " + last).trim();
+    }
+    return full;
+  }
+
+  function readSimulatedEmail() {
+    try {
+      return (localStorage.getItem(PS_SIM_STORAGE_KEY) || "").trim().toLowerCase();
+    } catch (err) {
+      return "";
+    }
+  }
+
+  function writeSimulatedEmail(email) {
+    try {
+      if (email) localStorage.setItem(PS_SIM_STORAGE_KEY, email);
+      else localStorage.removeItem(PS_SIM_STORAGE_KEY);
+    } catch (err) {
+      /* ignore */
+    }
+  }
+
+  function setSimulatedUserState(email, name) {
+    var emailN = (email || "").trim().toLowerCase();
+    if (emailN) {
+      window.__PS_SIMULATED_USER__ = {
+        email: emailN,
+        name: name || emailN,
+      };
+      writeSimulatedEmail(emailN);
+    } else {
+      window.__PS_SIMULATED_USER__ = null;
+      writeSimulatedEmail("");
+    }
+  }
+
+  function userCanSimulate(me) {
+    if (!me) return false;
+    var roles = me.roles;
+    if (Array.isArray(roles)) {
+      return roles.some(function (r) {
+        var n = typeof r === "string" ? r : r && r.name;
+        return n === "Admin" || n === "Alpha";
+      });
+    }
+    if (roles && typeof roles === "object") {
+      return Object.prototype.hasOwnProperty.call(roles, "Admin") ||
+        Object.prototype.hasOwnProperty.call(roles, "Alpha");
+    }
+    return false;
+  }
+
+  async function fetchMe() {
     try {
       var res = await fetch(appRoot() + "/api/v1/me/", { credentials: "include" });
       if (!res.ok) return null;
       var payload = await res.json();
-      var me = payload && payload.result ? payload.result : payload;
-      if (!me) return null;
-      var full = [me.first_name || "", me.last_name || ""].join(" ").trim();
-      return full || me.username || me.email || null;
+      return payload && payload.result ? payload.result : payload;
     } catch (err) {
       return null;
     }
+  }
+
+  async function fetchLoggedUserName() {
+    var sim = window.__PS_SIMULATED_USER__;
+    if (sim && sim.name) return formatBcDisplayName(sim.name, sim.email);
+    var me = await fetchMe();
+    if (!me) return null;
+    var full = [me.first_name || "", me.last_name || ""].join(" ").trim();
+    return full || me.username || me.email || null;
   }
 
   function replaceOwnerWithLoggedUser(displayName) {
@@ -1949,16 +2018,221 @@
     return true;
   }
 
-  async function runPatch() {
-    var name = await fetchLoggedUserName();
-    if (!name) return;
-    var tries = 0;
-    var timer = setInterval(function () {
-      tries += 1;
-      if (replaceOwnerWithLoggedUser(name) || tries > 25) {
-        clearInterval(timer);
+  function refreshDisplayedUserName() {
+    fetchLoggedUserName().then(function (name) {
+      if (!name) return;
+      var tries = 0;
+      var timer = setInterval(function () {
+        tries += 1;
+        if (replaceOwnerWithLoggedUser(name) || tries > 25) {
+          clearInterval(timer);
+        }
+      }, 400);
+    });
+  }
+
+  function ensureSimulatorStyles() {
+    if (document.getElementById("ps-user-simulator-style")) return;
+    var style = document.createElement("style");
+    style.id = "ps-user-simulator-style";
+    style.textContent =
+      "#" +
+      PS_SIM_MOUNT_ID +
+      "{" +
+      "position:fixed;top:8px;right:160px;z-index:2100;" +
+      "display:flex;align-items:center;gap:6px;padding:3px 8px;" +
+      "background:#fff3cd;border:1px solid #ffc107;border-radius:4px;" +
+      "font-size:12px;color:#856404;box-shadow:0 1px 4px rgba(0,0,0,.12);" +
+      "}" +
+      "#" +
+      PS_SIM_MOUNT_ID +
+      " input{padding:3px 6px;border:1px solid #ccc;border-radius:4px;" +
+      "font-size:12px;width:220px;box-sizing:border-box;background:#fff;}" +
+      "#" +
+      PS_SIM_MOUNT_ID +
+      " .ps-sim-list{position:absolute;top:100%;left:28px;right:8px;" +
+      "max-height:220px;overflow:auto;background:#fff;border:1px solid #ccc;" +
+      "border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.15);z-index:2200;}" +
+      "#" +
+      PS_SIM_MOUNT_ID +
+      " .ps-sim-item{padding:6px 10px;cursor:pointer;white-space:nowrap;" +
+      "overflow:hidden;text-overflow:ellipsis;color:#333;}" +
+      "#" +
+      PS_SIM_MOUNT_ID +
+      " .ps-sim-item:hover{background:#f5f5f5;}" +
+      "#" +
+      PS_SIM_MOUNT_ID +
+      " .ps-sim-item.active{background:#e3f2fd;}" +
+      "@media (max-width:900px){#" +
+      PS_SIM_MOUNT_ID +
+      "{right:8px;top:48px;}}";
+    document.head.appendChild(style);
+  }
+
+  function mountUserSimulator(me, resources) {
+    if (document.getElementById(PS_SIM_MOUNT_ID)) return;
+    ensureSimulatorStyles();
+
+    var realEmail = (me.email || me.username || "").trim().toLowerCase();
+    var realLocal = realEmail.split("@")[0] || "?";
+    var selectedEmail = readSimulatedEmail();
+    var selected = resources.find(function (r) {
+      return (r.email || "").toLowerCase() === selectedEmail;
+    });
+    if (selected) {
+      setSimulatedUserState(selected.email, selected.name);
+    } else {
+      setSimulatedUserState("", "");
+      selectedEmail = "";
+    }
+
+    var root = document.createElement("div");
+    root.id = PS_SIM_MOUNT_ID;
+    root.title = "Simular usuario (solo nombre; no filtra datos)";
+
+    var label = document.createElement("span");
+    label.textContent = "🧪";
+    root.appendChild(label);
+
+    var wrap = document.createElement("div");
+    wrap.style.position = "relative";
+
+    var input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = selected
+      ? selected.name
+      : "Real (" + realLocal + ")";
+    input.autocomplete = "off";
+    wrap.appendChild(input);
+
+    var list = null;
+    var searchTerm = "";
+
+    function closeList() {
+      if (list && list.parentNode) list.parentNode.removeChild(list);
+      list = null;
+    }
+
+    function choose(email, name) {
+      setSimulatedUserState(email, name);
+      searchTerm = "";
+      input.value = "";
+      input.placeholder = email
+        ? name || email
+        : "Real (" + realLocal + ")";
+      closeList();
+      refreshDisplayedUserName();
+      console.log(
+        email
+          ? "[PS] Simulando usuario: " + name + " <" + email + ">"
+          : "[PS] Simulación desactivada → usuario real"
+      );
+    }
+
+    function renderList() {
+      closeList();
+      list = document.createElement("div");
+      list.className = "ps-sim-list";
+
+      var realItem = document.createElement("div");
+      realItem.className =
+        "ps-sim-item" + (!selectedEmail ? " active" : "");
+      realItem.textContent = "🔄 Real (" + realLocal + ")";
+      realItem.addEventListener("mousedown", function (ev) {
+        ev.preventDefault();
+        selectedEmail = "";
+        choose("", "");
+      });
+      list.appendChild(realItem);
+
+      var term = searchTerm.toLowerCase().trim();
+      var filtered = resources.filter(function (r) {
+        if (!term) return true;
+        return (
+          (r.name || "").toLowerCase().indexOf(term) !== -1 ||
+          (r.email || "").toLowerCase().indexOf(term) !== -1
+        );
+      });
+
+      if (!filtered.length) {
+        var empty = document.createElement("div");
+        empty.className = "ps-sim-item";
+        empty.style.cursor = "default";
+        empty.style.color = "#666";
+        empty.textContent = "No encontrado";
+        list.appendChild(empty);
+      } else {
+        filtered.slice(0, 80).forEach(function (r) {
+          var item = document.createElement("div");
+          var email = (r.email || "").toLowerCase();
+          item.className =
+            "ps-sim-item" + (email === selectedEmail ? " active" : "");
+          item.textContent = r.name || email;
+          item.title = email;
+          item.addEventListener("mousedown", function (ev) {
+            ev.preventDefault();
+            selectedEmail = email;
+            choose(email, r.name || email);
+          });
+          list.appendChild(item);
+        });
       }
-    }, 400);
+      wrap.appendChild(list);
+    }
+
+    input.addEventListener("focus", function () {
+      renderList();
+    });
+    input.addEventListener("input", function () {
+      searchTerm = input.value || "";
+      renderList();
+    });
+    document.addEventListener("mousedown", function (ev) {
+      if (!root.contains(ev.target)) closeList();
+    });
+
+    root.appendChild(wrap);
+    document.body.appendChild(root);
+    console.log(
+      "[PS] Combo simulación listo (" + resources.length + " recursos, Admin/Alpha)"
+    );
+  }
+
+  async function initUserSimulator() {
+    var me = await fetchMe();
+    if (!me || !userCanSimulate(me)) {
+      // Sin permiso: limpiar simulación residual
+      if (!userCanSimulate(me)) setSimulatedUserState("", "");
+      return;
+    }
+    try {
+      var res = await fetch(appRoot() + "/api/v1/ps/resources", {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        console.warn("[PS] /api/v1/ps/resources →", res.status);
+        return;
+      }
+      var payload = await res.json();
+      var resources = (payload && payload.result) || [];
+      mountUserSimulator(me, resources);
+      refreshDisplayedUserName();
+    } catch (err) {
+      console.warn("[PS] No se pudo cargar recursos de simulación", err);
+    }
+  }
+
+  async function runPatch() {
+    // Restaurar simulación guardada antes de pintar el nombre
+    var saved = readSimulatedEmail();
+    if (saved) {
+      window.__PS_SIMULATED_USER__ = window.__PS_SIMULATED_USER__ || {
+        email: saved,
+        name: saved,
+      };
+    }
+    refreshDisplayedUserName();
+    initUserSimulator();
   }
 
   if (document.readyState === "loading") {
