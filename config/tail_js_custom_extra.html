@@ -2558,65 +2558,194 @@
     );
   }
 
-  // ── Ocultación del widget Departamentos cuando el usuario está restringido ──
-  // El RLS server-side (ps_dept_filter Jinja) garantiza que el dato nunca sale
-  // del departamento correcto aunque el usuario manipule la URL.
-  // Ocultar el widget además evita confusión: usuario cambia filtro → datos vacíos
-  // → "¿bug?". Con el widget oculto el flujo es transparente.
+  // ── Ocultar filtro Departamentos cuando el ámbito está forzado (RLS) ──
+  // Evita confusión: el chip con la X sugiere que se puede “ver todo”, pero
+  // el servidor ya restringe. Ocultamos el control entero del panel.
 
   var PS_DEPT_LOCK_STYLE_ID = "ps-dept-lock-style";
   var _deptLockObserver = null;
+  var _deptLockActive = false;
+
+  function _isDeptFilterNode(el) {
+    if (!el || el.nodeType !== 1) return false;
+    var name = (
+      el.getAttribute("name") ||
+      el.getAttribute("aria-label") ||
+      el.getAttribute("data-test") ||
+      el.id ||
+      ""
+    );
+    if (name.indexOf(PS_DEPT_FILTER_ID) !== -1) return true;
+    if (name === "Departamentos" || name === "Departamento") return true;
+    return false;
+  }
+
+  function _findDeptFilterContainers() {
+    var found = [];
+    var seen = new Set();
+
+    function add(el) {
+      if (!el || seen.has(el)) return;
+      seen.add(el);
+      found.push(el);
+    }
+
+    // Combobox / control con id del filtro nativo
+    document
+      .querySelectorAll(
+        '[name="' +
+          PS_DEPT_FILTER_ID +
+          '"], [aria-label="' +
+          PS_DEPT_FILTER_ID +
+          '"], [data-test*="' +
+          PS_DEPT_FILTER_ID +
+          '"], #' +
+          PS_DEPT_FILTER_ID
+      )
+      .forEach(function (ctrl) {
+        // Subir hasta el bloque del filtro (título + control)
+        var block =
+          ctrl.closest(".filter-item") ||
+          ctrl.closest("[data-test='filter-control-container']") ||
+          ctrl.closest(".ant-collapse-item") ||
+          ctrl.closest("[class*='FilterControl']") ||
+          ctrl.closest("[class*='filter-control']");
+        if (!block) {
+          // Heurística: contenedor que incluye el heading "Departamentos"
+          var p = ctrl.parentElement;
+          for (var i = 0; i < 8 && p; i++) {
+            var txt = (p.textContent || "").trim();
+            if (
+              /^Departamentos?/m.test(txt) &&
+              p.querySelector("h4, .ant-collapse-header, [class*='title']")
+            ) {
+              block = p;
+              break;
+            }
+            p = p.parentElement;
+          }
+        }
+        add(block || ctrl);
+      });
+
+    // Fallback: heading "Departamentos" en el panel de filtros
+    var panel =
+      document.querySelector("[data-test='dashboard-filters-panel']") ||
+      document.querySelector(".dashboard-filters-panel") ||
+      document.body;
+    panel.querySelectorAll("h4, .ant-collapse-header, [class*='FilterTitle']").forEach(
+      function (h) {
+        var t = (h.textContent || "").replace(/\s+/g, " ").trim();
+        if (!/^Departamentos?$/i.test(t)) return;
+        var block =
+          h.closest(".filter-item") ||
+          h.closest(".ant-collapse-item") ||
+          h.closest("[data-test='filter-control-container']") ||
+          h.parentElement;
+        add(block);
+      }
+    );
+
+    return found;
+  }
+
+  function _injectDeptLockCss() {
+    if (document.getElementById(PS_DEPT_LOCK_STYLE_ID)) return;
+    var s = document.createElement("style");
+    s.id = PS_DEPT_LOCK_STYLE_ID;
+    s.textContent =
+      "/* Ocultar control nativo Departamentos cuando RLS fuerza ámbito */\n" +
+      "[name='" +
+      PS_DEPT_FILTER_ID +
+      "'],\n" +
+      "[aria-label='" +
+      PS_DEPT_FILTER_ID +
+      "'],\n" +
+      "[data-test*='" +
+      PS_DEPT_FILTER_ID +
+      "'],\n" +
+      "#" +
+      PS_DEPT_FILTER_ID +
+      ",\n" +
+      ".filter-item:has([name='" +
+      PS_DEPT_FILTER_ID +
+      "']),\n" +
+      ".filter-item:has([aria-label='" +
+      PS_DEPT_FILTER_ID +
+      "']),\n" +
+      ".ant-collapse-item:has([name='" +
+      PS_DEPT_FILTER_ID +
+      "']),\n" +
+      ".ant-collapse-item:has([aria-label='" +
+      PS_DEPT_FILTER_ID +
+      "']),\n" +
+      "[data-test='filter-control-container']:has([name='" +
+      PS_DEPT_FILTER_ID +
+      "']),\n" +
+      "[data-test='filter-control-container']:has([aria-label='" +
+      PS_DEPT_FILTER_ID +
+      "']) {\n" +
+      "  display: none !important;\n" +
+      "}\n" +
+      "/* Marcados por JS */\n" +
+      ".ps-dept-filter-hidden { display: none !important; }\n";
+    document.head.appendChild(s);
+  }
 
   function _hideDeptFilterItems() {
-    // Recorre los ítems del panel de filtros y oculta el de departamentos.
-    // Superset 6.x renderiza cada filtro en un .ant-collapse-item cuyo
-    // data-key es el ID del filtro. Fallback: buscar por texto "Departamentos".
-    var items = document.querySelectorAll(".ant-collapse-item");
-    items.forEach(function (item) {
-      var key = item.getAttribute("data-key") || "";
-      if (key === PS_DEPT_FILTER_ID) {
-        item.style.display = "none";
-        return;
-      }
-      // Fallback por texto del encabezado (por si el data-key varía entre versiones)
-      var header = item.querySelector(".ant-collapse-header");
-      if (header && /^Departamentos?$/i.test((header.textContent || "").trim())) {
-        item.style.display = "none";
-      }
+    if (!_deptLockActive) return;
+    _injectDeptLockCss();
+    _findDeptFilterContainers().forEach(function (el) {
+      el.classList.add("ps-dept-filter-hidden");
+      el.style.setProperty("display", "none", "important");
+      el.setAttribute("data-ps-dept-hidden", "1");
     });
   }
 
   function _startDeptLockObserver() {
-    if (_deptLockObserver) return;
-    var panel = document.querySelector("[data-test='dashboard-filters-panel']");
-    var target = panel || document.body;
-    _deptLockObserver = new MutationObserver(function () {
-      _hideDeptFilterItems();
-    });
-    _deptLockObserver.observe(target, { childList: true, subtree: true });
+    _deptLockActive = true;
+    _injectDeptLockCss();
     _hideDeptFilterItems();
+    if (_deptLockObserver) return;
+    var panel =
+      document.querySelector("[data-test='dashboard-filters-panel']") ||
+      document.querySelector(".dashboard-filters-panel") ||
+      document.body;
+    _deptLockObserver = new MutationObserver(function () {
+      if (_deptLockActive) _hideDeptFilterItems();
+    });
+    _deptLockObserver.observe(panel, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["class", "style"],
+    });
+    // Reintentos: el panel de filtros a veces pinta tarde
+    [300, 800, 1600, 3000].forEach(function (ms) {
+      setTimeout(function () {
+        if (_deptLockActive) _hideDeptFilterItems();
+      }, ms);
+    });
   }
 
   function _stopDeptLockObserver() {
+    _deptLockActive = false;
     if (_deptLockObserver) {
       _deptLockObserver.disconnect();
       _deptLockObserver = null;
     }
-    // Restaurar visibilidad de ítems ocultos
-    document.querySelectorAll(".ant-collapse-item").forEach(function (item) {
-      var key = item.getAttribute("data-key") || "";
-      var header = item.querySelector(".ant-collapse-header");
-      var byText = header && /^Departamentos?$/i.test((header.textContent || "").trim());
-      if (key === PS_DEPT_FILTER_ID || byText) {
-        item.style.display = "";
+    document.querySelectorAll("[data-ps-dept-hidden='1'], .ps-dept-filter-hidden").forEach(
+      function (el) {
+        el.classList.remove("ps-dept-filter-hidden");
+        el.style.removeProperty("display");
+        el.removeAttribute("data-ps-dept-hidden");
       }
-    });
+    );
     var s = document.getElementById(PS_DEPT_LOCK_STYLE_ID);
     if (s) s.remove();
   }
 
   function markDeptFilterLocked(locked, deptLabel) {
-    // Limpiar banner anterior
     var existing = document.getElementById("ps-dept-scope-banner");
     if (existing) existing.remove();
 
@@ -2625,17 +2754,16 @@
       return;
     }
 
-    // Ocultar el widget del panel con observer (React re-renderiza el panel)
     _startDeptLockObserver();
 
-    // Banner informativo sobre el filtro server-side
     var ban = document.createElement("div");
     ban.id = "ps-dept-scope-banner";
     ban.style.cssText =
       "position:fixed;top:8px;left:12px;z-index:2050;padding:4px 10px;" +
       "background:#e3f2fd;border:1px solid #90caf9;border-radius:4px;" +
       "font-size:12px;color:#0d47a1;box-shadow:0 1px 3px rgba(0,0,0,.1);";
-    ban.textContent = "Departamento: " + deptLabel + " (filtro aplicado por servidor)";
+    ban.textContent =
+      "Departamento: " + deptLabel + " (fijado por servidor — no editable)";
     document.body.appendChild(ban);
   }
 
