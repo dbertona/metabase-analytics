@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-28m] — KPI: etiquetas +15%
+
+### Changed
+- Solo títulos bajo el valor (FACTURACIÓN, MARGEN, Δ %, BENEFICIO): **8px → 9.2px**.
+- Números KPI sin cambio (euros 14px / % 11px).
+
 ## [2026-07-28l] — Dashboard max-width 1440 (ultrawide)
 
 ### Changed
