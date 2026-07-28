@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [2026-07-28d] — Ámbito departamento (paridad PBI)
+
+### Added
+
+- API `GET /api/v1/ps/user-scope`: email efectivo → `bc_user_configuration.departamento`.
+  Vacío o `999` = ver todos los departamentos; otro valor fuerza filtro nativo
+  `NATIVE_FILTER-DEPT` (`department_code`).
+- Al cargar el dashboard (y al cambiar el combo de simulación) se aplica el ámbito
+  vía `native_filters` en la URL; banner informativo si hay departamento forzado.
+
+### Changed
+
+- La simulación de usuario ya no es solo identidad visual: el email simulado
+  determina el ámbito de departamento (requiere Admin/Alpha/PS_Testing).
+
 ## [2026-07-28c] — Fix sync Departamento en ConfiguracionUsuarios
 
 ### Fixed

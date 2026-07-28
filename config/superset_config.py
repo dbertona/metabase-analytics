@@ -157,7 +157,7 @@ class PsAppInitializer(SupersetAppInitializer):
             logger.exception("PS: no se pudo crear el rol PS_Testing")
 
     def _register_ps_simulation_routes(self) -> None:
-        """API para combo simular usuario (Admin/Alpha/PS_Testing; no filtra datos)."""
+        """APIs PS: simulación (Admin/Alpha/PS_Testing) + ámbito departamento (todos)."""
         from flask import current_app, g, jsonify, request
         from flask_login import current_user
 
@@ -194,6 +194,13 @@ class PsAppInitializer(SupersetAppInitializer):
             roles = {getattr(r, "name", "") for r in (getattr(user, "roles", None) or [])}
             return bool(roles & PS_SIMULATION_ROLES)
 
+        def _user_email(user: Any) -> str:
+            return (
+                (getattr(user, "email", None) or getattr(user, "username", None) or "")
+                .strip()
+                .lower()
+            )
+
         @app.get("/api/v1/ps/resources")
         def ps_list_resources_for_simulation():  # type: ignore[no-untyped-def]
             # JSON 401 (no @login_required): evita BuildError del redirect a 'login'
@@ -211,8 +218,30 @@ class PsAppInitializer(SupersetAppInitializer):
                 }
             )
 
+        @app.get("/api/v1/ps/user-scope")
+        def ps_user_department_scope():  # type: ignore[no-untyped-def]
+            """Ámbito de departamento (paridad PBI: vacío/999 = ver todo)."""
+            user = _resolve_user()
+            if not user:
+                return jsonify({"message": "Unauthorized"}), 401
+
+            real_email = _user_email(user)
+            requested = (request.args.get("email") or "").strip().lower()
+            effective = requested or real_email
+            if not effective or "@" not in effective:
+                return jsonify({"message": "Email inválido"}), 400
+
+            # Simular otro email solo con rol de simulación
+            if requested and requested != real_email and not _can_simulate(user):
+                return jsonify({"message": "Forbidden", "can_simulate": False}), 403
+
+            scope = resolve_department_scope(effective)
+            scope["real_email"] = real_email
+            scope["simulated"] = bool(requested and requested != real_email)
+            return jsonify({"result": scope})
+
         logger.info(
-            "PS: ruta /api/v1/ps/resources (simulación %s) registrada",
+            "PS: rutas /api/v1/ps/resources + /api/v1/ps/user-scope (%s)",
             ",".join(sorted(PS_SIMULATION_ROLES)),
         )
 
@@ -233,7 +262,7 @@ SESSION_COOKIE_PATH = "/"
 REMEMBER_COOKIE_SECURE = True
 REMEMBER_COOKIE_PATH = "/"
 
-# Roles que pueden usar el combo de simulación de usuario (solo identidad visual).
+# Roles que pueden usar el combo de simulación (identidad + ámbito departamento).
 PS_SIMULATION_ROLES = frozenset({"Admin", "Alpha", "PS_Testing"})
 
 # Analytics DB (misma red Docker: supabase-db) — lookup bc_resource
@@ -322,6 +351,48 @@ def list_resources_for_simulation() -> list[dict[str, str]]:
             }
         )
     return out
+
+
+def lookup_user_departamento(email: str) -> str:
+    """Departamento en bc_user_configuration por email (preferir valor no vacío)."""
+    email = (email or "").strip().lower()
+    if not email or "@" not in email:
+        return ""
+    try:
+        with _analytics_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT trim(departamento)
+                    FROM public.bc_user_configuration
+                    WHERE lower(trim(email)) = %s
+                      AND coalesce(trim(departamento), '') <> ''
+                    ORDER BY company_name
+                    LIMIT 1
+                    """,
+                    (email,),
+                )
+                row = cur.fetchone()
+                if row and row[0]:
+                    return str(row[0]).strip()
+    except Exception:
+        logger.exception(
+            "No se pudo leer bc_user_configuration.departamento para email=%s", email
+        )
+    return ""
+
+
+def resolve_department_scope(email: str) -> dict[str, Any]:
+    """Paridad PBI: vacío o '999' → ver todos los departamentos."""
+    email_n = (email or "").strip().lower()
+    dept = lookup_user_departamento(email_n)
+    see_all = dept == "" or dept == "999"
+    return {
+        "email": email_n,
+        "departamento": dept or None,
+        "see_all": see_all,
+        "department_code": None if see_all else dept,
+    }
 
 
 def split_resource_display_name(full_name: str, email: str) -> tuple[str, str]:

@@ -2113,6 +2113,13 @@
           ? "[PS] Simulando usuario: " + name + " <" + email + ">"
           : "[PS] Simulación desactivada → usuario real"
       );
+      // Forzar reaplicación de ámbito departamento
+      try {
+        sessionStorage.removeItem(PS_DEPT_SCOPE_KEY);
+      } catch (err) {
+        /* ignore */
+      }
+      applyDepartmentScope();
     }
 
     function renderList() {
@@ -2194,7 +2201,7 @@
         credentials: "include",
       });
       if (res.status === 401 || res.status === 403) {
-        setSimulatedUserState("", "");
+        // Sin simulación: igual aplicar ámbito del usuario real
         return;
       }
       if (!res.ok) {
@@ -2203,7 +2210,6 @@
       }
       var payload = await res.json();
       if (!payload || !payload.can_simulate) {
-        setSimulatedUserState("", "");
         return;
       }
       var resources = payload.result || [];
@@ -2211,6 +2217,127 @@
       refreshDisplayedUserName();
     } catch (err) {
       console.warn("[PS] No se pudo cargar recursos de simulación", err);
+    }
+  }
+
+  // ─── Ámbito departamento (paridad PBI: vacío/999 = ver todo) ────────────
+  var PS_DEPT_FILTER_ID = "NATIVE_FILTER-DEPT";
+  var PS_DEPT_SCOPE_KEY = "psDeptScopeApplied";
+
+  function risonQuote(value) {
+    return "'" + String(value).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
+  }
+
+  function buildDeptNativeFiltersRison(dept) {
+    var v = risonQuote(dept);
+    return (
+      "(" +
+      PS_DEPT_FILTER_ID +
+      ":(__cache:(label:" +
+      v +
+      ",validateStatus:!f,value:!(" +
+      v +
+      ")),extraFormData:(filters:!((col:department_code,op:IN,val:!(" +
+      v +
+      ")))),filterState:(label:" +
+      v +
+      ",validateStatus:!f,value:!(" +
+      v +
+      ")),id:" +
+      PS_DEPT_FILTER_ID +
+      ",ownState:()))"
+    );
+  }
+
+  function markDeptFilterLocked(locked, deptLabel) {
+    var existing = document.getElementById("ps-dept-scope-banner");
+    if (existing) existing.remove();
+    if (!locked) return;
+    var ban = document.createElement("div");
+    ban.id = "ps-dept-scope-banner";
+    ban.style.cssText =
+      "position:fixed;top:48px;left:12px;z-index:2050;padding:4px 10px;" +
+      "background:#e3f2fd;border:1px solid #90caf9;border-radius:4px;" +
+      "font-size:12px;color:#0d47a1;box-shadow:0 1px 3px rgba(0,0,0,.1);";
+    ban.textContent = "Ámbito departamento: " + deptLabel + " (como PBI)";
+    document.body.appendChild(ban);
+  }
+
+  async function fetchUserScope(email) {
+    var q = email ? "?email=" + encodeURIComponent(email) : "";
+    var res = await fetch(appRoot() + "/api/v1/ps/user-scope" + q, {
+      credentials: "include",
+    });
+    if (!res.ok) return null;
+    var payload = await res.json();
+    return payload && payload.result ? payload.result : null;
+  }
+
+  async function applyDepartmentScope() {
+    if (!isDashboardPage()) return;
+    try {
+      var me = await fetchMe();
+      if (!me) return;
+      var realEmail = (me.email || me.username || "").trim().toLowerCase();
+      var sim = window.__PS_SIMULATED_USER__;
+      var effective =
+        sim && sim.email ? String(sim.email).trim().toLowerCase() : realEmail;
+      if (!effective) return;
+
+      // Sin ?email → ámbito del usuario real; con email simulado → exige rol
+      var scope = await fetchUserScope(
+        effective !== realEmail ? effective : ""
+      );
+      if (!scope) return;
+
+      var token =
+        effective +
+        "|" +
+        (scope.see_all ? "ALL" : scope.department_code || "");
+      var prev = "";
+      try {
+        prev = sessionStorage.getItem(PS_DEPT_SCOPE_KEY) || "";
+      } catch (err) {
+        prev = "";
+      }
+      if (prev === token) {
+        markDeptFilterLocked(!scope.see_all, scope.department_code || "");
+        return;
+      }
+
+      var url = new URL(window.location.href);
+      // native_filters_key pisa native_filters → hay que quitarlo al forzar ámbito
+      url.searchParams.delete("native_filters_key");
+      url.searchParams.delete("permalink_key");
+
+      if (scope.see_all) {
+        url.searchParams.delete("native_filters");
+        try {
+          sessionStorage.setItem(PS_DEPT_SCOPE_KEY, token);
+        } catch (err) {
+          /* ignore */
+        }
+        markDeptFilterLocked(false, "");
+        if (url.href !== window.location.href) {
+          console.log("[PS] Ámbito dept: ver todo (vacío/999)");
+          window.location.replace(url.pathname + url.search + url.hash);
+        } else {
+          console.log("[PS] Ámbito dept: ver todo (sin cambio URL)");
+        }
+        return;
+      }
+
+      var dept = scope.department_code;
+      url.searchParams.set("native_filters", buildDeptNativeFiltersRison(dept));
+      try {
+        sessionStorage.setItem(PS_DEPT_SCOPE_KEY, token);
+      } catch (err) {
+        /* ignore */
+      }
+      console.log("[PS] Ámbito dept →", dept);
+      window.location.replace(url.pathname + url.search + url.hash);
+    } catch (err) {
+      console.warn("[PS] No se pudo aplicar ámbito departamento", err);
     }
   }
 
@@ -2224,6 +2351,7 @@
       };
     }
     refreshDisplayedUserName();
+    await applyDepartmentScope();
     initUserSimulator();
   }
 
