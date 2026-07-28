@@ -146,11 +146,13 @@ class PsAppInitializer(SupersetAppInitializer):
     def _ensure_ps_testing_role(self) -> None:
         """Crea el rol PS_Testing si no existe (flag para combo simulación)."""
         try:
-            sm = self.superset_app.appbuilder.sm
-            if sm.find_role("PS_Testing"):
-                return
-            sm.add_role("PS_Testing")
-            logger.info("PS: rol PS_Testing creado (simulación de usuario)")
+            app = self.superset_app
+            with app.app_context():
+                sm = app.appbuilder.sm
+                if sm.find_role("PS_Testing"):
+                    return
+                sm.add_role("PS_Testing")
+                logger.info("PS: rol PS_Testing creado (simulación de usuario)")
         except Exception:
             logger.exception("PS: no se pudo crear el rol PS_Testing")
 
