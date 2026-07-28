@@ -63,6 +63,18 @@ DATASETS = [
     "bi_v_unidad",
 ]
 
+# Vistas que tienen columna department_code y deben llevar RLS de departamento.
+# Se convierten a virtual SQL con {{ ps_dept_filter() }} (Jinja, server-side).
+# Admin/Alpha/see_all → 1=1 (sin restricción).
+# Usuario con departamento → department_code = 'DEPT' (imposible de bypassar desde UI).
+DEPT_FILTERED_VIEWS = [
+    "bi_v_planificacion_kpi",
+    "bi_v_evolucion_mensual",
+    "bi_v_facturacion_probabilidad",
+    "bi_v_resumen_proyectos",
+    "bi_v_unidad",
+]
+
 
 class SupersetClient:
     def __init__(self) -> None:
@@ -164,6 +176,37 @@ class SupersetClient:
             except RuntimeError:
                 continue
         print(f"  aviso: no se pudo refrescar columnas dataset id={ds_id}")
+
+    def patch_dataset_virtual_sql(self, dataset_ids: dict[str, int]) -> None:
+        """Convierte datasets con department_code a virtual SQL con RLS Jinja.
+
+        Jinja: {{ ps_dept_filter() }} → se evalúa en cada consulta con el
+        usuario autenticado real → imposible de bypassar desde la UI.
+
+        - Admin/Alpha/see_all → WHERE 1=1 (sin restricción; simulación sigue
+          usando native_filters para restringir la vista visualmente).
+        - Usuario con departamento → WHERE department_code = 'DEPT'.
+        """
+        print("==> RLS: parchando datasets con virtual SQL de departamento...")
+        for view in DEPT_FILTERED_VIEWS:
+            ds_id = dataset_ids.get(view)
+            if not ds_id:
+                print(f"  ⚠️  {view}: no encontrado en dataset_ids, omitido")
+                continue
+            # {{ ps_dept_filter() }} en el SQL: Jinja lo procesa en runtime.
+            virtual_sql = (
+                f"SELECT * FROM {view}\n"
+                "WHERE {{ ps_dept_filter() }}"
+            )
+            try:
+                self._request(
+                    "PUT",
+                    f"/api/v1/dataset/{ds_id}",
+                    {"sql": virtual_sql, "is_managed_externally": False},
+                )
+                print(f"  ✓ RLS virtual SQL → {view} (id={ds_id})")
+            except RuntimeError as exc:
+                print(f"  ⚠️  No se pudo patchear {view} (id={ds_id}): {exc}")
 
     def list_charts(self) -> list[dict[str, Any]]:
         res = self._request(
@@ -1700,6 +1743,10 @@ def main() -> int:
     print("==> 2/4 Creando datasets...")
     db_id = client.ensure_database()
     dataset_ids = {name: client.ensure_dataset(db_id, name) for name in DATASETS}
+    # RLS server-side: virtual SQL con {{ ps_dept_filter() }} en cada dataset
+    # con department_code. Se aplica tras ensure_dataset para que los charts
+    # existentes no necesiten cambios (mismas columnas, subquery transparente).
+    client.patch_dataset_virtual_sql(dataset_ids)
     # Tarjetas KPI: bi_v_planificacion_kpi (tiene department_code + real_anterior)
     kpi_ds = dataset_ids["bi_v_planificacion_kpi"]
     evo_ds = dataset_ids["bi_v_evolucion_mensual"]

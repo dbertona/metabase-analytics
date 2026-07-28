@@ -158,56 +158,17 @@ class PsAppInitializer(SupersetAppInitializer):
 
     def _register_ps_simulation_routes(self) -> None:
         """APIs PS: simulación (Admin/Alpha/PS_Testing) + ámbito departamento (todos)."""
-        from flask import current_app, g, jsonify, request
-        from flask_login import current_user
+        from flask import jsonify, request
 
         app = self.superset_app
-
-        def _resolve_user() -> Any:
-            """Usuario de sesión cookie o JWT Bearer (como APIs nativas)."""
-            if current_user and getattr(current_user, "is_authenticated", False):
-                return current_user
-            gu = getattr(g, "user", None)
-            if gu and getattr(gu, "is_authenticated", False):
-                return gu
-            auth = request.headers.get("Authorization") or ""
-            if not auth.startswith("Bearer "):
-                return None
-            try:
-                from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
-
-                verify_jwt_in_request(optional=False)
-                identity = get_jwt_identity()
-                if identity is None:
-                    return None
-                user = current_app.appbuilder.sm.load_user(identity)
-                if user and getattr(user, "is_active", True):
-                    g.user = user
-                    return user
-            except Exception:
-                logger.debug("PS resources: JWT no válido", exc_info=True)
-            return None
-
-        def _can_simulate(user: Any) -> bool:
-            if not user:
-                return False
-            roles = {getattr(r, "name", "") for r in (getattr(user, "roles", None) or [])}
-            return bool(roles & PS_SIMULATION_ROLES)
-
-        def _user_email(user: Any) -> str:
-            return (
-                (getattr(user, "email", None) or getattr(user, "username", None) or "")
-                .strip()
-                .lower()
-            )
 
         @app.get("/api/v1/ps/resources")
         def ps_list_resources_for_simulation():  # type: ignore[no-untyped-def]
             # JSON 401 (no @login_required): evita BuildError del redirect a 'login'
-            user = _resolve_user()
+            user = _ps_resolve_request_user()
             if not user:
                 return jsonify({"message": "Unauthorized", "can_simulate": False}), 401
-            if not _can_simulate(user):
+            if not _ps_can_simulate(user):
                 return jsonify({"message": "Forbidden", "can_simulate": False}), 403
             resources = list_resources_for_simulation()
             return jsonify(
@@ -221,18 +182,18 @@ class PsAppInitializer(SupersetAppInitializer):
         @app.get("/api/v1/ps/user-scope")
         def ps_user_department_scope():  # type: ignore[no-untyped-def]
             """Ámbito de departamento (paridad PBI: vacío/999 = ver todo)."""
-            user = _resolve_user()
+            user = _ps_resolve_request_user()
             if not user:
                 return jsonify({"message": "Unauthorized"}), 401
 
-            real_email = _user_email(user)
+            real_email = _ps_user_email(user)
             requested = (request.args.get("email") or "").strip().lower()
             effective = requested or real_email
             if not effective or "@" not in effective:
                 return jsonify({"message": "Email inválido"}), 400
 
             # Simular otro email solo con rol de simulación
-            if requested and requested != real_email and not _can_simulate(user):
+            if requested and requested != real_email and not _ps_can_simulate(user):
                 return jsonify({"message": "Forbidden", "can_simulate": False}), 403
 
             scope = resolve_department_scope(effective)
@@ -240,8 +201,47 @@ class PsAppInitializer(SupersetAppInitializer):
             scope["simulated"] = bool(requested and requested != real_email)
             return jsonify({"result": scope})
 
+        @app.route("/api/v1/ps/simulate", methods=["GET", "POST", "DELETE"])
+        def ps_set_simulation():  # type: ignore[no-untyped-def]
+            """Guarda/limpia email simulado (session + cookie firmada ps_sim).
+
+            GET ?email=...  → set (sin CSRF; uso desde tail_js)
+            GET sin email   → clear
+            POST/DELETE     → mismo contrato (con CSRF si aplica)
+            """
+            user = _ps_resolve_request_user()
+            if not user:
+                return jsonify({"message": "Unauthorized"}), 401
+            if not _ps_can_simulate(user):
+                return jsonify({"message": "Forbidden"}), 403
+
+            if request.method == "DELETE":
+                email = ""
+            elif request.method == "POST":
+                body = request.get_json(silent=True) or {}
+                email = (body.get("email") or "").strip().lower()
+            else:
+                email = (request.args.get("email") or "").strip().lower()
+
+            if not email:
+                return _ps_simulate_response(
+                    {"simulated": False, "email": None}, None
+                )
+            if "@" not in email:
+                return jsonify({"message": "Email inválido"}), 400
+            scope = resolve_department_scope(email)
+            return _ps_simulate_response(
+                {
+                    "simulated": True,
+                    "email": email,
+                    "see_all": scope["see_all"],
+                    "department_code": scope["department_code"],
+                },
+                email,
+            )
+
         logger.info(
-            "PS: rutas /api/v1/ps/resources + /api/v1/ps/user-scope (%s)",
+            "PS: rutas /api/v1/ps/resources + /user-scope + /simulate (%s)",
             ",".join(sorted(PS_SIMULATION_ROLES)),
         )
 
@@ -393,6 +393,154 @@ def resolve_department_scope(email: str) -> dict[str, Any]:
         "see_all": see_all,
         "department_code": None if see_all else dept,
     }
+
+
+PS_SIMULATED_EMAIL_SESSION_KEY = "ps_simulated_email"
+PS_SIM_COOKIE = "ps_sim"
+
+
+def _ps_sim_serializer():
+    from flask import current_app
+    from itsdangerous import URLSafeSerializer
+
+    return URLSafeSerializer(
+        str(current_app.config.get("SECRET_KEY") or SECRET_KEY),
+        salt="ps-dept-sim-v1",
+    )
+
+
+def _ps_read_simulated_email() -> str:
+    """Email simulado: session Flask o cookie firmada ps_sim."""
+    from flask import request, session
+
+    sim = (session.get(PS_SIMULATED_EMAIL_SESSION_KEY) or "").strip().lower()
+    if sim and "@" in sim:
+        return sim
+    raw = request.cookies.get(PS_SIM_COOKIE) or ""
+    if not raw:
+        return ""
+    try:
+        email = _ps_sim_serializer().loads(raw)
+        email = (email or "").strip().lower()
+        return email if email and "@" in email else ""
+    except Exception:
+        return ""
+
+
+def _ps_simulate_response(payload: dict[str, Any], email: str | None):
+    """JSON + cookie firmada ps_sim (RLS la lee aunque falle la session)."""
+    from flask import jsonify, make_response, session
+
+    if email:
+        session[PS_SIMULATED_EMAIL_SESSION_KEY] = email
+        session.modified = True
+        token = _ps_sim_serializer().dumps(email)
+    else:
+        session.pop(PS_SIMULATED_EMAIL_SESSION_KEY, None)
+        session.modified = True
+        token = ""
+
+    resp = make_response(jsonify({"result": payload}))
+    # secure=False: también funciona en LAN HTTP; en HTTPS el navegador sigue OK.
+    resp.set_cookie(
+        PS_SIM_COOKIE,
+        token,
+        max_age=60 * 60 * 12 if token else 0,
+        httponly=True,
+        samesite="Lax",
+        secure=False,
+        path="/",
+    )
+    return resp
+
+
+def _ps_resolve_request_user() -> Any:
+    """Usuario autenticado: cookie Flask-Login, g.user o JWT Bearer."""
+    try:
+        from flask import current_app, g, request
+        from flask_login import current_user
+
+        if current_user and getattr(current_user, "is_authenticated", False):
+            return current_user
+        gu = getattr(g, "user", None)
+        if gu and getattr(gu, "is_authenticated", False):
+            return gu
+        auth = request.headers.get("Authorization") or ""
+        if not auth.startswith("Bearer "):
+            return None
+        from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
+
+        verify_jwt_in_request(optional=False)
+        identity = get_jwt_identity()
+        if identity is None:
+            return None
+        user = current_app.appbuilder.sm.load_user(identity)
+        if user and getattr(user, "is_active", True):
+            g.user = user
+            return user
+    except Exception:
+        logger.debug("PS: no se pudo resolver usuario de request", exc_info=True)
+    return None
+
+
+def _ps_user_email(user: Any) -> str:
+    return (
+        (getattr(user, "email", None) or getattr(user, "username", None) or "")
+        .strip()
+        .lower()
+    )
+
+
+def _ps_can_simulate(user: Any) -> bool:
+    if not user:
+        return False
+    roles = {getattr(r, "name", "") for r in (getattr(user, "roles", None) or [])}
+    return bool(roles & PS_SIMULATION_ROLES)
+
+
+def _ps_effective_email_for_rls() -> str:
+    """Email efectivo para RLS: simulación (si autorizada) o usuario real."""
+    user = _ps_resolve_request_user()
+    if not user:
+        return ""
+    real = _ps_user_email(user)
+    sim = _ps_read_simulated_email()
+    if sim and sim != real and _ps_can_simulate(user):
+        return sim
+    return real
+
+
+def _ps_dept_jinja_filter() -> str:
+    """Cláusula SQL WHERE para RLS de departamento.
+
+    - Departamento vacío/999 del email efectivo → 1=1
+    - Email efectivo con departamento → department_code = 'DEPT'
+    - Sin usuario → 1=0
+
+    Simulación Admin: cookie firmada `ps_sim` + session (GET /api/v1/ps/simulate).
+    """
+    try:
+        email = _ps_effective_email_for_rls()
+        if not email or "@" not in email:
+            return "1=0"
+        scope = resolve_department_scope(email)
+        if scope["see_all"]:
+            return "1=1"
+        dept = (scope.get("department_code") or "").strip()
+        if not dept:
+            return "1=0"
+        dept_safe = dept.replace("'", "''")
+        return f"department_code = '{dept_safe}'"
+    except Exception:
+        logger.exception("ps_dept_filter: error determinando ámbito de departamento")
+        return "1=0"
+
+
+# Función Jinja disponible en todos los datasets con ENABLE_TEMPLATE_PROCESSING=True.
+# Uso en virtual SQL: SELECT * FROM bi_v_xxx WHERE {{ ps_dept_filter() }}
+JINJA_CONTEXT_ADDONS = {
+    "ps_dept_filter": _ps_dept_jinja_filter,
+}
 
 
 def split_resource_display_name(full_name: str, email: str) -> tuple[str, str]:

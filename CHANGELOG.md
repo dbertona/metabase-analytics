@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [2026-07-28u] — Cierre rama `feat/rls-departamento-server-side`
+
+### Summary
+- RLS server-side por departamento en datasets BI (`ps_dept_filter` Jinja + SQL virtual).
+- Simulación de usuario vía cookie firmada `ps_sim` y API `/api/v1/ps/simulate`.
+- UI: banner de dept fijado, ocultar filtro Departamentos, sin bucle refresh/hang.
+- Acceso navegador solo por DNS `apps.powersolution.es/analytics` (no IP LAN).
+- Regla agente: verificación obligatoria en Browser MCP.
+
+### Added
+- `JINJA_CONTEXT_ADDONS` / `ps_dept_filter()` en `config/superset_config.py`.
+- `patch_dataset_virtual_sql` + `DEPT_FILTERED_VIEWS` en setup dashboard.
+- `.cursor/rules/00-BROWSER-VERIFY-MANDATORY.mdc`.
+
+### Fixed
+- Simulación respetada en RLS (antes admin/sim veía todos los depts).
+- Bucle `location.replace` del guard de departamento.
+- Hang «Loading filter values» por `MutationObserver` en attributes class/style.
+
 ## [2026-07-28t] — merge-safe: auto-borrar también `chore/*`
 
 ### Changed

@@ -22,9 +22,12 @@ NO contiene código de la app Timesheet/Gastos (eso está en `power-solution-app
 
 | Componente | Ubicación | Acceso |
 |------------|-----------|--------|
-| **Superset** | VM 100 — `http://192.168.36.100:8088/` | admin / ver `.env` |
+| **Superset (usuarios)** | VM 100 | **Solo DNS:** `https://apps.powersolution.es/analytics/` |
+| **Superset (scripts/API)** | VM 100 — `http://192.168.36.100:8088/analytics` | Solo ops (pull/setup/health); **no** navegador |
 | **PostgreSQL Analytics** | VM 100 — `192.168.36.100:5433` | postgres / `SuperSecurePassword2025` |
 | **n8n prod (sync 004)** | VM 101 — `https://apps.powersolution.es/n8n/` | No usar n8n VM 100 (retirado) |
+
+> **⛔ Navegador / SSO:** no abrir `http://192.168.36.100:8088/…`. OAuth Azure solo funciona por DNS.
 
 ```bash
 # Conectar a analytics DB desde terminal

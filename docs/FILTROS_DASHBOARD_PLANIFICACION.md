@@ -2,12 +2,13 @@
 
 > Repo canónico: **`superset-analytics`**  
 > Título UI: **Seguimiento Económico — Resumen** (slug estable `planificacion-ps-analytics`)  
-> Regenerar: `SUPERSET_URL=http://192.168.36.100:8088 python3 scripts/setup-superset-planificacion.py`  
+> Regenerar: `SUPERSET_URL=http://192.168.36.100:8088/analytics python3 scripts/setup-superset-planificacion.py`  
 > (el setup hace **pull UI automático** primero — ver `.cursor/rules/superset-dashboard-ui-sync.mdc`)  
 > Pull solo: `python3 scripts/pull-superset-dashboard.py` → `exports/superset-dashboard/latest/`  
 > (desde Mac sin Docker local: `SKIP_APPLY_BI_VIEWS=1` si las vistas BI ya están aplicadas)  
 > Vistas: `scripts/sql/bi_dashboard_planificacion_views.sql`  
-> URL: http://192.168.36.100:8088/superset/dashboard/planificacion-ps-analytics/
+> **URL usuarios (solo DNS):** https://apps.powersolution.es/analytics/superset/dashboard/planificacion-ps-analytics/  
+> ⛔ No abrir por IP LAN (`192.168.36.100:8088`) en el navegador — SSO solo por DNS.
 
 ## ⚠️ Edits en la UI vs regeneración
 

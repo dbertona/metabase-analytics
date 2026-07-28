@@ -29,14 +29,15 @@ Si falta una de las tres piezas, fallará en producción aunque el chart exista.
 ### URL correcta (no olvidar `/analytics`)
 
 ```bash
-# LAN
+# Scripts/API (LAN, solo ops — no navegador)
 SUPERSET_URL=http://192.168.36.100:8088/analytics
 
-# Público
+# Usuarios / navegador (única URL válida)
 # https://apps.powersolution.es/analytics/
 ```
 
-❌ `http://192.168.36.100:8088` sin `/analytics` → login API 404.
+❌ `http://192.168.36.100:8088` sin `/analytics` → login API 404.  
+❌ Abrir el dashboard por IP LAN en el navegador → SSO Azure no aplica; **usar solo el DNS**.
 
 ### Orden obligatorio (nunca invertir)
 

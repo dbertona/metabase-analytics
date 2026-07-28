@@ -2144,6 +2144,44 @@
     }
   }
 
+  async function fetchCsrfToken() {
+    try {
+      var res = await fetch(appRoot() + "/api/v1/security/csrf_token/", {
+        credentials: "include",
+      });
+      if (!res.ok) return null;
+      var payload = await res.json();
+      return payload && payload.result ? payload.result : null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  /** Persiste simulación en session Flask → ps_dept_filter() Jinja la lee. */
+  async function syncServerSimulation(email) {
+    var emailN = (email || "").trim().toLowerCase();
+    try {
+      // GET evita CSRF (mismo patrón que /user-scope); cookie de sesión basta.
+      var q = emailN ? "?email=" + encodeURIComponent(emailN) : "";
+      var res = await fetch(appRoot() + "/api/v1/ps/simulate" + q, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        console.warn("[PS] sync simulación HTTP", res.status);
+        return false;
+      }
+      console.log(
+        emailN
+          ? "[PS] Simulación servidor → " + emailN
+          : "[PS] Simulación servidor limpiada"
+      );
+      return true;
+    } catch (err) {
+      console.warn("[PS] sync simulación falló", err);
+      return false;
+    }
+  }
+
   async function fetchMe() {
     try {
       var res = await fetch(appRoot() + "/api/v1/me/", { credentials: "include" });
@@ -2374,13 +2412,15 @@
           ? "[PS] Simulando usuario: " + name + " <" + email + ">"
           : "[PS] Simulación desactivada → usuario real"
       );
-      // Forzar reaplicación de ámbito departamento
+      // Forzar reaplicación de ámbito departamento (tras sync session servidor)
       try {
         sessionStorage.removeItem(PS_DEPT_SCOPE_KEY);
       } catch (err) {
         /* ignore */
       }
-      applyDepartmentScope();
+      syncServerSimulation(email).then(function () {
+        applyDepartmentScope();
+      });
     }
 
     function renderList() {
@@ -2518,17 +2558,208 @@
     );
   }
 
+  // ── Ocultar filtro Departamentos cuando el ámbito está forzado (RLS) ──
+  // Evita confusión: el chip con la X sugiere que se puede “ver todo”, pero
+  // el servidor ya restringe. Ocultamos el control entero del panel.
+
+  var PS_DEPT_LOCK_STYLE_ID = "ps-dept-lock-style";
+  var _deptLockObserver = null;
+  var _deptLockActive = false;
+  var _deptHideRunning = false;
+
+  function _findDeptFilterContainers() {
+    var found = [];
+    var seen = new Set();
+
+    function add(el) {
+      if (!el || seen.has(el)) return;
+      seen.add(el);
+      found.push(el);
+    }
+
+    // Combobox / control con id del filtro nativo
+    document
+      .querySelectorAll(
+        '[name="' +
+          PS_DEPT_FILTER_ID +
+          '"], [aria-label="' +
+          PS_DEPT_FILTER_ID +
+          '"], [data-test*="' +
+          PS_DEPT_FILTER_ID +
+          '"], #' +
+          PS_DEPT_FILTER_ID
+      )
+      .forEach(function (ctrl) {
+        // Subir hasta el bloque del filtro (título + control)
+        var block =
+          ctrl.closest(".filter-item") ||
+          ctrl.closest("[data-test='filter-control-container']") ||
+          ctrl.closest(".ant-collapse-item") ||
+          ctrl.closest("[class*='FilterControl']") ||
+          ctrl.closest("[class*='filter-control']");
+        if (!block) {
+          // Heurística: contenedor que incluye el heading "Departamentos"
+          var p = ctrl.parentElement;
+          for (var i = 0; i < 8 && p; i++) {
+            var txt = (p.textContent || "").trim();
+            if (
+              /^Departamentos?/m.test(txt) &&
+              p.querySelector("h4, .ant-collapse-header, [class*='title']")
+            ) {
+              block = p;
+              break;
+            }
+            p = p.parentElement;
+          }
+        }
+        add(block || ctrl);
+      });
+
+    // Fallback: heading "Departamentos" en el panel de filtros
+    var panel =
+      document.querySelector("[data-test='dashboard-filters-panel']") ||
+      document.querySelector(".dashboard-filters-panel") ||
+      document.body;
+    panel.querySelectorAll("h4, .ant-collapse-header, [class*='FilterTitle']").forEach(
+      function (h) {
+        var t = (h.textContent || "").replace(/\s+/g, " ").trim();
+        if (!/^Departamentos?$/i.test(t)) return;
+        var block =
+          h.closest(".filter-item") ||
+          h.closest(".ant-collapse-item") ||
+          h.closest("[data-test='filter-control-container']") ||
+          h.parentElement;
+        add(block);
+      }
+    );
+
+    return found;
+  }
+
+  function _injectDeptLockCss() {
+    if (document.getElementById(PS_DEPT_LOCK_STYLE_ID)) return;
+    var s = document.createElement("style");
+    s.id = PS_DEPT_LOCK_STYLE_ID;
+    s.textContent =
+      "/* Ocultar control nativo Departamentos cuando RLS fuerza ámbito */\n" +
+      "[name='" +
+      PS_DEPT_FILTER_ID +
+      "'],\n" +
+      "[aria-label='" +
+      PS_DEPT_FILTER_ID +
+      "'],\n" +
+      "[data-test*='" +
+      PS_DEPT_FILTER_ID +
+      "'],\n" +
+      "#" +
+      PS_DEPT_FILTER_ID +
+      ",\n" +
+      ".filter-item:has([name='" +
+      PS_DEPT_FILTER_ID +
+      "']),\n" +
+      ".filter-item:has([aria-label='" +
+      PS_DEPT_FILTER_ID +
+      "']),\n" +
+      ".ant-collapse-item:has([name='" +
+      PS_DEPT_FILTER_ID +
+      "']),\n" +
+      ".ant-collapse-item:has([aria-label='" +
+      PS_DEPT_FILTER_ID +
+      "']),\n" +
+      "[data-test='filter-control-container']:has([name='" +
+      PS_DEPT_FILTER_ID +
+      "']),\n" +
+      "[data-test='filter-control-container']:has([aria-label='" +
+      PS_DEPT_FILTER_ID +
+      "']) {\n" +
+      "  display: none !important;\n" +
+      "}\n" +
+      "/* Marcados por JS */\n" +
+      ".ps-dept-filter-hidden { display: none !important; }\n";
+    document.head.appendChild(s);
+  }
+
+  function _hideDeptFilterItems() {
+    if (!_deptLockActive) return;
+    _injectDeptLockCss();
+    // Evitar reentrada: setear class/style dispara MutationObserver si observa
+    // attributes → bucle infinito → UI congelada en "Loading…".
+    if (_deptHideRunning) return;
+    _deptHideRunning = true;
+    try {
+      _findDeptFilterContainers().forEach(function (el) {
+        if (el.getAttribute("data-ps-dept-hidden") === "1") return;
+        el.classList.add("ps-dept-filter-hidden");
+        el.style.setProperty("display", "none", "important");
+        el.setAttribute("data-ps-dept-hidden", "1");
+      });
+    } finally {
+      _deptHideRunning = false;
+    }
+  }
+
+  function _startDeptLockObserver() {
+    _deptLockActive = true;
+    _injectDeptLockCss();
+    _hideDeptFilterItems();
+    if (_deptLockObserver) return;
+    var panel =
+      document.querySelector("[data-test='dashboard-filters-panel']") ||
+      document.querySelector(".dashboard-filters-panel") ||
+      document.body;
+    _deptLockObserver = new MutationObserver(function () {
+      if (!_deptLockActive || _deptHideRunning) return;
+      // Solo childList: NO observar attributes (class/style) — provoca bucle.
+      _hideDeptFilterItems();
+    });
+    _deptLockObserver.observe(panel, {
+      childList: true,
+      subtree: true,
+    });
+    // Reintentos: el panel de filtros a veces pinta tarde
+    [300, 800, 1600, 3000].forEach(function (ms) {
+      setTimeout(function () {
+        if (_deptLockActive) _hideDeptFilterItems();
+      }, ms);
+    });
+  }
+
+  function _stopDeptLockObserver() {
+    _deptLockActive = false;
+    if (_deptLockObserver) {
+      _deptLockObserver.disconnect();
+      _deptLockObserver = null;
+    }
+    document.querySelectorAll("[data-ps-dept-hidden='1'], .ps-dept-filter-hidden").forEach(
+      function (el) {
+        el.classList.remove("ps-dept-filter-hidden");
+        el.style.removeProperty("display");
+        el.removeAttribute("data-ps-dept-hidden");
+      }
+    );
+    var s = document.getElementById(PS_DEPT_LOCK_STYLE_ID);
+    if (s) s.remove();
+  }
+
   function markDeptFilterLocked(locked, deptLabel) {
     var existing = document.getElementById("ps-dept-scope-banner");
     if (existing) existing.remove();
-    if (!locked) return;
+
+    if (!locked) {
+      _stopDeptLockObserver();
+      return;
+    }
+
+    _startDeptLockObserver();
+
     var ban = document.createElement("div");
     ban.id = "ps-dept-scope-banner";
     ban.style.cssText =
       "position:fixed;top:8px;left:12px;z-index:2050;padding:4px 10px;" +
       "background:#e3f2fd;border:1px solid #90caf9;border-radius:4px;" +
       "font-size:12px;color:#0d47a1;box-shadow:0 1px 3px rgba(0,0,0,.1);";
-    ban.textContent = "Ámbito departamento: " + deptLabel + " (como PBI)";
+    ban.textContent =
+      "Departamento: " + deptLabel + " (fijado por servidor — no editable)";
     document.body.appendChild(ban);
   }
 
@@ -2553,7 +2784,16 @@
         sim && sim.email ? String(sim.email).trim().toLowerCase() : realEmail;
       if (!effective) return;
 
-      // Sin ?email → ámbito del usuario real; con email simulado → exige rol
+      // Sync cookie firmada ps_sim ANTES de charts (RLS Jinja la lee)
+      if (effective !== realEmail) {
+        await syncServerSimulation(effective);
+      } else {
+        var savedSim = readSimulatedEmail();
+        if (!savedSim) {
+          await syncServerSimulation("");
+        }
+      }
+
       var scope = await fetchUserScope(
         effective !== realEmail ? effective : ""
       );
@@ -2569,27 +2809,33 @@
       } catch (err) {
         prev = "";
       }
+
+      var locked = !scope.see_all;
+
+      // ⛔ NO reaplicar por URL: Superset sustituye native_filters → native_filters_key
+      // y un guard que mira la URL provoca bucle infinito de location.replace.
+      // Seguridad = RLS Jinja (cookie ps_sim). UI = ocultar widget + 1 reload máx.
       if (prev === token) {
-        markDeptFilterLocked(!scope.see_all, scope.department_code || "");
+        markDeptFilterLocked(locked, scope.department_code || "");
         return;
       }
 
-      var url = new URL(window.location.href);
-      // native_filters_key pisa native_filters → hay que quitarlo al forzar ámbito
-      url.searchParams.delete("native_filters_key");
-      url.searchParams.delete("permalink_key");
+      var urlNow = new URL(window.location.href);
+      urlNow.searchParams.delete("native_filters_key");
+      urlNow.searchParams.delete("permalink_key");
+
+      try {
+        sessionStorage.setItem(PS_DEPT_SCOPE_KEY, token);
+      } catch (err) {
+        /* ignore */
+      }
 
       if (scope.see_all) {
-        url.searchParams.delete("native_filters");
-        try {
-          sessionStorage.setItem(PS_DEPT_SCOPE_KEY, token);
-        } catch (err) {
-          /* ignore */
-        }
+        urlNow.searchParams.delete("native_filters");
         markDeptFilterLocked(false, "");
-        if (url.href !== window.location.href) {
+        if (urlNow.href !== window.location.href) {
           console.log("[PS] Ámbito dept: ver todo (vacío/999)");
-          window.location.replace(url.pathname + url.search + url.hash);
+          window.location.replace(urlNow.pathname + urlNow.search + urlNow.hash);
         } else {
           console.log("[PS] Ámbito dept: ver todo (sin cambio URL)");
         }
@@ -2597,14 +2843,10 @@
       }
 
       var dept = scope.department_code;
-      url.searchParams.set("native_filters", buildDeptNativeFiltersRison(dept));
-      try {
-        sessionStorage.setItem(PS_DEPT_SCOPE_KEY, token);
-      } catch (err) {
-        /* ignore */
-      }
-      console.log("[PS] Ámbito dept →", dept);
-      window.location.replace(url.pathname + url.search + url.hash);
+      urlNow.searchParams.set("native_filters", buildDeptNativeFiltersRison(dept));
+      console.log("[PS] Ámbito dept →", dept, "(RLS servidor; 1 reload)");
+      markDeptFilterLocked(true, dept);
+      window.location.replace(urlNow.pathname + urlNow.search + urlNow.hash);
     } catch (err) {
       console.warn("[PS] No se pudo aplicar ámbito departamento", err);
     }
