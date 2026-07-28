@@ -537,7 +537,7 @@ def resumen_proyectos_params() -> dict[str, Any]:
             ),
         ],
         "percent_metrics": [],
-        "order_by_cols": ['["Fact.", false]'],
+        "order_by_cols": ['["Margen %", false]'],
         "row_limit": 5000,
         # Sin page_length: evita el selector "Show N entries per page"
         "server_pagination": False,
