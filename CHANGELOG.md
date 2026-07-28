@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-28k] — Probabilidad: fuente +10%
+
+### Changed
+- Tipografía ECharts de Facturación por Probabilidad: factor **0.65 → 0.715** (+10%).
+- Título del chart Probabilidad: **12px → 13px**.
+
 ## [2026-07-28j] — Compactar banda KPI+Prob ~−35%
 
 ### Changed
