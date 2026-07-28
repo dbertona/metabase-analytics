@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [2026-07-28h] — Edición UI: resize KPIs/Probabilidad + Salir
+
+### Fixed
+
+- En **modo edición**, CSS deja visible el asa de resize (`react-resizable-handle`)
+  en KPIs y Probabilidad (`overflow: visible`, z-index alto; drop zones del COLUMN
+  no roban el ratón). Antes solo redimensionaban las tablas de abajo.
+- En edición se muestra el menú ⋮ también en KPIs (Editar chart).
+- Botón **Salir** en la cabecera del dashboard (navbar global oculta).
+
 ## [2026-07-28g] — Probabilidad: menos alto de card
 
 ### Changed

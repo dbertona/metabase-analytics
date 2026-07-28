@@ -1969,13 +1969,56 @@
       "padding-top:0!important;" +
       "}" +
       "#ps-dash-sim-host{" +
-      "display:inline-flex;align-items:center;margin-right:8px;flex-shrink:0;" +
+      "display:inline-flex;align-items:center;gap:6px;margin-right:8px;flex-shrink:0;" +
+      "}" +
+      "#ps-dash-logout{" +
+      "display:inline-flex;align-items:center;padding:2px 8px;margin-left:4px;" +
+      "font-size:12px;color:#334155;background:#f1f5f9;border:1px solid #cbd5e1;" +
+      "border-radius:4px;text-decoration:none;white-space:nowrap;" +
+      "}" +
+      "#ps-dash-logout:hover{background:#e2e8f0;color:#0f172a;}" +
+      /* En edición: mostrar navbar global (Ajustes / logout) */
+      "body.ps-dashboard-editing." +
+      PS_DASH_CHROME_CLASS +
+      " [data-ps-hidden-nav='1']{" +
+      "display:revert!important;height:auto!important;min-height:unset!important;" +
+      "overflow:visible!important;padding:unset!important;margin:unset!important;" +
       "}";
     document.head.appendChild(style);
   }
 
-  function hideGlobalNavbarByScan() {
+  function isDashboardEditing() {
+    return !!(
+      document.querySelector(".dashboard--editing") ||
+      document.querySelector('[data-test="dashboard-edit-mode"]') ||
+      /([?&]edit=true|edit_mode=true)/i.test(window.location.search + window.location.hash)
+    );
+  }
+
+  function ensureLogoutControl() {
     if (!isDashboardPage()) return;
+    var existing = document.getElementById("ps-dash-logout");
+    if (existing) return;
+    var a = document.createElement("a");
+    a.id = "ps-dash-logout";
+    a.href = appRoot() + "/logout/";
+    a.textContent = "Salir";
+    a.title = "Cerrar sesión";
+    var host = document.getElementById(PS_SIM_HOST_ID);
+    if (host) {
+      host.appendChild(a);
+      return;
+    }
+    // Fallback: cabecera del dashboard
+    var header =
+      document.querySelector('[data-test="dashboard-header"]') ||
+      document.querySelector(".dashboard-header");
+    if (header) header.appendChild(a);
+    else document.body.appendChild(a);
+  }
+
+  function hideGlobalNavbarByScan() {
+    if (!isDashboardPage() || isDashboardEditing()) return;
     var candidates = document.querySelectorAll(
       "header, nav, .ant-layout-header, [role='banner']"
     );
@@ -2006,14 +2049,37 @@
   function applyDashboardChromeMode() {
     if (!isDashboardPage()) {
       document.body.classList.remove(PS_DASH_CHROME_CLASS);
+      document.body.classList.remove("ps-dashboard-editing");
       return;
     }
     ensureDashboardChromeStyles();
-    document.body.classList.add(PS_DASH_CHROME_CLASS);
-    hideGlobalNavbarByScan();
+    var editing = isDashboardEditing();
+    document.body.classList.toggle("ps-dashboard-editing", editing);
+    if (editing) {
+      // Mostrar navbar para Ajustes / Cerrar sesión
+      document.body.classList.remove(PS_DASH_CHROME_CLASS);
+      document.querySelectorAll('[data-ps-hidden-nav="1"]').forEach(function (el) {
+        el.style.removeProperty("display");
+        el.style.removeProperty("height");
+        el.removeAttribute("data-ps-hidden-nav");
+      });
+    } else {
+      document.body.classList.add(PS_DASH_CHROME_CLASS);
+      hideGlobalNavbarByScan();
+    }
+    ensureLogoutControl();
     setTimeout(publishDashboardViewportVars, 50);
     setTimeout(publishDashboardViewportVars, 400);
   }
+
+  // Reaplicar chrome al entrar/salir de edición (SPA)
+  setInterval(function () {
+    if (!isDashboardPage()) return;
+    var editing = isDashboardEditing();
+    var marked = document.body.classList.contains("ps-dashboard-editing");
+    if (editing !== marked) applyDashboardChromeMode();
+    else if (!editing) ensureLogoutControl();
+  }, 800);
 
   // ─── Simulación de usuario (Admin/Alpha) — solo identidad visual ─────────
   var PS_SIM_STORAGE_KEY = "psSimulatedUserEmail";
