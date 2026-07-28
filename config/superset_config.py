@@ -201,16 +201,29 @@ class PsAppInitializer(SupersetAppInitializer):
             scope["simulated"] = bool(requested and requested != real_email)
             return jsonify({"result": scope})
 
-        @app.post("/api/v1/ps/simulate")
+        @app.route("/api/v1/ps/simulate", methods=["GET", "POST", "DELETE"])
         def ps_set_simulation():  # type: ignore[no-untyped-def]
-            """Guarda email simulado en session Flask (RLS Jinja lo lee)."""
+            """Guarda/limpia email simulado en session Flask (RLS Jinja lo lee).
+
+            GET ?email=...  → set (sin CSRF; uso desde tail_js)
+            GET sin email   → clear
+            POST/DELETE     → mismo contrato (con CSRF si aplica)
+            """
             user = _ps_resolve_request_user()
             if not user:
                 return jsonify({"message": "Unauthorized"}), 401
             if not _ps_can_simulate(user):
                 return jsonify({"message": "Forbidden"}), 403
-            body = request.get_json(silent=True) or {}
-            email = (body.get("email") or "").strip().lower()
+
+            if request.method == "DELETE":
+                email = ""
+            elif request.method == "POST":
+                body = request.get_json(silent=True) or {}
+                email = (body.get("email") or "").strip().lower()
+            else:
+                # GET: email vacío o ausente → clear
+                email = (request.args.get("email") or "").strip().lower()
+
             if not email:
                 session.pop(PS_SIMULATED_EMAIL_SESSION_KEY, None)
                 return jsonify({"result": {"simulated": False, "email": None}})
@@ -228,14 +241,6 @@ class PsAppInitializer(SupersetAppInitializer):
                     }
                 }
             )
-
-        @app.delete("/api/v1/ps/simulate")
-        def ps_clear_simulation():  # type: ignore[no-untyped-def]
-            user = _ps_resolve_request_user()
-            if not user:
-                return jsonify({"message": "Unauthorized"}), 401
-            session.pop(PS_SIMULATED_EMAIL_SESSION_KEY, None)
-            return jsonify({"result": {"simulated": False, "email": None}})
 
         logger.info(
             "PS: rutas /api/v1/ps/resources + /user-scope + /simulate (%s)",
