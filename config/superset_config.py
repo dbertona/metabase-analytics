@@ -158,56 +158,17 @@ class PsAppInitializer(SupersetAppInitializer):
 
     def _register_ps_simulation_routes(self) -> None:
         """APIs PS: simulación (Admin/Alpha/PS_Testing) + ámbito departamento (todos)."""
-        from flask import current_app, g, jsonify, request
-        from flask_login import current_user
+        from flask import jsonify, request, session
 
         app = self.superset_app
-
-        def _resolve_user() -> Any:
-            """Usuario de sesión cookie o JWT Bearer (como APIs nativas)."""
-            if current_user and getattr(current_user, "is_authenticated", False):
-                return current_user
-            gu = getattr(g, "user", None)
-            if gu and getattr(gu, "is_authenticated", False):
-                return gu
-            auth = request.headers.get("Authorization") or ""
-            if not auth.startswith("Bearer "):
-                return None
-            try:
-                from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
-
-                verify_jwt_in_request(optional=False)
-                identity = get_jwt_identity()
-                if identity is None:
-                    return None
-                user = current_app.appbuilder.sm.load_user(identity)
-                if user and getattr(user, "is_active", True):
-                    g.user = user
-                    return user
-            except Exception:
-                logger.debug("PS resources: JWT no válido", exc_info=True)
-            return None
-
-        def _can_simulate(user: Any) -> bool:
-            if not user:
-                return False
-            roles = {getattr(r, "name", "") for r in (getattr(user, "roles", None) or [])}
-            return bool(roles & PS_SIMULATION_ROLES)
-
-        def _user_email(user: Any) -> str:
-            return (
-                (getattr(user, "email", None) or getattr(user, "username", None) or "")
-                .strip()
-                .lower()
-            )
 
         @app.get("/api/v1/ps/resources")
         def ps_list_resources_for_simulation():  # type: ignore[no-untyped-def]
             # JSON 401 (no @login_required): evita BuildError del redirect a 'login'
-            user = _resolve_user()
+            user = _ps_resolve_request_user()
             if not user:
                 return jsonify({"message": "Unauthorized", "can_simulate": False}), 401
-            if not _can_simulate(user):
+            if not _ps_can_simulate(user):
                 return jsonify({"message": "Forbidden", "can_simulate": False}), 403
             resources = list_resources_for_simulation()
             return jsonify(
@@ -221,18 +182,18 @@ class PsAppInitializer(SupersetAppInitializer):
         @app.get("/api/v1/ps/user-scope")
         def ps_user_department_scope():  # type: ignore[no-untyped-def]
             """Ámbito de departamento (paridad PBI: vacío/999 = ver todo)."""
-            user = _resolve_user()
+            user = _ps_resolve_request_user()
             if not user:
                 return jsonify({"message": "Unauthorized"}), 401
 
-            real_email = _user_email(user)
+            real_email = _ps_user_email(user)
             requested = (request.args.get("email") or "").strip().lower()
             effective = requested or real_email
             if not effective or "@" not in effective:
                 return jsonify({"message": "Email inválido"}), 400
 
             # Simular otro email solo con rol de simulación
-            if requested and requested != real_email and not _can_simulate(user):
+            if requested and requested != real_email and not _ps_can_simulate(user):
                 return jsonify({"message": "Forbidden", "can_simulate": False}), 403
 
             scope = resolve_department_scope(effective)
@@ -240,8 +201,44 @@ class PsAppInitializer(SupersetAppInitializer):
             scope["simulated"] = bool(requested and requested != real_email)
             return jsonify({"result": scope})
 
+        @app.post("/api/v1/ps/simulate")
+        def ps_set_simulation():  # type: ignore[no-untyped-def]
+            """Guarda email simulado en session Flask (RLS Jinja lo lee)."""
+            user = _ps_resolve_request_user()
+            if not user:
+                return jsonify({"message": "Unauthorized"}), 401
+            if not _ps_can_simulate(user):
+                return jsonify({"message": "Forbidden"}), 403
+            body = request.get_json(silent=True) or {}
+            email = (body.get("email") or "").strip().lower()
+            if not email:
+                session.pop(PS_SIMULATED_EMAIL_SESSION_KEY, None)
+                return jsonify({"result": {"simulated": False, "email": None}})
+            if "@" not in email:
+                return jsonify({"message": "Email inválido"}), 400
+            session[PS_SIMULATED_EMAIL_SESSION_KEY] = email
+            scope = resolve_department_scope(email)
+            return jsonify(
+                {
+                    "result": {
+                        "simulated": True,
+                        "email": email,
+                        "see_all": scope["see_all"],
+                        "department_code": scope["department_code"],
+                    }
+                }
+            )
+
+        @app.delete("/api/v1/ps/simulate")
+        def ps_clear_simulation():  # type: ignore[no-untyped-def]
+            user = _ps_resolve_request_user()
+            if not user:
+                return jsonify({"message": "Unauthorized"}), 401
+            session.pop(PS_SIMULATED_EMAIL_SESSION_KEY, None)
+            return jsonify({"result": {"simulated": False, "email": None}})
+
         logger.info(
-            "PS: rutas /api/v1/ps/resources + /api/v1/ps/user-scope (%s)",
+            "PS: rutas /api/v1/ps/resources + /user-scope + /simulate (%s)",
             ",".join(sorted(PS_SIMULATION_ROLES)),
         )
 
@@ -395,29 +392,83 @@ def resolve_department_scope(email: str) -> dict[str, Any]:
     }
 
 
+PS_SIMULATED_EMAIL_SESSION_KEY = "ps_simulated_email"
+
+
+def _ps_resolve_request_user() -> Any:
+    """Usuario autenticado: cookie Flask-Login, g.user o JWT Bearer."""
+    try:
+        from flask import current_app, g, request
+        from flask_login import current_user
+
+        if current_user and getattr(current_user, "is_authenticated", False):
+            return current_user
+        gu = getattr(g, "user", None)
+        if gu and getattr(gu, "is_authenticated", False):
+            return gu
+        auth = request.headers.get("Authorization") or ""
+        if not auth.startswith("Bearer "):
+            return None
+        from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
+
+        verify_jwt_in_request(optional=False)
+        identity = get_jwt_identity()
+        if identity is None:
+            return None
+        user = current_app.appbuilder.sm.load_user(identity)
+        if user and getattr(user, "is_active", True):
+            g.user = user
+            return user
+    except Exception:
+        logger.debug("PS: no se pudo resolver usuario de request", exc_info=True)
+    return None
+
+
+def _ps_user_email(user: Any) -> str:
+    return (
+        (getattr(user, "email", None) or getattr(user, "username", None) or "")
+        .strip()
+        .lower()
+    )
+
+
+def _ps_can_simulate(user: Any) -> bool:
+    if not user:
+        return False
+    roles = {getattr(r, "name", "") for r in (getattr(user, "roles", None) or [])}
+    return bool(roles & PS_SIMULATION_ROLES)
+
+
+def _ps_effective_email_for_rls() -> str:
+    """Email efectivo para RLS: simulación en session (si autorizada) o usuario real."""
+    from flask import session
+
+    user = _ps_resolve_request_user()
+    if not user:
+        return ""
+    real = _ps_user_email(user)
+    sim = (session.get(PS_SIMULATED_EMAIL_SESSION_KEY) or "").strip().lower()
+    if sim and sim != real and _ps_can_simulate(user):
+        return sim
+    return real
+
+
 def _ps_dept_jinja_filter() -> str:
     """Cláusula SQL WHERE para RLS de departamento.
 
-    - Admin/Alpha o departamento vacío/999 → sin restricción (1=1)
-    - Simulación frontend (Admin): Admin ya tiene see_all → 1=1 (simulación solo UX)
-    - Usuario normal con departamento → department_code = 'DEPT'
+    - Departamento vacío/999 del email efectivo → 1=1
+    - Email efectivo con departamento → department_code = 'DEPT'
+    - Sin usuario → 1=0
+
+    La simulación Admin → otro email se guarda en session Flask
+    (POST /api/v1/ps/simulate). Sin eso, Admin siempre veía todo aunque
+    el filtro nativo estuviera aplicado (y podía borrarlo).
 
     Registrada como función Jinja en JINJA_CONTEXT_ADDONS.
-    Los datasets bi_v_* con department_code usan:
-        SELECT * FROM bi_v_xxx WHERE {{ ps_dept_filter() }}
     """
     try:
-        from flask_login import current_user
-
-        user = current_user
-        if not user or not getattr(user, "is_authenticated", False):
-            return "1=0"
-        email = (
-            getattr(user, "email", None)
-            or getattr(user, "username", None)
-            or ""
-        ).strip().lower()
-        if not email:
+        email = _ps_effective_email_for_rls()
+        if not email or "@" not in email:
             return "1=0"
         scope = resolve_department_scope(email)
         if scope["see_all"]:
