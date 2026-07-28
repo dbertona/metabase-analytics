@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-28s] — Merge-safe borra la rama tras merge
+
+### Changed
+- `merge-safe.sh`: tras merge + push a `main`, elimina la rama `feat/*`|`fix/*`|`hotfix/*`
+  en local, `gitea` y `origin` (si existe). Escape: `KEEP_BRANCH=1`.
+- Reglas (`merge-command-workflow`, `git-workflow-automatic`, `sync-gitea-before-code`):
+  obligatorio no declarar «rama cerrada» si la feature sigue viva.
+
 ## [2026-07-28] — Cierre rama `feat/simular-usuario-recursos`
 
 ### Summary
