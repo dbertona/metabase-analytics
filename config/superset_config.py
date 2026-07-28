@@ -144,23 +144,49 @@ class PsAppInitializer(SupersetAppInitializer):
 
     def _register_ps_simulation_routes(self) -> None:
         """API para combo simular usuario (solo Admin/Alpha; no filtra datos)."""
-        from flask import jsonify
+        from flask import current_app, g, jsonify, request
         from flask_login import current_user
 
         app = self.superset_app
 
-        def _can_simulate() -> bool:
-            if not current_user or not getattr(current_user, "is_authenticated", False):
+        def _resolve_user() -> Any:
+            """Usuario de sesión cookie o JWT Bearer (como APIs nativas)."""
+            if current_user and getattr(current_user, "is_authenticated", False):
+                return current_user
+            gu = getattr(g, "user", None)
+            if gu and getattr(gu, "is_authenticated", False):
+                return gu
+            auth = request.headers.get("Authorization") or ""
+            if not auth.startswith("Bearer "):
+                return None
+            try:
+                from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
+
+                verify_jwt_in_request(optional=False)
+                identity = get_jwt_identity()
+                if identity is None:
+                    return None
+                user = current_app.appbuilder.sm.load_user(identity)
+                if user and getattr(user, "is_active", True):
+                    g.user = user
+                    return user
+            except Exception:
+                logger.debug("PS resources: JWT no válido", exc_info=True)
+            return None
+
+        def _can_simulate(user: Any) -> bool:
+            if not user:
                 return False
-            roles = {getattr(r, "name", "") for r in (current_user.roles or [])}
+            roles = {getattr(r, "name", "") for r in (getattr(user, "roles", None) or [])}
             return bool(roles & {"Admin", "Alpha"})
 
         @app.get("/api/v1/ps/resources")
         def ps_list_resources_for_simulation():  # type: ignore[no-untyped-def]
             # JSON 401 (no @login_required): evita BuildError del redirect a 'login'
-            if not current_user or not getattr(current_user, "is_authenticated", False):
+            user = _resolve_user()
+            if not user:
                 return jsonify({"message": "Unauthorized", "can_simulate": False}), 401
-            if not _can_simulate():
+            if not _can_simulate(user):
                 return jsonify({"message": "Forbidden", "can_simulate": False}), 403
             resources = list_resources_for_simulation()
             return jsonify(
@@ -171,8 +197,7 @@ class PsAppInitializer(SupersetAppInitializer):
                 }
             )
 
-        logger.info("PS: ruta /api/v1/ps/resources (simulación Admin/Alpha) registrada")
-APP_INITIALIZER = PsAppInitializer
+        logger.info("PS: ruta /api/v1/ps/resources (simulación Admin/Alpha) registrada")APP_INITIALIZER = PsAppInitializer
 
 ENABLE_PROXY_FIX = True
 PROXY_FIX_CONFIG = {"x_for": 1, "x_proto": 1, "x_host": 1, "x_port": 1, "x_prefix": 1}

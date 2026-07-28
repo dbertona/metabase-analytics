@@ -1954,22 +1954,6 @@
     }
   }
 
-  function userCanSimulate(me) {
-    if (!me) return false;
-    var roles = me.roles;
-    if (Array.isArray(roles)) {
-      return roles.some(function (r) {
-        var n = typeof r === "string" ? r : r && r.name;
-        return n === "Admin" || n === "Alpha";
-      });
-    }
-    if (roles && typeof roles === "object") {
-      return Object.prototype.hasOwnProperty.call(roles, "Admin") ||
-        Object.prototype.hasOwnProperty.call(roles, "Alpha");
-    }
-    return false;
-  }
-
   async function fetchMe() {
     try {
       var res = await fetch(appRoot() + "/api/v1/me/", { credentials: "include" });
@@ -2199,22 +2183,28 @@
   }
 
   async function initUserSimulator() {
+    // /api/v1/me/ no incluye roles → la autorización la decide /ps/resources
+    // (Admin/Alpha → 200; Viewer → 403; anónimo → 401).
     var me = await fetchMe();
-    if (!me || !userCanSimulate(me)) {
-      // Sin permiso: limpiar simulación residual
-      if (!userCanSimulate(me)) setSimulatedUserState("", "");
-      return;
-    }
+    if (!me) return;
     try {
       var res = await fetch(appRoot() + "/api/v1/ps/resources", {
         credentials: "include",
       });
+      if (res.status === 401 || res.status === 403) {
+        setSimulatedUserState("", "");
+        return;
+      }
       if (!res.ok) {
         console.warn("[PS] /api/v1/ps/resources →", res.status);
         return;
       }
       var payload = await res.json();
-      var resources = (payload && payload.result) || [];
+      if (!payload || !payload.can_simulate) {
+        setSimulatedUserState("", "");
+        return;
+      }
+      var resources = payload.result || [];
       mountUserSimulator(me, resources);
       refreshDisplayedUserName();
     } catch (err) {
