@@ -1638,6 +1638,8 @@
               name: "",
               axisLabel: Object.assign(
                 {
+                  margin: 10,
+                  hideOverlap: false,
                   formatter: function (v) {
                     return formatProbPct(v);
                   },
@@ -1652,7 +1654,14 @@
               return formatEuroAmount(v);
             },
           },
-          series: seriesPatch,
+          series: seriesPatch.map(function (sp) {
+            return Object.assign({}, sp, {
+              label: Object.assign({}, sp.label, {
+                position: "right",
+                distance: 6,
+              }),
+            });
+          }),
         },
         false
       );
