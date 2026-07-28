@@ -197,7 +197,10 @@ class PsAppInitializer(SupersetAppInitializer):
                 }
             )
 
-        logger.info("PS: ruta /api/v1/ps/resources (simulación Admin/Alpha) registrada")APP_INITIALIZER = PsAppInitializer
+        logger.info("PS: ruta /api/v1/ps/resources (simulación Admin/Alpha) registrada")
+
+
+APP_INITIALIZER = PsAppInitializer
 
 ENABLE_PROXY_FIX = True
 PROXY_FIX_CONFIG = {"x_for": 1, "x_proto": 1, "x_host": 1, "x_port": 1, "x_prefix": 1}
