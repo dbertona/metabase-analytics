@@ -395,6 +395,50 @@ def resolve_department_scope(email: str) -> dict[str, Any]:
     }
 
 
+def _ps_dept_jinja_filter() -> str:
+    """Cláusula SQL WHERE para RLS de departamento.
+
+    - Admin/Alpha o departamento vacío/999 → sin restricción (1=1)
+    - Simulación frontend (Admin): Admin ya tiene see_all → 1=1 (simulación solo UX)
+    - Usuario normal con departamento → department_code = 'DEPT'
+
+    Registrada como función Jinja en JINJA_CONTEXT_ADDONS.
+    Los datasets bi_v_* con department_code usan:
+        SELECT * FROM bi_v_xxx WHERE {{ ps_dept_filter() }}
+    """
+    try:
+        from flask_login import current_user
+
+        user = current_user
+        if not user or not getattr(user, "is_authenticated", False):
+            return "1=0"
+        email = (
+            getattr(user, "email", None)
+            or getattr(user, "username", None)
+            or ""
+        ).strip().lower()
+        if not email:
+            return "1=0"
+        scope = resolve_department_scope(email)
+        if scope["see_all"]:
+            return "1=1"
+        dept = (scope.get("department_code") or "").strip()
+        if not dept:
+            return "1=0"
+        dept_safe = dept.replace("'", "''")
+        return f"department_code = '{dept_safe}'"
+    except Exception:
+        logger.exception("ps_dept_filter: error determinando ámbito de departamento")
+        return "1=0"
+
+
+# Función Jinja disponible en todos los datasets con ENABLE_TEMPLATE_PROCESSING=True.
+# Uso en virtual SQL: SELECT * FROM bi_v_xxx WHERE {{ ps_dept_filter() }}
+JINJA_CONTEXT_ADDONS = {
+    "ps_dept_filter": _ps_dept_jinja_filter,
+}
+
+
 def split_resource_display_name(full_name: str, email: str) -> tuple[str, str]:
     """Convierte 'Apellido, Nombre' (BC) → (Nombre, Apellido) para la barra."""
     full_name = (full_name or "").strip()

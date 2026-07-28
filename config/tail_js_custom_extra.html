@@ -2518,17 +2518,84 @@
     );
   }
 
+  // ── Ocultación del widget Departamentos cuando el usuario está restringido ──
+  // El RLS server-side (ps_dept_filter Jinja) garantiza que el dato nunca sale
+  // del departamento correcto aunque el usuario manipule la URL.
+  // Ocultar el widget además evita confusión: usuario cambia filtro → datos vacíos
+  // → "¿bug?". Con el widget oculto el flujo es transparente.
+
+  var PS_DEPT_LOCK_STYLE_ID = "ps-dept-lock-style";
+  var _deptLockObserver = null;
+
+  function _hideDeptFilterItems() {
+    // Recorre los ítems del panel de filtros y oculta el de departamentos.
+    // Superset 6.x renderiza cada filtro en un .ant-collapse-item cuyo
+    // data-key es el ID del filtro. Fallback: buscar por texto "Departamentos".
+    var items = document.querySelectorAll(".ant-collapse-item");
+    items.forEach(function (item) {
+      var key = item.getAttribute("data-key") || "";
+      if (key === PS_DEPT_FILTER_ID) {
+        item.style.display = "none";
+        return;
+      }
+      // Fallback por texto del encabezado (por si el data-key varía entre versiones)
+      var header = item.querySelector(".ant-collapse-header");
+      if (header && /^Departamentos?$/i.test((header.textContent || "").trim())) {
+        item.style.display = "none";
+      }
+    });
+  }
+
+  function _startDeptLockObserver() {
+    if (_deptLockObserver) return;
+    var panel = document.querySelector("[data-test='dashboard-filters-panel']");
+    var target = panel || document.body;
+    _deptLockObserver = new MutationObserver(function () {
+      _hideDeptFilterItems();
+    });
+    _deptLockObserver.observe(target, { childList: true, subtree: true });
+    _hideDeptFilterItems();
+  }
+
+  function _stopDeptLockObserver() {
+    if (_deptLockObserver) {
+      _deptLockObserver.disconnect();
+      _deptLockObserver = null;
+    }
+    // Restaurar visibilidad de ítems ocultos
+    document.querySelectorAll(".ant-collapse-item").forEach(function (item) {
+      var key = item.getAttribute("data-key") || "";
+      var header = item.querySelector(".ant-collapse-header");
+      var byText = header && /^Departamentos?$/i.test((header.textContent || "").trim());
+      if (key === PS_DEPT_FILTER_ID || byText) {
+        item.style.display = "";
+      }
+    });
+    var s = document.getElementById(PS_DEPT_LOCK_STYLE_ID);
+    if (s) s.remove();
+  }
+
   function markDeptFilterLocked(locked, deptLabel) {
+    // Limpiar banner anterior
     var existing = document.getElementById("ps-dept-scope-banner");
     if (existing) existing.remove();
-    if (!locked) return;
+
+    if (!locked) {
+      _stopDeptLockObserver();
+      return;
+    }
+
+    // Ocultar el widget del panel con observer (React re-renderiza el panel)
+    _startDeptLockObserver();
+
+    // Banner informativo sobre el filtro server-side
     var ban = document.createElement("div");
     ban.id = "ps-dept-scope-banner";
     ban.style.cssText =
       "position:fixed;top:8px;left:12px;z-index:2050;padding:4px 10px;" +
       "background:#e3f2fd;border:1px solid #90caf9;border-radius:4px;" +
       "font-size:12px;color:#0d47a1;box-shadow:0 1px 3px rgba(0,0,0,.1);";
-    ban.textContent = "Ámbito departamento: " + deptLabel + " (como PBI)";
+    ban.textContent = "Departamento: " + deptLabel + " (filtro aplicado por servidor)";
     document.body.appendChild(ban);
   }
 
