@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-28g] — Probabilidad: menos alto de card
+
+### Changed
+
+- Layout `Facturación por Probabilidad`: height **36 → 28** (alineado al alto de
+  Objetivos + Planificación Actual; elimina el hueco blanco bajo el eje).
+
 ## [2026-07-28f] — Dashboard sin navbar + combo en cabecera
 
 ### Changed
