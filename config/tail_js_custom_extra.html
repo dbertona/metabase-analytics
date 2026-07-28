@@ -2660,18 +2660,16 @@
         sim && sim.email ? String(sim.email).trim().toLowerCase() : realEmail;
       if (!effective) return;
 
-      // Sync session Flask ANTES del scope/charts (RLS Jinja lee session)
+      // Sync cookie firmada ps_sim ANTES de charts (RLS Jinja la lee)
       if (effective !== realEmail) {
         await syncServerSimulation(effective);
       } else {
-        // Usuario real: limpiar simulación residual en session
         var savedSim = readSimulatedEmail();
         if (!savedSim) {
           await syncServerSimulation("");
         }
       }
 
-      // Sin ?email → ámbito del usuario real; con email simulado → exige rol
       var scope = await fetchUserScope(
         effective !== realEmail ? effective : ""
       );
@@ -2689,32 +2687,28 @@
       }
 
       var locked = !scope.see_all;
-      // Si el usuario borró native_filters de dept, reaplicar aunque el token coincida
-      var urlNow = new URL(window.location.href);
-      var nf = urlNow.searchParams.get("native_filters") || "";
-      var deptMissingInUrl =
-        locked &&
-        (!nf || nf.indexOf(PS_DEPT_FILTER_ID) === -1);
 
-      if (prev === token && !deptMissingInUrl) {
+      // ⛔ NO reaplicar por URL: Superset sustituye native_filters → native_filters_key
+      // y un guard que mira la URL provoca bucle infinito de location.replace.
+      // Seguridad = RLS Jinja (cookie ps_sim). UI = ocultar widget + 1 reload máx.
+      if (prev === token) {
         markDeptFilterLocked(locked, scope.department_code || "");
-        if (locked) startDeptFilterGuard(scope.department_code || "");
-        else stopDeptFilterGuard();
         return;
       }
 
+      var urlNow = new URL(window.location.href);
       urlNow.searchParams.delete("native_filters_key");
       urlNow.searchParams.delete("permalink_key");
 
+      try {
+        sessionStorage.setItem(PS_DEPT_SCOPE_KEY, token);
+      } catch (err) {
+        /* ignore */
+      }
+
       if (scope.see_all) {
         urlNow.searchParams.delete("native_filters");
-        try {
-          sessionStorage.setItem(PS_DEPT_SCOPE_KEY, token);
-        } catch (err) {
-          /* ignore */
-        }
         markDeptFilterLocked(false, "");
-        stopDeptFilterGuard();
         if (urlNow.href !== window.location.href) {
           console.log("[PS] Ámbito dept: ver todo (vacío/999)");
           window.location.replace(urlNow.pathname + urlNow.search + urlNow.hash);
@@ -2726,56 +2720,12 @@
 
       var dept = scope.department_code;
       urlNow.searchParams.set("native_filters", buildDeptNativeFiltersRison(dept));
-      try {
-        sessionStorage.setItem(PS_DEPT_SCOPE_KEY, token);
-      } catch (err) {
-        /* ignore */
-      }
-      console.log("[PS] Ámbito dept →", dept, "(RLS servidor + filtro UI)");
+      console.log("[PS] Ámbito dept →", dept, "(RLS servidor; 1 reload)");
       markDeptFilterLocked(true, dept);
-      startDeptFilterGuard(dept);
       window.location.replace(urlNow.pathname + urlNow.search + urlNow.hash);
     } catch (err) {
       console.warn("[PS] No se pudo aplicar ámbito departamento", err);
     }
-  }
-
-  // Si el usuario borra/cambia el filtro Departamentos, reinyectar URL (UX).
-  // La seguridad real está en ps_dept_filter() Jinja; esto evita confusión.
-  var _deptGuardTimer = null;
-  var _deptGuardDept = "";
-
-  function stopDeptFilterGuard() {
-    if (_deptGuardTimer) {
-      clearInterval(_deptGuardTimer);
-      _deptGuardTimer = null;
-    }
-    _deptGuardDept = "";
-  }
-
-  function startDeptFilterGuard(dept) {
-    _deptGuardDept = dept || "";
-    if (_deptGuardTimer) return;
-    _deptGuardTimer = setInterval(function () {
-      if (!_deptGuardDept) return;
-      try {
-        var url = new URL(window.location.href);
-        var nf = url.searchParams.get("native_filters") || "";
-        if (!nf || nf.indexOf(PS_DEPT_FILTER_ID) === -1) {
-          console.warn(
-            "[PS] Filtro dept borrado → reaplicando (RLS ya limita datos)"
-          );
-          try {
-            sessionStorage.removeItem(PS_DEPT_SCOPE_KEY);
-          } catch (err) {
-            /* ignore */
-          }
-          applyDepartmentScope();
-        }
-      } catch (err) {
-        /* ignore */
-      }
-    }, 1500);
   }
 
   async function runPatch() {
