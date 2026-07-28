@@ -236,6 +236,8 @@ REMEMBER_COOKIE_PATH = "/"
 # Roles que pueden usar el combo de simulación de usuario (solo identidad visual).
 PS_SIMULATION_ROLES = frozenset({"Admin", "Alpha", "PS_Testing"})
 
+# Analytics DB (misma red Docker: supabase-db) — lookup bc_resource
+PS_ANALYTICS_HOST = os.environ.get("PS_ANALYTICS_HOST", "supabase-db").strip()
 PS_ANALYTICS_PORT = int(os.environ.get("PS_ANALYTICS_PORT", "5432"))
 PS_ANALYTICS_DB = os.environ.get("PS_ANALYTICS_DB", "postgres").strip()
 PS_ANALYTICS_USER = os.environ.get("PS_ANALYTICS_USER", "postgres").strip()
