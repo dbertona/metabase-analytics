@@ -609,7 +609,7 @@ def persist_dashboard_config(
         " */\n"
         ":root {\n"
         "  --ps-dash-top: 126px;\n"
-        "  --ps-tables-top: 510px;\n"
+        "  --ps-tables-top: 522px;\n"
         "  --ps-unidad-top: 200px;\n"
         "  /* Techo de lectura ultrawide (~lienzo PBI); ≤ este valor = 100% */\n"
         "  --ps-dash-max-width: 1440px;\n"
