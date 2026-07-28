@@ -97,7 +97,7 @@ merge_push_via_main_worktree() {
   unset ALLOW_BYPASS_GUARD
 }
 
-# Obligatoria tras merge exitoso: borrar feat/fix/hotfix local + remotes.
+# Obligatoria tras merge exitoso: borrar feat/fix/hotfix/chore local + remotes.
 # No es "rama ajena": es la rama que este script acaba de fusionar en main.
 delete_merged_branch() {
   local target_branch="$1"
@@ -107,7 +107,7 @@ delete_merged_branch() {
     main|master|"")
       fail "Refusing to delete protected branch: '${target_branch}'"
       ;;
-    feat/*|fix/*|hotfix/*) ;;
+    feat/*|fix/*|hotfix/*|chore/*) ;;
     *)
       warn "Nombre de rama inesperado ($target_branch); no borro automaticamente"
       return 0

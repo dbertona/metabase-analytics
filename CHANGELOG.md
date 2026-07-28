@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [2026-07-28t] — merge-safe: auto-borrar también `chore/*`
+
+### Changed
+- `delete_merged_branch` acepta `chore/*` (además de feat/fix/hotfix).
+
 ## [2026-07-28s] — Merge-safe borra la rama tras merge
 
 ### Changed

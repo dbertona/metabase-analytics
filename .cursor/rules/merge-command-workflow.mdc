@@ -31,7 +31,7 @@ Cuando el usuario diga **«merge»** (o sinónimos válidos), ejecutar **todo el
 ### 2. Pre-flight
 
 - Working tree limpio; si hay cambios sin commitear → commitear primero.
-- Verificar rama `feat/*`, `fix/*` o `hotfix/*` (NO `main`).
+- Verificar rama `feat/*`, `fix/*`, `hotfix/*` o `chore/*` (NO `main`).
 - Submódulo `docs/shared` sin cambios pendientes en el padre.
 
 ### 3. Versión
@@ -84,7 +84,7 @@ Si tocó `sql/views/` → aplicar vistas en analytics DB (`./scripts/apply-bi-vi
 
 ## 🚨 Obligatoriedad: borrar rama tras merge
 
-**Tras un merge exitoso a `main`, la rama `feat/*` | `fix/*` | `hotfix/*` DEBE desaparecer:**
+**Tras un merge exitoso a `main`, la rama `feat/*` | `fix/*` | `hotfix/*` | `chore/*` DEBE desaparecer:**
 
 1. Local: `git branch -d <rama>` (lo hace `merge-safe.sh`)
 2. Gitea: `git push gitea --delete <rama>` (lo hace `merge-safe.sh`)
