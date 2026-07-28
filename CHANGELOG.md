@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [2026-07-28e] — Query IDs AL exactos en docs sync 004
+
+### Fixed
+
+- `ExpedienteMes` documentado como QRY**50229** (era `LoginCompany`); ID real
+  **50215** (`PS_ExpedienteMes`).
+- Tabla completa EntitySet ↔ Query AL del workflow 004 en
+  `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md` y `docs/GUIA_COMPLETA_ANALYTICS.md`.
+- Mapeo campos `ExpedienteMes` en `ANALYTICS_FACTURACION_PBI_ALIGNMENT.md`.
+
 ## [2026-07-28d] — Ámbito departamento (paridad PBI)
 
 ### Added

@@ -63,26 +63,28 @@ flowchart LR
 
 Todas prefijadas con `bc_` desde migración `20260627120001_rename_bc_tables_analytics.sql`.
 
-| Tabla | Origen BC (API 004) | Modo sync | Descripción |
-|-------|---------------------|-----------|-------------|
-| `bc_resource` | Recursos | Incremental | Empleados/recursos con email y departamento |
-| `bc_ps_year` | PS_Years | Full | Años fiscales PS |
-| `bc_job` | Proyectos | Incremental | Maestro proyectos |
-| `bc_job_team` | EquipoProyectos | Incremental | Equipo por proyecto |
-| `bc_job_task` | ProyectosTareas | Incremental | Tareas de proyecto |
-| `bc_responsibility_center` | CentrosDeResponsabilidad | Incremental | Centros de responsabilidad |
-| `bc_user_configuration` | ConfiguracionUsuarios | Incremental | Config usuarios BC |
-| `bc_technology` | Tecnologias | Incremental | Dimensión tecnología |
-| `bc_typology` | Tipologias | Incremental | Dimensión tipología |
-| `bc_department` | Departamentos | Incremental | Dimensión departamento |
-| `bc_job_ledger_entry_month` | MovimientosProyectosMes | Full | Movimientos reales agregados por mes |
-| `bc_job_planning_line` | PlanificacionMes | Full | Planificación por mes/línea |
-| `bc_expediente_mes` | ExpedienteMes | Full | Expedientes planificados |
-| `bc_meses_cerrados` | MesesCerrados | Full | Meses cerrados por proyecto |
-| `bc_objectives_by_department` | ObjectivesByDepartaments | Full | Objetivos anuales por dpto |
-| `bc_historico_planificacion_mes` | HistoricoPlanificacionMes | Full | Histórico planificación cerrada |
-| `bc_dias_imputacion` | DiasdeImputacion | Full | Calendario imputable |
-| `bc_job_ledger_entry` | *(legacy)* | — | **Vacía** — el sync usa `bc_job_ledger_entry_month` |
+| Tabla | Origen BC (API 004) | Query AL | Modo sync | Descripción |
+|-------|---------------------|----------|-----------|-------------|
+| `bc_resource` | Recursos | 50207 | Incremental | Empleados/recursos con email y departamento |
+| `bc_ps_year` | PS_Years | 50220 | Full | Años fiscales PS |
+| `bc_job` | Proyectos | 50206 | Incremental | Maestro proyectos |
+| `bc_job_team` | EquipoProyectos | 50204 | Incremental | Equipo por proyecto |
+| `bc_job_task` | ProyectosTareas | 50222 | Incremental | Tareas de proyecto |
+| `bc_responsibility_center` | CentrosDeResponsabilidad | 50200 | Incremental | Centros de responsabilidad |
+| `bc_user_configuration` | ConfiguracionUsuarios | 50202 | Incremental | Config usuarios BC |
+| `bc_technology` | Tecnologias | 50208 | Incremental | Dimensión tecnología |
+| `bc_typology` | Tipologias | 50209 | Incremental | Dimensión tipología |
+| `bc_department` | Departamentos | 50203 | Incremental | Dimensión departamento |
+| `bc_job_ledger_entry_month` | MovimientosProyectosMes | 50214 | Full | Movimientos reales agregados por mes |
+| `bc_job_planning_line` | PlanificacionMes | 50219 | Full | Planificación por mes/línea |
+| `bc_expediente_mes` | ExpedienteMes | **50215** | Full | Expedientes planificados (`PS_ExpedienteMes`) |
+| `bc_meses_cerrados` | MesesCerrados | 50217 | Full | Meses cerrados por proyecto |
+| `bc_objectives_by_department` | ObjectivesByDepartaments | 50218 | Full | Objetivos anuales por dpto |
+| `bc_historico_planificacion_mes` | HistoricoPlanificacionMes | 50221 | Full | Histórico planificación cerrada |
+| `bc_dias_imputacion` | DiasdeImputacion | 50212 | Full | Calendario imputable |
+| `bc_job_ledger_entry` | *(legacy)* | — | — | **Vacía** — el sync usa `bc_job_ledger_entry_month` |
+
+> IDs AL verificados en `Business-Central/src/Queries/` (2026-07-28). No confundir **50215** (`ExpedienteMes`) con **50229** (`LoginCompany`).
 
 **Tablas operativas (no BC):**
 
