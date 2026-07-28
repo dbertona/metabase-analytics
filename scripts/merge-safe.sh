@@ -12,7 +12,8 @@
 #   5. git checkout main (o merge delegado al worktree que tiene main)
 #   6. git merge <rama> --no-ff
 #   7. git push gitea main  (overrides DENTRO del script)
-#   8. Queda en main
+#   8. Borrar la rama mergeada (local + gitea + origin si existe)
+#   9. Queda en main
 #
 # Uso:
 #   ./scripts/merge-safe.sh                 # usa rama actual
@@ -22,6 +23,7 @@
 #   SKIP_VALIDATE=1  -> omite validacion JSON/SQL (solo docs/reglas triviales)
 #   DRY_RUN=1        -> no ejecuta merge ni push; solo valida
 #   QUIET=1          -> log de validaciones en <git-common-dir>/merge-safe-last.log
+#   KEEP_BRANCH=1    -> no borra la rama tras el merge (excepcion explicita)
 #
 # Alias de compatibilidad con la regla compartida Apps:
 #   SKIP_BUILD=1 / SKIP_CONSIST=1  -> tratados como SKIP_VALIDATE=1 (no-op npm)
@@ -93,6 +95,71 @@ merge_push_via_main_worktree() {
   unset ALLOW_PUSH
   unset ALLOW_MAIN_PUSH
   unset ALLOW_BYPASS_GUARD
+}
+
+# Obligatoria tras merge exitoso: borrar feat/fix/hotfix local + remotes.
+# No es "rama ajena": es la rama que este script acaba de fusionar en main.
+delete_merged_branch() {
+  local target_branch="$1"
+  local remote
+
+  case "$target_branch" in
+    main|master|"")
+      fail "Refusing to delete protected branch: '${target_branch}'"
+      ;;
+    feat/*|fix/*|hotfix/*) ;;
+    *)
+      warn "Nombre de rama inesperado ($target_branch); no borro automaticamente"
+      return 0
+      ;;
+  esac
+
+  if [ "${KEEP_BRANCH:-0}" = "1" ]; then
+    warn "KEEP_BRANCH=1 - se conserva $target_branch (local y remoto)"
+    return 0
+  fi
+
+  if ! git merge-base --is-ancestor "$target_branch" main 2>/dev/null \
+    && ! git merge-base --is-ancestor "$target_branch" gitea/main 2>/dev/null; then
+    warn "No borro $target_branch: no esta contenida en main tras el merge"
+    return 0
+  fi
+
+  log "Borrando rama mergeada: $target_branch (local + remotes)"
+
+  # Si seguimos en la feature (p.ej. worktree), salir a main antes de borrar.
+  if [ "$(git branch --show-current 2>/dev/null || true)" = "$target_branch" ]; then
+    if ! git checkout main 2>/dev/null; then
+      git fetch gitea main --quiet 2>/dev/null || true
+      git checkout -B main gitea/main 2>/dev/null || {
+        warn "No se pudo salir de $target_branch; remotes se borran, local pendiente"
+      }
+    fi
+  fi
+
+  if git show-ref --verify --quiet "refs/heads/$target_branch"; then
+    if [ "$(git branch --show-current 2>/dev/null || true)" = "$target_branch" ]; then
+      warn "Checkout sigue en $target_branch; no se borra local (borra a mano tras cambiar de rama)"
+    else
+      git branch -d "$target_branch" 2>/dev/null \
+        || git branch -D "$target_branch" \
+        || warn "No se pudo borrar local $target_branch"
+    fi
+  fi
+
+  export ALLOW_PUSH=1
+  for remote in gitea origin; do
+    if git remote get-url "$remote" >/dev/null 2>&1; then
+      if git ls-remote --exit-code --heads "$remote" "$target_branch" >/dev/null 2>&1; then
+        git push "$remote" --delete "$target_branch" \
+          && ok "Borrada $remote/$target_branch" \
+          || warn "Fallo al borrar $remote/$target_branch"
+      else
+        log "Sin $remote/$target_branch (ya ausente)"
+      fi
+    fi
+  done
+  unset ALLOW_PUSH
 }
 
 quiet_run() {
@@ -216,8 +283,9 @@ elif [ -n "$MAIN_WT" ]; then
   fi
   log "3/3 - merge --no-ff delegado de $TARGET_BRANCH a main"
   merge_push_via_main_worktree "$TARGET_BRANCH" "$MAIN_WT"
-  ok "Rama $TARGET_BRANCH mergeada a main y publicada (via $MAIN_WT)"
-  warn "Este worktree sigue en $TARGET_BRANCH. Actualiza checkout principal: git pull gitea main"
+  delete_merged_branch "$TARGET_BRANCH"
+  ok "Rama $TARGET_BRANCH mergeada a main, publicada y eliminada (via $MAIN_WT)"
+  warn "Si este worktree seguia en la feature, actualiza: git pull gitea main"
   exit 0
 else
   fail "No se pudo hacer checkout de main y no hay worktree con main. Ejecuta merge-safe desde el checkout principal."
@@ -246,4 +314,6 @@ unset ALLOW_MAIN_PUSH
 unset ALLOW_BYPASS_GUARD
 ok "push completado"
 
-ok "Rama $TARGET_BRANCH mergeada a main y publicada. Rama actual: main"
+delete_merged_branch "$TARGET_BRANCH"
+
+ok "Rama $TARGET_BRANCH mergeada a main, publicada y eliminada. Rama actual: $(git branch --show-current)"

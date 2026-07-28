@@ -59,7 +59,9 @@ QUIET=1 ./scripts/merge-safe.sh
 QUIET=1 ./scripts/merge-safe.sh fix/mi-rama
 ```
 
-Tras el merge el checkout queda en `main`. No volver a la rama de feature.
+Tras el merge el checkout queda en `main`. **La rama feature se borra automáticamente** (local + `gitea` + `origin` si existe). No volver a la rama de feature.
+
+Excepción rara: `KEEP_BRANCH=1 ./scripts/merge-safe.sh` (solo si el usuario lo pide explícitamente).
 
 ### 5. Post-merge (runtime)
 
@@ -70,12 +72,29 @@ Si tocó `sql/views/` → aplicar vistas en analytics DB (`./scripts/apply-bi-vi
 ### 6. Reportar
 
 ```
-✅ Rama cerrada: <rama>
+✅ Rama cerrada y borrada: <rama>
 📝 Documentado: CHANGELOG + <otros docs>
 🔀 Merge: <hash corto>
 📂 Rama actual: main
+🗑️ Remotes: gitea (+ origin si aplica) sin <rama>
 ⭐ Post-merge: <n8n / SQL / nada>
 ```
+
+---
+
+## 🚨 Obligatoriedad: borrar rama tras merge
+
+**Tras un merge exitoso a `main`, la rama `feat/*` | `fix/*` | `hotfix/*` DEBE desaparecer:**
+
+1. Local: `git branch -d <rama>` (lo hace `merge-safe.sh`)
+2. Gitea: `git push gitea --delete <rama>` (lo hace `merge-safe.sh`)
+3. Origin/GitHub (si el remote existe): `git push origin --delete <rama>` (lo hace `merge-safe.sh`)
+
+**⛔ Prohibido** declarar «rama cerrada» si la feature sigue viva en local o remoto (salvo `KEEP_BRANCH=1` pedido por el usuario).
+
+Si el merge se hizo a mano (sin script): el agente **debe** borrar igual al terminar, antes de reportar.
+
+**No confundir** con «borrar ramas ajenas» (`sync-gitea-before-code.mdc`): eso prohíbe borrar trabajo de otros. **Sí** se borra la rama que **este** merge acaba de fusionar.
 
 ---
 
@@ -84,4 +103,5 @@ Si tocó `sql/views/` → aplicar vistas en analytics DB (`./scripts/apply-bi-vi
 - Validación JSON falla → **DETENER**, corregir en la rama, no mergear.
 - Errores críticos → `never-ignore-without-approval.mdc` antes de `--no-verify`.
 
-**Última actualización:** 2026-07-25
+**Última actualización:** 2026-07-28
+**Motivo:** Tras merge, borrar siempre la rama local y remota (evita ramas residuales).
