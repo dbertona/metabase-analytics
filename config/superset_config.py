@@ -141,9 +141,21 @@ class PsAppInitializer(SupersetAppInitializer):
                 session["locale"] = "es"
 
         self._register_ps_simulation_routes()
+        self._ensure_ps_testing_role()
+
+    def _ensure_ps_testing_role(self) -> None:
+        """Crea el rol PS_Testing si no existe (flag para combo simulación)."""
+        try:
+            sm = self.superset_app.appbuilder.sm
+            if sm.find_role("PS_Testing"):
+                return
+            sm.add_role("PS_Testing")
+            logger.info("PS: rol PS_Testing creado (simulación de usuario)")
+        except Exception:
+            logger.exception("PS: no se pudo crear el rol PS_Testing")
 
     def _register_ps_simulation_routes(self) -> None:
-        """API para combo simular usuario (solo Admin/Alpha; no filtra datos)."""
+        """API para combo simular usuario (Admin/Alpha/PS_Testing; no filtra datos)."""
         from flask import current_app, g, jsonify, request
         from flask_login import current_user
 
@@ -178,7 +190,7 @@ class PsAppInitializer(SupersetAppInitializer):
             if not user:
                 return False
             roles = {getattr(r, "name", "") for r in (getattr(user, "roles", None) or [])}
-            return bool(roles & {"Admin", "Alpha"})
+            return bool(roles & PS_SIMULATION_ROLES)
 
         @app.get("/api/v1/ps/resources")
         def ps_list_resources_for_simulation():  # type: ignore[no-untyped-def]
@@ -197,8 +209,10 @@ class PsAppInitializer(SupersetAppInitializer):
                 }
             )
 
-        logger.info("PS: ruta /api/v1/ps/resources (simulación Admin/Alpha) registrada")
-
+        logger.info(
+            "PS: ruta /api/v1/ps/resources (simulación %s) registrada",
+            ",".join(sorted(PS_SIMULATION_ROLES)),
+        )
 
 APP_INITIALIZER = PsAppInitializer
 
@@ -217,8 +231,9 @@ SESSION_COOKIE_PATH = "/"
 REMEMBER_COOKIE_SECURE = True
 REMEMBER_COOKIE_PATH = "/"
 
-# Analytics DB (misma red Docker: supabase-db) — lookup bc_resource
-PS_ANALYTICS_HOST = os.environ.get("PS_ANALYTICS_HOST", "supabase-db").strip()
+# Roles que pueden usar el combo de simulación de usuario (solo identidad visual).
+PS_SIMULATION_ROLES = frozenset({"Admin", "Alpha", "PS_Testing"})
+
 PS_ANALYTICS_PORT = int(os.environ.get("PS_ANALYTICS_PORT", "5432"))
 PS_ANALYTICS_DB = os.environ.get("PS_ANALYTICS_DB", "postgres").strip()
 PS_ANALYTICS_USER = os.environ.get("PS_ANALYTICS_USER", "postgres").strip()

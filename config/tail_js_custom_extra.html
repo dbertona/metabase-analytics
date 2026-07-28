@@ -2180,13 +2180,13 @@
     root.appendChild(wrap);
     document.body.appendChild(root);
     console.log(
-      "[PS] Combo simulación listo (" + resources.length + " recursos, Admin/Alpha)"
+      "[PS] Combo simulación listo (" + resources.length + " recursos, Admin/Alpha/PS_Testing)"
     );
   }
 
   async function initUserSimulator() {
     // /api/v1/me/ no incluye roles → la autorización la decide /ps/resources
-    // (Admin/Alpha → 200; Viewer → 403; anónimo → 401).
+    // (Admin/Alpha/PS_Testing → 200; Viewer → 403; anónimo → 401).
     var me = await fetchMe();
     if (!me) return;
     try {

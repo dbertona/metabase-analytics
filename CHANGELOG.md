@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-28b] — Rol PS_Testing para combo simulación
+
+### Added
+
+- Rol Superset `PS_Testing`: permite el combo de simulación de usuario sin
+  ser Admin/Alpha (mismo patrón que Testing en Apps).
+- Se crea solo al arrancar si no existe; asignado a `dbertona@powersolution.es`.
+
 ## [2026-07-28a] — Combo simular usuario (Admin/Alpha)
 
 ### Added
