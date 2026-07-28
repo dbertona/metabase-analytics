@@ -140,6 +140,110 @@ class PsAppInitializer(SupersetAppInitializer):
             if session.get("locale") != "es":
                 session["locale"] = "es"
 
+        self._register_ps_simulation_routes()
+        self._ensure_ps_testing_role()
+
+    def _ensure_ps_testing_role(self) -> None:
+        """Crea el rol PS_Testing si no existe (flag para combo simulación)."""
+        try:
+            app = self.superset_app
+            with app.app_context():
+                sm = app.appbuilder.sm
+                if sm.find_role("PS_Testing"):
+                    return
+                sm.add_role("PS_Testing")
+                logger.info("PS: rol PS_Testing creado (simulación de usuario)")
+        except Exception:
+            logger.exception("PS: no se pudo crear el rol PS_Testing")
+
+    def _register_ps_simulation_routes(self) -> None:
+        """APIs PS: simulación (Admin/Alpha/PS_Testing) + ámbito departamento (todos)."""
+        from flask import current_app, g, jsonify, request
+        from flask_login import current_user
+
+        app = self.superset_app
+
+        def _resolve_user() -> Any:
+            """Usuario de sesión cookie o JWT Bearer (como APIs nativas)."""
+            if current_user and getattr(current_user, "is_authenticated", False):
+                return current_user
+            gu = getattr(g, "user", None)
+            if gu and getattr(gu, "is_authenticated", False):
+                return gu
+            auth = request.headers.get("Authorization") or ""
+            if not auth.startswith("Bearer "):
+                return None
+            try:
+                from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
+
+                verify_jwt_in_request(optional=False)
+                identity = get_jwt_identity()
+                if identity is None:
+                    return None
+                user = current_app.appbuilder.sm.load_user(identity)
+                if user and getattr(user, "is_active", True):
+                    g.user = user
+                    return user
+            except Exception:
+                logger.debug("PS resources: JWT no válido", exc_info=True)
+            return None
+
+        def _can_simulate(user: Any) -> bool:
+            if not user:
+                return False
+            roles = {getattr(r, "name", "") for r in (getattr(user, "roles", None) or [])}
+            return bool(roles & PS_SIMULATION_ROLES)
+
+        def _user_email(user: Any) -> str:
+            return (
+                (getattr(user, "email", None) or getattr(user, "username", None) or "")
+                .strip()
+                .lower()
+            )
+
+        @app.get("/api/v1/ps/resources")
+        def ps_list_resources_for_simulation():  # type: ignore[no-untyped-def]
+            # JSON 401 (no @login_required): evita BuildError del redirect a 'login'
+            user = _resolve_user()
+            if not user:
+                return jsonify({"message": "Unauthorized", "can_simulate": False}), 401
+            if not _can_simulate(user):
+                return jsonify({"message": "Forbidden", "can_simulate": False}), 403
+            resources = list_resources_for_simulation()
+            return jsonify(
+                {
+                    "result": resources,
+                    "count": len(resources),
+                    "can_simulate": True,
+                }
+            )
+
+        @app.get("/api/v1/ps/user-scope")
+        def ps_user_department_scope():  # type: ignore[no-untyped-def]
+            """Ámbito de departamento (paridad PBI: vacío/999 = ver todo)."""
+            user = _resolve_user()
+            if not user:
+                return jsonify({"message": "Unauthorized"}), 401
+
+            real_email = _user_email(user)
+            requested = (request.args.get("email") or "").strip().lower()
+            effective = requested or real_email
+            if not effective or "@" not in effective:
+                return jsonify({"message": "Email inválido"}), 400
+
+            # Simular otro email solo con rol de simulación
+            if requested and requested != real_email and not _can_simulate(user):
+                return jsonify({"message": "Forbidden", "can_simulate": False}), 403
+
+            scope = resolve_department_scope(effective)
+            scope["real_email"] = real_email
+            scope["simulated"] = bool(requested and requested != real_email)
+            return jsonify({"result": scope})
+
+        logger.info(
+            "PS: rutas /api/v1/ps/resources + /api/v1/ps/user-scope (%s)",
+            ",".join(sorted(PS_SIMULATION_ROLES)),
+        )
 
 APP_INITIALIZER = PsAppInitializer
 
@@ -158,6 +262,9 @@ SESSION_COOKIE_PATH = "/"
 REMEMBER_COOKIE_SECURE = True
 REMEMBER_COOKIE_PATH = "/"
 
+# Roles que pueden usar el combo de simulación (identidad + ámbito departamento).
+PS_SIMULATION_ROLES = frozenset({"Admin", "Alpha", "PS_Testing"})
+
 # Analytics DB (misma red Docker: supabase-db) — lookup bc_resource
 PS_ANALYTICS_HOST = os.environ.get("PS_ANALYTICS_HOST", "supabase-db").strip()
 PS_ANALYTICS_PORT = int(os.environ.get("PS_ANALYTICS_PORT", "5432"))
@@ -168,20 +275,25 @@ PS_ANALYTICS_PASSWORD = os.environ.get(
 ).strip()
 
 
+def _analytics_connect():
+    """Conexión corta a Analytics DB (bc_resource)."""
+    return psycopg2.connect(
+        host=PS_ANALYTICS_HOST,
+        port=PS_ANALYTICS_PORT,
+        dbname=PS_ANALYTICS_DB,
+        user=PS_ANALYTICS_USER,
+        password=PS_ANALYTICS_PASSWORD,
+        connect_timeout=5,
+    )
+
+
 def lookup_resource_name(email: str) -> str | None:
     """Nombre completo en bc_resource por email (como Timesheet)."""
     email = (email or "").strip().lower()
     if not email or "@" not in email:
         return None
     try:
-        with psycopg2.connect(
-            host=PS_ANALYTICS_HOST,
-            port=PS_ANALYTICS_PORT,
-            dbname=PS_ANALYTICS_DB,
-            user=PS_ANALYTICS_USER,
-            password=PS_ANALYTICS_PASSWORD,
-            connect_timeout=5,
-        ) as conn:
+        with _analytics_connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -200,6 +312,87 @@ def lookup_resource_name(email: str) -> str | None:
     except Exception:
         logger.exception("No se pudo leer bc_resource para email=%s", email)
     return None
+
+
+def list_resources_for_simulation() -> list[dict[str, str]]:
+    """Recursos activos con email (misma lógica que UserSimulatorSelector en Apps)."""
+    try:
+        with _analytics_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT code, name, email
+                    FROM public.bc_resource
+                    WHERE email IS NOT NULL
+                      AND trim(email) <> ''
+                      AND fecha_de_baja IS NULL
+                      AND code NOT LIKE %s
+                    ORDER BY name NULLS LAST, email
+                    """,
+                    ("REC.%",),
+                )
+                rows = cur.fetchall()
+    except Exception:
+        logger.exception("No se pudo listar bc_resource para simulación")
+        return []
+
+    seen: set[str] = set()
+    out: list[dict[str, str]] = []
+    for code, name, email in rows:
+        email_n = (email or "").strip().lower()
+        if not email_n or email_n in seen:
+            continue
+        seen.add(email_n)
+        out.append(
+            {
+                "code": str(code or "").strip(),
+                "name": str(name or "").strip() or email_n,
+                "email": email_n,
+            }
+        )
+    return out
+
+
+def lookup_user_departamento(email: str) -> str:
+    """Departamento en bc_user_configuration por email (preferir valor no vacío)."""
+    email = (email or "").strip().lower()
+    if not email or "@" not in email:
+        return ""
+    try:
+        with _analytics_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT trim(departamento)
+                    FROM public.bc_user_configuration
+                    WHERE lower(trim(email)) = %s
+                      AND coalesce(trim(departamento), '') <> ''
+                    ORDER BY company_name
+                    LIMIT 1
+                    """,
+                    (email,),
+                )
+                row = cur.fetchone()
+                if row and row[0]:
+                    return str(row[0]).strip()
+    except Exception:
+        logger.exception(
+            "No se pudo leer bc_user_configuration.departamento para email=%s", email
+        )
+    return ""
+
+
+def resolve_department_scope(email: str) -> dict[str, Any]:
+    """Paridad PBI: vacío o '999' → ver todos los departamentos."""
+    email_n = (email or "").strip().lower()
+    dept = lookup_user_departamento(email_n)
+    see_all = dept == "" or dept == "999"
+    return {
+        "email": email_n,
+        "departamento": dept or None,
+        "see_all": see_all,
+        "department_code": None if see_all else dept,
+    }
 
 
 def split_resource_display_name(full_name: str, email: str) -> tuple[str, str]:

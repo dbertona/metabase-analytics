@@ -1,5 +1,158 @@
 # Changelog — superset-analytics
 
+## [Unreleased]
+
+## [2026-07-28] — Cierre rama `feat/simular-usuario-recursos`
+
+### Summary
+- Combo Admin/Alpha/PS_Testing para simular usuario; ámbito departamento por usuario.
+- Dashboard chrome: navbar oculta, simulación en cabecera, botón Salir.
+- Banda KPI/Prob compacta, max-width 1440 ultrawide, tipografía y espaciados afinados.
+- Probabilidad: chart llena el card; altura sync UI (26); separación 12px vs tablas.
+- Docs Query IDs AL del workflow 004 (ExpedienteMes QRY50215).
+
+## [2026-07-28r] — Separación KPI ↔ tablas + sync Prob 26
+
+### Changed
+- Pull UI: Probabilidad height **28→26** (edit manual) incorporado al script.
+- Margen superior **12px** en la fila Resumen/Proyectos (menos “pegado” a KPIs).
+
+## [2026-07-28q] — KPI: menos hueco + etiquetas sin recorte
+
+### Fixed
+- Headers Objetivos/Planificación: height **3→2** (menos espacio vacío bajo el título).
+- Cards KPI: height **7→8**, padding más bajo; etiquetas **11px** (1.077em recortaba).
+- CSS: overflow visible en subheader + line-height compacto.
+
+## [2026-07-28p] — KPI: etiquetas = fuente tablas
+
+### Changed
+- Etiquetas FACTURACIÓN/MARGEN/Δ%/BENEFICIO: **1.077em** (igual que celdas AG Grid
+  Resumen/Proyectos). Números KPI sin cambio.
+
+## [2026-07-28o] — Probabilidad: fuente −10%
+
+### Changed
+- Tipografía ECharts Probabilidad: factor **0.715 → 0.6435** (−10%).
+- Sin regenerar layout (pull: divergencias solo de alias de nombres KPI).
+
+## [2026-07-28n] — Probabilidad: chart llena el card
+
+### Changed
+- Pull UI previo: sin divergencias vs previous; altura Probabilidad **28** (sync script).
+- ECharts `grid` más ajustado + CSS flex/`height:100%` para ocupar el contenedor.
+- Margen inferior ~10px (padding + `grid.bottom`).
+
+## [2026-07-28m] — KPI: etiquetas +15%
+
+### Changed
+- Solo títulos bajo el valor (FACTURACIÓN, MARGEN, Δ %, BENEFICIO): **8px → 9.2px**.
+- Números KPI sin cambio (euros 14px / % 11px).
+
+## [2026-07-28l] — Dashboard max-width 1440 (ultrawide)
+
+### Changed
+- Contenido del dashboard (header + grid) con `max-width: 1440px` centrado.
+  En pantallas ≤1440 sigue al 100%; en ultrawide evita estirar tablas/KPI.
+  Panel de filtros nativos queda fuera del techo (columna hermana).
+
+## [2026-07-28k] — Probabilidad: fuente +10%
+
+### Changed
+- Tipografía ECharts de Facturación por Probabilidad: factor **0.65 → 0.715** (+10%).
+- Título del chart Probabilidad: **12px → 13px**.
+
+## [2026-07-28j] — Compactar banda KPI+Prob ~−35%
+
+### Changed
+- Layout superior: KPI height **10→7**, headers **4→3** (`SMALL_HEADER`), Probabilidad **34→22**.
+- Tipografía KPI: euros **14px**, % **11px**, etiquetas **8px**; `header_font_size` 0.58 / subheader 0.4.
+- Títulos de sección Objetivos/Planificación **12px**; título Probabilidad **12px**.
+- `tail_js`: fuentes ECharts de Probabilidad a ~65% del tamaño de tablas.
+
+## [2026-07-28i] — Probabilidad height 34 desde UI
+
+### Changed
+
+- Layout `Facturación por Probabilidad`: height **34** (pull UI Superset;
+  antes 28 en script). Así no se pierde al regenerar el dashboard.
+
+## [2026-07-28h] — Edición UI: resize KPIs/Probabilidad + Salir
+
+### Fixed
+
+- En **modo edición**, CSS deja visible el asa de resize (`react-resizable-handle`)
+  en KPIs y Probabilidad (`overflow: visible`, z-index alto; drop zones del COLUMN
+  no roban el ratón). Antes solo redimensionaban las tablas de abajo.
+- En edición se muestra el menú ⋮ también en KPIs (Editar chart).
+- Botón **Salir** en la cabecera del dashboard (navbar global oculta).
+
+## [2026-07-28g] — Probabilidad: menos alto de card
+
+### Changed
+
+- Layout `Facturación por Probabilidad`: height **36 → 28** (alineado al alto de
+  Objetivos + Planificación Actual; elimina el hueco blanco bajo el eje).
+
+## [2026-07-28f] — Dashboard sin navbar + combo en cabecera
+
+### Changed
+
+- En rutas de dashboard se oculta la navbar global de Superset (logo / Paneles /
+  idioma / Ajustes) — modo informe.
+- El combo 🧪 de simulación de usuario se monta en la cabecera del dashboard
+  (junto a usuario / «hace …»), no fixed sobre la navbar.
+
+## [2026-07-28e] — Query IDs AL exactos en docs sync 004
+
+### Fixed
+
+- `ExpedienteMes` documentado como QRY**50229** (era `LoginCompany`); ID real
+  **50215** (`PS_ExpedienteMes`).
+- Tabla completa EntitySet ↔ Query AL del workflow 004 en
+  `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md` y `docs/GUIA_COMPLETA_ANALYTICS.md`.
+- Mapeo campos `ExpedienteMes` en `ANALYTICS_FACTURACION_PBI_ALIGNMENT.md`.
+
+## [2026-07-28d] — Ámbito departamento (paridad PBI)
+
+### Added
+
+- API `GET /api/v1/ps/user-scope`: email efectivo → `bc_user_configuration.departamento`.
+  Vacío o `999` = ver todos los departamentos; otro valor fuerza filtro nativo
+  `NATIVE_FILTER-DEPT` (`department_code`).
+- Al cargar el dashboard (y al cambiar el combo de simulación) se aplica el ámbito
+  vía `native_filters` en la URL; banner informativo si hay departamento forzado.
+
+### Changed
+
+- La simulación de usuario ya no es solo identidad visual: el email simulado
+  determina el ámbito de departamento (requiere Admin/Alpha/PS_Testing).
+
+## [2026-07-28c] — Fix sync Departamento en ConfiguracionUsuarios
+
+### Fixed
+
+- Transform 004 leía solo `r.Departamento`; la API BC devuelve `departamento`
+  (camelCase) → `bc_user_configuration.departamento` quedaba vacío.
+- `$select` alineado a `departamento`; Transform acepta ambos casings.
+
+## [2026-07-28b] — Rol PS_Testing para combo simulación
+
+### Added
+
+- Rol Superset `PS_Testing`: permite el combo de simulación de usuario sin
+  ser Admin/Alpha (mismo patrón que Testing en Apps).
+- Se crea solo al arrancar si no existe; asignado a `dbertona@powersolution.es`.
+
+## [2026-07-28a] — Combo simular usuario (Admin/Alpha)
+
+### Added
+
+- Combo de recursos (como Apps) para simular el usuario mostrado en la barra.
+  Solo **Admin/Alpha**; cambia el nombre visual, **no filtra** datos del dashboard.
+- API `GET /api/v1/ps/resources` (bc_resource activos con email).
+- Persistencia en `localStorage` (`psSimulatedUserEmail`).
+
 ## [2026-07-28] — Cierre rama `fix/scroll-horizontal-ag-grid`
 
 ### Fixed

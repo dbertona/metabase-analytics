@@ -24,6 +24,21 @@ Detalle: [`exports/superset-dashboard/README.md`](../exports/superset-dashboard/
 
 ---
 
+## Ancho en pantallas ultrawide
+
+El grid de Superset es fluido (100 % del viewport). En monitores ultrawide eso
+estiraba KPI/tablas de forma poco legible.
+
+**Solución (2026-07-28):** `max-width: 1440px` centrado en header + contenido
+(`--ps-dash-max-width` en `dashboard_css` del setup). En laptops ≤1440 px el
+layout sigue usando el 100 % del ancho disponible. El panel de filtros no entra
+en ese techo (sigue en su columna).
+
+Comparable a PBI en espíritu (lienzo acotado), pero adaptativo hacia abajo
+(sin `transform: scale`).
+
+---
+
 ## Diseño (Superset 6.1.0)
 
 ### Layout superior (KPI + Probabilidad)
@@ -31,11 +46,15 @@ Detalle: [`exports/superset-dashboard/README.md`](../exports/superset-dashboard/
 ```text
 ROW-KPI-BAND
 ├── COLUMN-KPIS (width 6) — Facturación/Beneficio=2, Margen/Crecimiento=1
-└── Facturación por Probabilidad (width 6, height ≈ alto de las dos bandas KPI)
+└── Facturación por Probabilidad (width 6, height **26** — sync UI 2026-07-28)
 ```
 
-Debajo: Resumen mensual (ancho 12) · Evolución + Margen (6+6).
-
+Debajo: separación ~12px · Resumen mensual + Proyectos.
+| Pieza | Alturas layout (grid units) | Notas |
+|-------|----------------------------|-------|
+| KPI cards Obj/Plan | height **8** | Etiquetas 11px sin recorte |
+| Headers Objetivos / Planificación | height **2**, `SMALL_HEADER` | Menos hueco bajo el título |
+| Facturación por Probabilidad | height **26** | Sync UI pull 2026-07-28 |
 | Pieza | Dataset | Motivo |
 |-------|---------|--------|
 | 8 tarjetas KPI (Obj/Plan) | `bi_v_planificacion_kpi` | Tiene `department_code` + `facturacion_real_anterior` → filtro Departamento y Crecimiento |

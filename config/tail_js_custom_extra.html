@@ -1608,6 +1608,15 @@
       inst.setOption(
         {
           textStyle: labelStyle,
+          /* Llenar el card: márgenes mínimos; containLabel reserva ejes/valores.
+             bottom un poco mayor = margen inferior pedido. */
+          grid: {
+            left: 4,
+            right: 8,
+            top: 2,
+            bottom: 10,
+            containLabel: true,
+          },
           // Valor (importes) en horizontal → xAxis
           xAxis: [
             {
@@ -1647,6 +1656,11 @@
         },
         false
       );
+      try {
+        if (typeof inst.resize === "function") inst.resize();
+      } catch (eResize) {
+        /* ignore */
+      }
       inst.__psProbFmt = fontPx;
     } catch (err) {
       /* remount */
@@ -1654,7 +1668,8 @@
   }
 
   function bumpProbabilidadChartFonts() {
-    var fontPx = getTableFontPx();
+    /* Probabilidad: −10% vs 0.715 → 0.6435 */
+    var fontPx = Math.max(9, Math.round(getTableFontPx() * 0.6435));
     var roots = document.querySelectorAll(
       '[data-test-chart-name*="Facturación por Probabilidad"]'
     );
@@ -1907,18 +1922,246 @@
     );
   }
 
-  async function fetchLoggedUserName() {
+  // ─── Chrome dashboard: ocultar navbar global (modo informe) ─────────────
+  var PS_DASH_CHROME_STYLE_ID = "ps-dashboard-chrome-style";
+  var PS_DASH_CHROME_CLASS = "ps-dashboard-chrome";
+
+  function ensureDashboardChromeStyles() {
+    if (document.getElementById(PS_DASH_CHROME_STYLE_ID)) return;
+    var style = document.createElement("style");
+    style.id = PS_DASH_CHROME_STYLE_ID;
+    style.textContent =
+      /* Solo menú global; NO tocar cabecera del dashboard */
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " > #app > header," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " #app > div > header.top," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " header.top:not(.dashboard-header)," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " .navbar," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " nav.navbar," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " #main-menu," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " [data-test='menu']," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " .main-nav," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " .ant-layout-header:has([data-test='menu'])," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " .ant-layout-header:has(.navbar)," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " .ant-layout-header:has(a[href*='superset/welcome'])," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " .ant-layout-header:has(.menu){" +
+      "display:none!important;height:0!important;min-height:0!important;" +
+      "overflow:hidden!important;padding:0!important;margin:0!important;" +
+      "border:none!important;" +
+      "}" +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " #app," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " .app," +
+      "body." +
+      PS_DASH_CHROME_CLASS +
+      " .dashboard{" +
+      "padding-top:0!important;" +
+      "}" +
+      "#ps-dash-sim-host{" +
+      "display:inline-flex;align-items:center;gap:6px;margin-right:8px;flex-shrink:0;" +
+      "}" +
+      "#ps-dash-logout{" +
+      "display:inline-flex;align-items:center;padding:2px 8px;margin-left:4px;" +
+      "font-size:12px;color:#334155;background:#f1f5f9;border:1px solid #cbd5e1;" +
+      "border-radius:4px;text-decoration:none;white-space:nowrap;" +
+      "}" +
+      "#ps-dash-logout:hover{background:#e2e8f0;color:#0f172a;}" +
+      /* En edición: mostrar navbar global (Ajustes / logout) */
+      "body.ps-dashboard-editing." +
+      PS_DASH_CHROME_CLASS +
+      " [data-ps-hidden-nav='1']{" +
+      "display:revert!important;height:auto!important;min-height:unset!important;" +
+      "overflow:visible!important;padding:unset!important;margin:unset!important;" +
+      "}";
+    document.head.appendChild(style);
+  }
+
+  function isDashboardEditing() {
+    return !!(
+      document.querySelector(".dashboard--editing") ||
+      document.querySelector('[data-test="dashboard-edit-mode"]') ||
+      /([?&]edit=true|edit_mode=true)/i.test(window.location.search + window.location.hash)
+    );
+  }
+
+  function ensureLogoutControl() {
+    if (!isDashboardPage()) return;
+    var existing = document.getElementById("ps-dash-logout");
+    if (existing) return;
+    var a = document.createElement("a");
+    a.id = "ps-dash-logout";
+    a.href = appRoot() + "/logout/";
+    a.textContent = "Salir";
+    a.title = "Cerrar sesión";
+    var host = document.getElementById(PS_SIM_HOST_ID);
+    if (host) {
+      host.appendChild(a);
+      return;
+    }
+    // Fallback: cabecera del dashboard
+    var header =
+      document.querySelector('[data-test="dashboard-header"]') ||
+      document.querySelector(".dashboard-header");
+    if (header) header.appendChild(a);
+    else document.body.appendChild(a);
+  }
+
+  function hideGlobalNavbarByScan() {
+    if (!isDashboardPage() || isDashboardEditing()) return;
+    var candidates = document.querySelectorAll(
+      "header, nav, .ant-layout-header, [role='banner']"
+    );
+    Array.prototype.forEach.call(candidates, function (el) {
+      if (el.getAttribute("data-ps-hidden-nav") === "1") return;
+      // No tocar la cabecera del propio dashboard
+      if (
+        el.getAttribute("data-test") === "dashboard-header" ||
+        (el.className &&
+          String(el.className).indexOf("dashboard-header") !== -1) ||
+        el.querySelector('[data-test="dashboard-header"]')
+      ) {
+        return;
+      }
+      var t = (el.textContent || "").replace(/\s+/g, " ");
+      var looksGlobal =
+        (/Paneles de control|Dashboards/i.test(t) ||
+          /\/superset\/welcome|Superset/i.test(t)) &&
+        (/Ajustes|Settings|Settings/i.test(t) ||
+          /idioma|language|Ctrl\+k|Ctrl\+K/i.test(t));
+      if (!looksGlobal) return;
+      el.style.setProperty("display", "none", "important");
+      el.style.setProperty("height", "0", "important");
+      el.setAttribute("data-ps-hidden-nav", "1");
+    });
+  }
+
+  function applyDashboardChromeMode() {
+    if (!isDashboardPage()) {
+      document.body.classList.remove(PS_DASH_CHROME_CLASS);
+      document.body.classList.remove("ps-dashboard-editing");
+      return;
+    }
+    ensureDashboardChromeStyles();
+    var editing = isDashboardEditing();
+    document.body.classList.toggle("ps-dashboard-editing", editing);
+    if (editing) {
+      // Mostrar navbar para Ajustes / Cerrar sesión
+      document.body.classList.remove(PS_DASH_CHROME_CLASS);
+      document.querySelectorAll('[data-ps-hidden-nav="1"]').forEach(function (el) {
+        el.style.removeProperty("display");
+        el.style.removeProperty("height");
+        el.removeAttribute("data-ps-hidden-nav");
+      });
+    } else {
+      document.body.classList.add(PS_DASH_CHROME_CLASS);
+      hideGlobalNavbarByScan();
+    }
+    ensureLogoutControl();
+    setTimeout(publishDashboardViewportVars, 50);
+    setTimeout(publishDashboardViewportVars, 400);
+  }
+
+  // Reaplicar chrome al entrar/salir de edición (SPA)
+  setInterval(function () {
+    if (!isDashboardPage()) return;
+    var editing = isDashboardEditing();
+    var marked = document.body.classList.contains("ps-dashboard-editing");
+    if (editing !== marked) applyDashboardChromeMode();
+    else if (!editing) ensureLogoutControl();
+  }, 800);
+
+  // ─── Simulación de usuario (Admin/Alpha) — solo identidad visual ─────────
+  var PS_SIM_STORAGE_KEY = "psSimulatedUserEmail";
+  var PS_SIM_MOUNT_ID = "ps-user-simulator";
+  var PS_SIM_HOST_ID = "ps-dash-sim-host";
+
+  function formatBcDisplayName(bcName, email) {
+    var full = (bcName || "").trim();
+    if (!full) return (email || "").split("@")[0] || "usuario";
+    if (full.indexOf(",") !== -1) {
+      var parts = full.split(",");
+      var last = parts[0].trim();
+      var first = parts.slice(1).join(",").trim();
+      if (first) return (first + " " + last).trim();
+    }
+    return full;
+  }
+
+  function readSimulatedEmail() {
+    try {
+      return (localStorage.getItem(PS_SIM_STORAGE_KEY) || "").trim().toLowerCase();
+    } catch (err) {
+      return "";
+    }
+  }
+
+  function writeSimulatedEmail(email) {
+    try {
+      if (email) localStorage.setItem(PS_SIM_STORAGE_KEY, email);
+      else localStorage.removeItem(PS_SIM_STORAGE_KEY);
+    } catch (err) {
+      /* ignore */
+    }
+  }
+
+  function setSimulatedUserState(email, name) {
+    var emailN = (email || "").trim().toLowerCase();
+    if (emailN) {
+      window.__PS_SIMULATED_USER__ = {
+        email: emailN,
+        name: name || emailN,
+      };
+      writeSimulatedEmail(emailN);
+    } else {
+      window.__PS_SIMULATED_USER__ = null;
+      writeSimulatedEmail("");
+    }
+  }
+
+  async function fetchMe() {
     try {
       var res = await fetch(appRoot() + "/api/v1/me/", { credentials: "include" });
       if (!res.ok) return null;
       var payload = await res.json();
-      var me = payload && payload.result ? payload.result : payload;
-      if (!me) return null;
-      var full = [me.first_name || "", me.last_name || ""].join(" ").trim();
-      return full || me.username || me.email || null;
+      return payload && payload.result ? payload.result : payload;
     } catch (err) {
       return null;
     }
+  }
+
+  async function fetchLoggedUserName() {
+    var sim = window.__PS_SIMULATED_USER__;
+    if (sim && sim.name) return formatBcDisplayName(sim.name, sim.email);
+    var me = await fetchMe();
+    if (!me) return null;
+    var full = [me.first_name || "", me.last_name || ""].join(" ").trim();
+    return full || me.username || me.email || null;
   }
 
   function replaceOwnerWithLoggedUser(displayName) {
@@ -1949,16 +2192,443 @@
     return true;
   }
 
-  async function runPatch() {
-    var name = await fetchLoggedUserName();
-    if (!name) return;
-    var tries = 0;
-    var timer = setInterval(function () {
-      tries += 1;
-      if (replaceOwnerWithLoggedUser(name) || tries > 25) {
-        clearInterval(timer);
+  function refreshDisplayedUserName() {
+    fetchLoggedUserName().then(function (name) {
+      if (!name) return;
+      var tries = 0;
+      var timer = setInterval(function () {
+        tries += 1;
+        if (replaceOwnerWithLoggedUser(name) || tries > 25) {
+          clearInterval(timer);
+        }
+      }, 400);
+    });
+  }
+
+  function ensureSimulatorStyles() {
+    var style = document.getElementById("ps-user-simulator-style");
+    if (style) style.remove();
+    style = document.createElement("style");
+    style.id = "ps-user-simulator-style";
+    style.textContent =
+      "#" +
+      PS_SIM_MOUNT_ID +
+      "{" +
+      "position:relative;top:auto;right:auto;z-index:20;" +
+      "display:inline-flex;align-items:center;gap:6px;padding:2px 8px;" +
+      "background:#fff3cd;border:1px solid #ffc107;border-radius:4px;" +
+      "font-size:12px;color:#856404;box-shadow:none;max-width:min(320px,42vw);" +
+      "}" +
+      "#" +
+      PS_SIM_MOUNT_ID +
+      " input{padding:2px 6px;border:1px solid #ccc;border-radius:4px;" +
+      "font-size:12px;width:180px;max-width:28vw;box-sizing:border-box;background:#fff;}" +
+      "#" +
+      PS_SIM_MOUNT_ID +
+      " .ps-sim-list{position:absolute;top:100%;left:0;right:0;min-width:220px;" +
+      "max-height:220px;overflow:auto;background:#fff;border:1px solid #ccc;" +
+      "border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.15);z-index:2200;}" +
+      "#" +
+      PS_SIM_MOUNT_ID +
+      " .ps-sim-item{padding:6px 10px;cursor:pointer;white-space:nowrap;" +
+      "overflow:hidden;text-overflow:ellipsis;color:#333;}" +
+      "#" +
+      PS_SIM_MOUNT_ID +
+      " .ps-sim-item:hover{background:#f5f5f5;}" +
+      "#" +
+      PS_SIM_MOUNT_ID +
+      " .ps-sim-item.active{background:#e3f2fd;}";
+    document.head.appendChild(style);
+  }
+
+  function findDashboardSimulatorHost() {
+    if (!isDashboardPage()) return null;
+
+    // Preferir la fila de metadatos (usuario + «hace …»)
+    var nodes = Array.prototype.slice.call(
+      document.querySelectorAll("span,div,a")
+    );
+    var agoNode = nodes.find(function (el) {
+      var t = (el.textContent || "").trim().toLowerCase();
+      if (!t || t.length > 40) return false;
+      return /(\bago\b|\bhace\b)/.test(t);
+    });
+    if (agoNode) {
+      var meta = agoNode.parentElement;
+      while (
+        meta &&
+        meta.parentElement &&
+        meta.parentElement !== document.body &&
+        meta.childElementCount < 2
+      ) {
+        meta = meta.parentElement;
       }
-    }, 400);
+      var row = meta && meta.parentElement ? meta.parentElement : meta;
+      if (row) {
+        var host = document.getElementById(PS_SIM_HOST_ID);
+        if (!host) {
+          host = document.createElement("div");
+          host.id = PS_SIM_HOST_ID;
+        }
+        if (host.parentElement !== row) {
+          // Insertar antes del pill de usuario / metadatos
+          if (meta && meta.parentElement === row) {
+            row.insertBefore(host, meta);
+          } else {
+            row.insertBefore(host, row.firstChild);
+          }
+        }
+        return host;
+      }
+    }
+
+    var header =
+      document.querySelector('[data-test="dashboard-header"]') ||
+      document.querySelector(".dashboard-header") ||
+      document.querySelector(".header-with-actions");
+    if (!header) return null;
+    var host2 = document.getElementById(PS_SIM_HOST_ID);
+    if (!host2) {
+      host2 = document.createElement("div");
+      host2.id = PS_SIM_HOST_ID;
+    }
+    if (host2.parentElement !== header) {
+      header.appendChild(host2);
+    }
+    return host2;
+  }
+
+  function placeSimulatorInDashboard(root) {
+    var host = findDashboardSimulatorHost();
+    if (host) {
+      if (root.parentElement !== host) host.appendChild(root);
+      return true;
+    }
+    if (root.parentElement !== document.body) {
+      document.body.appendChild(root);
+    }
+    return false;
+  }
+
+  function mountUserSimulator(me, resources) {
+    ensureSimulatorStyles();
+    applyDashboardChromeMode();
+
+    var existing = document.getElementById(PS_SIM_MOUNT_ID);
+    if (existing) {
+      placeSimulatorInDashboard(existing);
+      return;
+    }
+
+    var realEmail = (me.email || me.username || "").trim().toLowerCase();
+    var realLocal = realEmail.split("@")[0] || "?";
+    var selectedEmail = readSimulatedEmail();
+    var selected = resources.find(function (r) {
+      return (r.email || "").toLowerCase() === selectedEmail;
+    });
+    if (selected) {
+      setSimulatedUserState(selected.email, selected.name);
+    } else {
+      setSimulatedUserState("", "");
+      selectedEmail = "";
+    }
+
+    var root = document.createElement("div");
+    root.id = PS_SIM_MOUNT_ID;
+    root.title = "Simular usuario (Admin/Alpha/PS_Testing)";
+
+    var label = document.createElement("span");
+    label.textContent = "🧪";
+    root.appendChild(label);
+
+    var wrap = document.createElement("div");
+    wrap.style.position = "relative";
+
+    var input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = selected
+      ? selected.name
+      : "Real (" + realLocal + ")";
+    input.autocomplete = "off";
+    wrap.appendChild(input);
+
+    var list = null;
+    var searchTerm = "";
+
+    function closeList() {
+      if (list && list.parentNode) list.parentNode.removeChild(list);
+      list = null;
+    }
+
+    function choose(email, name) {
+      setSimulatedUserState(email, name);
+      searchTerm = "";
+      input.value = "";
+      input.placeholder = email
+        ? name || email
+        : "Real (" + realLocal + ")";
+      closeList();
+      refreshDisplayedUserName();
+      console.log(
+        email
+          ? "[PS] Simulando usuario: " + name + " <" + email + ">"
+          : "[PS] Simulación desactivada → usuario real"
+      );
+      // Forzar reaplicación de ámbito departamento
+      try {
+        sessionStorage.removeItem(PS_DEPT_SCOPE_KEY);
+      } catch (err) {
+        /* ignore */
+      }
+      applyDepartmentScope();
+    }
+
+    function renderList() {
+      closeList();
+      list = document.createElement("div");
+      list.className = "ps-sim-list";
+
+      var realItem = document.createElement("div");
+      realItem.className =
+        "ps-sim-item" + (!selectedEmail ? " active" : "");
+      realItem.textContent = "🔄 Real (" + realLocal + ")";
+      realItem.addEventListener("mousedown", function (ev) {
+        ev.preventDefault();
+        selectedEmail = "";
+        choose("", "");
+      });
+      list.appendChild(realItem);
+
+      var term = searchTerm.toLowerCase().trim();
+      var filtered = resources.filter(function (r) {
+        if (!term) return true;
+        return (
+          (r.name || "").toLowerCase().indexOf(term) !== -1 ||
+          (r.email || "").toLowerCase().indexOf(term) !== -1
+        );
+      });
+
+      if (!filtered.length) {
+        var empty = document.createElement("div");
+        empty.className = "ps-sim-item";
+        empty.style.cursor = "default";
+        empty.style.color = "#666";
+        empty.textContent = "No encontrado";
+        list.appendChild(empty);
+      } else {
+        filtered.slice(0, 80).forEach(function (r) {
+          var item = document.createElement("div");
+          var email = (r.email || "").toLowerCase();
+          item.className =
+            "ps-sim-item" + (email === selectedEmail ? " active" : "");
+          item.textContent = r.name || email;
+          item.title = email;
+          item.addEventListener("mousedown", function (ev) {
+            ev.preventDefault();
+            selectedEmail = email;
+            choose(email, r.name || email);
+          });
+          list.appendChild(item);
+        });
+      }
+      wrap.appendChild(list);
+    }
+
+    input.addEventListener("focus", function () {
+      renderList();
+    });
+    input.addEventListener("input", function () {
+      searchTerm = input.value || "";
+      renderList();
+    });
+    document.addEventListener("mousedown", function (ev) {
+      if (!root.contains(ev.target)) closeList();
+    });
+
+    root.appendChild(wrap);
+    placeSimulatorInDashboard(root);
+    console.log(
+      "[PS] Combo simulación listo (" + resources.length + " recursos, Admin/Alpha/PS_Testing)"
+    );
+
+    // SPA: reubicar si la cabecera se re-renderiza
+    var tries = 0;
+    var relocate = setInterval(function () {
+      tries += 1;
+      placeSimulatorInDashboard(root);
+      if (tries > 40) clearInterval(relocate);
+    }, 500);
+  }
+
+  async function initUserSimulator() {
+    // /api/v1/me/ no incluye roles → la autorización la decide /ps/resources
+    // (Admin/Alpha/PS_Testing → 200; Viewer → 403; anónimo → 401).
+    var me = await fetchMe();
+    if (!me) return;
+    try {
+      var res = await fetch(appRoot() + "/api/v1/ps/resources", {
+        credentials: "include",
+      });
+      if (res.status === 401 || res.status === 403) {
+        // Sin simulación: igual aplicar ámbito del usuario real
+        return;
+      }
+      if (!res.ok) {
+        console.warn("[PS] /api/v1/ps/resources →", res.status);
+        return;
+      }
+      var payload = await res.json();
+      if (!payload || !payload.can_simulate) {
+        return;
+      }
+      var resources = payload.result || [];
+      mountUserSimulator(me, resources);
+      refreshDisplayedUserName();
+    } catch (err) {
+      console.warn("[PS] No se pudo cargar recursos de simulación", err);
+    }
+  }
+
+  // ─── Ámbito departamento (paridad PBI: vacío/999 = ver todo) ────────────
+  var PS_DEPT_FILTER_ID = "NATIVE_FILTER-DEPT";
+  var PS_DEPT_SCOPE_KEY = "psDeptScopeApplied";
+
+  function risonQuote(value) {
+    return "'" + String(value).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
+  }
+
+  function buildDeptNativeFiltersRison(dept) {
+    var v = risonQuote(dept);
+    return (
+      "(" +
+      PS_DEPT_FILTER_ID +
+      ":(__cache:(label:" +
+      v +
+      ",validateStatus:!f,value:!(" +
+      v +
+      ")),extraFormData:(filters:!((col:department_code,op:IN,val:!(" +
+      v +
+      ")))),filterState:(label:" +
+      v +
+      ",validateStatus:!f,value:!(" +
+      v +
+      ")),id:" +
+      PS_DEPT_FILTER_ID +
+      ",ownState:()))"
+    );
+  }
+
+  function markDeptFilterLocked(locked, deptLabel) {
+    var existing = document.getElementById("ps-dept-scope-banner");
+    if (existing) existing.remove();
+    if (!locked) return;
+    var ban = document.createElement("div");
+    ban.id = "ps-dept-scope-banner";
+    ban.style.cssText =
+      "position:fixed;top:8px;left:12px;z-index:2050;padding:4px 10px;" +
+      "background:#e3f2fd;border:1px solid #90caf9;border-radius:4px;" +
+      "font-size:12px;color:#0d47a1;box-shadow:0 1px 3px rgba(0,0,0,.1);";
+    ban.textContent = "Ámbito departamento: " + deptLabel + " (como PBI)";
+    document.body.appendChild(ban);
+  }
+
+  async function fetchUserScope(email) {
+    var q = email ? "?email=" + encodeURIComponent(email) : "";
+    var res = await fetch(appRoot() + "/api/v1/ps/user-scope" + q, {
+      credentials: "include",
+    });
+    if (!res.ok) return null;
+    var payload = await res.json();
+    return payload && payload.result ? payload.result : null;
+  }
+
+  async function applyDepartmentScope() {
+    if (!isDashboardPage()) return;
+    try {
+      var me = await fetchMe();
+      if (!me) return;
+      var realEmail = (me.email || me.username || "").trim().toLowerCase();
+      var sim = window.__PS_SIMULATED_USER__;
+      var effective =
+        sim && sim.email ? String(sim.email).trim().toLowerCase() : realEmail;
+      if (!effective) return;
+
+      // Sin ?email → ámbito del usuario real; con email simulado → exige rol
+      var scope = await fetchUserScope(
+        effective !== realEmail ? effective : ""
+      );
+      if (!scope) return;
+
+      var token =
+        effective +
+        "|" +
+        (scope.see_all ? "ALL" : scope.department_code || "");
+      var prev = "";
+      try {
+        prev = sessionStorage.getItem(PS_DEPT_SCOPE_KEY) || "";
+      } catch (err) {
+        prev = "";
+      }
+      if (prev === token) {
+        markDeptFilterLocked(!scope.see_all, scope.department_code || "");
+        return;
+      }
+
+      var url = new URL(window.location.href);
+      // native_filters_key pisa native_filters → hay que quitarlo al forzar ámbito
+      url.searchParams.delete("native_filters_key");
+      url.searchParams.delete("permalink_key");
+
+      if (scope.see_all) {
+        url.searchParams.delete("native_filters");
+        try {
+          sessionStorage.setItem(PS_DEPT_SCOPE_KEY, token);
+        } catch (err) {
+          /* ignore */
+        }
+        markDeptFilterLocked(false, "");
+        if (url.href !== window.location.href) {
+          console.log("[PS] Ámbito dept: ver todo (vacío/999)");
+          window.location.replace(url.pathname + url.search + url.hash);
+        } else {
+          console.log("[PS] Ámbito dept: ver todo (sin cambio URL)");
+        }
+        return;
+      }
+
+      var dept = scope.department_code;
+      url.searchParams.set("native_filters", buildDeptNativeFiltersRison(dept));
+      try {
+        sessionStorage.setItem(PS_DEPT_SCOPE_KEY, token);
+      } catch (err) {
+        /* ignore */
+      }
+      console.log("[PS] Ámbito dept →", dept);
+      window.location.replace(url.pathname + url.search + url.hash);
+    } catch (err) {
+      console.warn("[PS] No se pudo aplicar ámbito departamento", err);
+    }
+  }
+
+  async function runPatch() {
+    applyDashboardChromeMode();
+    // Restaurar simulación guardada antes de pintar el nombre
+    var saved = readSimulatedEmail();
+    if (saved) {
+      window.__PS_SIMULATED_USER__ = window.__PS_SIMULATED_USER__ || {
+        email: saved,
+        name: saved,
+      };
+    }
+    refreshDisplayedUserName();
+    await applyDepartmentScope();
+    initUserSimulator();
+    // Reaplicar chrome/host tras pintados SPA
+    setTimeout(applyDashboardChromeMode, 300);
+    setTimeout(function () {
+      var el = document.getElementById(PS_SIM_MOUNT_ID);
+      if (el) placeSimulatorInDashboard(el);
+    }, 600);
   }
 
   if (document.readyState === "loading") {

@@ -508,9 +508,10 @@ def big_number_params(metric: dict[str, Any], fmt: str, *, currency: bool = Fals
     params: dict[str, Any] = {
         "adhoc_filters": dim_adhoc_filters(),
         "metric": metric,
-        "header_font_size": 0.9,
+        "header_font_size": 0.58,  # ~35% más compacto (antes 0.9)
         "subheader": label,
-        "subheader_font_size": 0.6,
+        "subheader_font_size": 0.7,  # CSS fija 11px; caben en card height 8
+
         "y_axis_format": fmt,
     }
     if currency:
@@ -608,8 +609,26 @@ def persist_dashboard_config(
         " */\n"
         ":root {\n"
         "  --ps-dash-top: 126px;\n"
-        "  --ps-tables-top: 510px;\n"
+        "  --ps-tables-top: 522px;\n"
         "  --ps-unidad-top: 200px;\n"
+        "  /* Techo de lectura ultrawide (~lienzo PBI); ≤ este valor = 100% */\n"
+        "  --ps-dash-max-width: 1440px;\n"
+        "}\n"
+        "/*\n"
+        " * Ancho máximo centrado (ultrawide):\n"
+        " * En pantallas >1440px el contenido no se estira; en laptops ≤1440\n"
+        " * width:100% usa todo el espacio. El panel de filtros queda fuera\n"
+        " * (hermano en el grid) y no se comprime.\n"
+        " */\n"
+        "[data-test='dashboard-header-wrapper'],\n"
+        "[data-test='dashboard-content-wrapper'],\n"
+        ".dashboard-content,\n"
+        ".grid-container {\n"
+        "  max-width: var(--ps-dash-max-width) !important;\n"
+        "  width: 100% !important;\n"
+        "  margin-left: auto !important;\n"
+        "  margin-right: auto !important;\n"
+        "  box-sizing: border-box !important;\n"
         "}\n"
         "html, body, #app {\n"
         "  height: 100dvh !important;\n"
@@ -653,12 +672,14 @@ def persist_dashboard_config(
         "  min-height: 0 !important;\n"
         "  overflow: hidden !important;\n"
         "}\n"
-        "/* Fila de tablas: resto del viewport bajo KPIs */\n"
+        "/* Fila de tablas: resto del viewport bajo KPIs + separación suave */\n"
         ".grid-row:has([data-test-chart-name*='Resumen mensual']),\n"
         ".dragdroppable-row:has([data-test-chart-name*='Resumen mensual']) {\n"
         "  height: calc(100dvh - var(--ps-tables-top)) !important;\n"
         "  max-height: calc(100dvh - var(--ps-tables-top)) !important;\n"
         "  min-height: 220px !important;\n"
+        "  margin-top: 12px !important;\n"
+        "  padding-top: 0 !important;\n"
         "}\n"
         "/* Solo el card externo usa calc; el interior es 100% (si no, el pie se recorta) */\n"
         ".dashboard-component-chart-holder[data-test-chart-name*='Resumen mensual'],\n"
@@ -818,12 +839,12 @@ def persist_dashboard_config(
         "  box-sizing: border-box !important;\n"
         "  overflow: hidden !important;\n"
         "}\n"
-        "/* KPI: barra lateral de acento + más padding */\n"
+        "/* KPI: barra lateral + padding compacto (etiqueta no se recorta) */\n"
         ".dashboard-component-chart-holder:has(.superset-legacy-chart-big-number) {\n"
         "  border-left-width: 4px !important;\n"
         "  border-left-style: solid !important;\n"
         "  border-left-color: #143b41 !important;\n"
-        "  padding: 10px 14px !important;\n"
+        "  padding: 4px 8px !important;\n"
         "  box-shadow: 0 1px 3px rgba(20, 59, 65, 0.08) !important;\n"
         "}\n"
         ".dashboard-component-chart-holder:has(.superset-legacy-chart-big-number)"
@@ -904,6 +925,40 @@ def persist_dashboard_config(
         "  display: flex !important;\n"
         "  align-items: center !important;\n"
         "}\n"
+        "/* Probabilidad: título compacto + chart llena el card (margen inferior) */\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
+        " .header-title,\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
+        " .editable-title,\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
+        " .editable-title a,\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
+        " .editable-title span {\n"
+        "  font-size: 13px !important;\n"
+        "}\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad'] {\n"
+        "  display: flex !important;\n"
+        "  flex-direction: column !important;\n"
+        "  overflow: hidden !important;\n"
+        "}\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
+        " .chart-slice,\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
+        " .slice_container,\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
+        " .misc-chart-table-controls ~ div,\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
+        " .slice_container > div {\n"
+        "  flex: 1 1 auto !important;\n"
+        "  height: 100% !important;\n"
+        "  min-height: 0 !important;\n"
+        "  max-height: 100% !important;\n"
+        "}\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
+        " .slice_container {\n"
+        "  padding: 0 4px 10px 4px !important;\n"
+        "  box-sizing: border-box !important;\n"
+        "}\n"
         "/* Valor KPI base */\n"
         ".superset-legacy-chart-big-number .header-line {\n"
         "  font-weight: 700 !important; color: #0f172a;\n"
@@ -915,16 +970,16 @@ def persist_dashboard_config(
         ".dashboard-component-chart-holder:has(.superset-legacy-chart-big-number)"
         "[data-test-chart-name*='Beneficio'] .header-line,\n"
         ".superset-legacy-chart-big-number .header-line {\n"
-        "  font-size: 22px !important;\n"
+        "  font-size: 14px !important;\n"
         "}\n"
-        "/* Porcentajes (Margen, Crecimiento): 17px -5% → 16px */\n"
+        "/* Porcentajes (Margen, Crecimiento): compact −35% → 11px */\n"
         ".dashboard-component-chart-holder:has(.superset-legacy-chart-big-number)"
         "[data-test-chart-name*='Margen'] .header-line,\n"
         ".dashboard-component-chart-holder:has(.superset-legacy-chart-big-number)"
         "[data-test-chart-name*='Crecimiento'] .header-line {\n"
-        "  font-size: 16px !important;\n"
+        "  font-size: 11px !important;\n"
         "}\n"
-        "/* Ocultar botón/badge de filtros y controles extra en charts */\n"
+        "/* Ocultar botón/badge de filtros por chart (barra nativa sí se muestra) */\n"
         ".dashboard-component-chart-holder .filter-counts,\n"
         ".dashboard-component-chart-holder .filters-badge,\n"
         ".dashboard-component-chart-holder [data-test='filter-counts'],\n"
@@ -966,14 +1021,20 @@ def persist_dashboard_config(
         "  padding: 0 !important;\n"
         "  overflow: hidden !important;\n"
         "}\n"
-        "/* Etiqueta bajo el valor: 16px -5% → 15px */\n"
+        "/* Etiqueta KPI: legible y sin recorte (1.077em no cabe en card bajo) */\n"
         ".superset-legacy-chart-big-number .subheader-line {\n"
         "  font-size: 11px !important; font-weight: 600 !important;\n"
         "  letter-spacing: 0.02em !important;\n"
         "  text-transform: uppercase !important;\n"
         "  color: #64748b !important;\n"
         "  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;\n"
-        "  text-align: left !important; margin-top: 4px !important;\n"
+        "  text-align: left !important;\n"
+        "  margin-top: 1px !important;\n"
+        "  margin-bottom: 0 !important;\n"
+        "  line-height: 1.15 !important;\n"
+        "  overflow: visible !important;\n"
+        "  white-space: nowrap !important;\n"
+        "  flex-shrink: 0 !important;\n"
         "}\n"
         "/* Titulos charts/tablas: teal bold estilo Timesheet (Lista de Notas) */\n"
         ".dashboard-component-chart-holder .header-title,\n"
@@ -1009,9 +1070,18 @@ def persist_dashboard_config(
         "  justify-content: flex-start !important;\n"
         "  height: 100% !important;\n"
         "  max-height: 100% !important;\n"
+        "  min-height: 0 !important;\n"
         "  margin: 0 !important;\n"
-        "  padding: 0 8px !important;\n"
+        "  padding: 0 4px !important;\n"
         "  box-sizing: border-box !important;\n"
+        "}\n"
+        "/* Menos hueco entre «Objetivos Anuales» / Planificación y la fila KPI */\n"
+        ".grid-row:has(> .dashboard-component-header),\n"
+        ".dragdroppable-row:has(.dashboard-component-header),\n"
+        ".resizable-container:has(> .dashboard-component-header) {\n"
+        "  margin: 0 !important;\n"
+        "  padding: 0 !important;\n"
+        "  min-height: 0 !important;\n"
         "}\n"
         ".dashboard-component-header *::-webkit-scrollbar {\n"
         "  width: 0 !important; height: 0 !important; display: none !important;\n"
@@ -1023,7 +1093,7 @@ def persist_dashboard_config(
         ".dashboard-component-header h2,\n"
         ".dashboard-component-header h3 {\n"
         "  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;\n"
-        "  font-size: 18px !important; font-weight: 700 !important; color: #007c89 !important;\n"
+        "  font-size: 12px !important; font-weight: 700 !important; color: #007c89 !important;\n"
         "  margin: 0 !important; padding: 0 !important;\n"
         "  line-height: 1.15 !important;\n"
         "  height: auto !important;\n"
@@ -1073,14 +1143,20 @@ def persist_dashboard_config(
         "  flex-direction: column !important;\n"
         "  justify-content: center !important;\n"
         "  align-items: flex-start !important;\n"
+        "  gap: 2px !important;\n"
         "  height: 100% !important;\n"
         "  width: 100% !important;\n"
-        "  overflow: hidden !important;\n"
+        "  overflow: visible !important;\n"
         "}\n"
-        ".superset-legacy-chart-big-number .header-line,\n"
-        ".superset-legacy-chart-big-number .subheader-line {\n"
+        ".superset-legacy-chart-big-number .header-line {\n"
         "  text-align: left !important;\n"
         "  overflow: hidden !important;\n"
+        "  line-height: 1.15 !important;\n"
+        "  flex-shrink: 0 !important;\n"
+        "}\n"
+        ".superset-legacy-chart-big-number .subheader-line {\n"
+        "  text-align: left !important;\n"
+        "  overflow: visible !important;\n"
         "}\n"
         "/* Tablas: estilo mínimo — usa el nativo Ant Design de Superset */\n"
         "/* Ocultar selector Show N entries per page */\n"
@@ -1273,6 +1349,46 @@ def persist_dashboard_config(
         "  display: none !important;\n"
         "  visibility: hidden !important;\n"
         "  pointer-events: none !important;\n"
+        "}\n"
+        "/* === Modo edición: desbloquear resize de KPIs / Probabilidad ===\n"
+        " * overflow:hidden del card + droppables del COLUMN tapan el asa.\n"
+        " * Las tablas de abajo no están ese problema (fila simple sin COLUMN). */\n"
+        ".dashboard--editing .dashboard-component-chart-holder {\n"
+        "  overflow: visible !important;\n"
+        "}\n"
+        ".dashboard--editing .react-resizable-handle,\n"
+        ".dashboard--editing .resizable-container > .react-resizable-handle,\n"
+        ".dashboard--editing .resizable-container .react-resizable-handle-se,\n"
+        ".dashboard--editing .resizable-container .react-resizable-handle-s,\n"
+        ".dashboard--editing .resizable-container .react-resizable-handle-e {\n"
+        "  display: block !important;\n"
+        "  visibility: visible !important;\n"
+        "  opacity: 1 !important;\n"
+        "  pointer-events: auto !important;\n"
+        "  z-index: 10050 !important;\n"
+        "}\n"
+        "/* Drop zones del COLUMN no deben robar el ratón al asa del chart hermano */\n"
+        ".dashboard--editing .dragdroppable-column > .droppable:last-child,\n"
+        ".dashboard--editing .grid-column > .droppable:last-child,\n"
+        ".dashboard--editing .dragdroppable-column .drop-indicator {\n"
+        "  pointer-events: none !important;\n"
+        "}\n"
+        "/* En edición, mostrar ⋮ también en KPIs (para Editar chart) */\n"
+        ".dashboard--editing .dashboard-component-chart-holder:has(.superset-legacy-chart-big-number)"
+        " .slice_header,\n"
+        ".dashboard--editing .dashboard-component-chart-holder:has(.superset-legacy-chart-big-number)"
+        " [data-test='slice-header'],\n"
+        ".dashboard--editing .dashboard-component-chart-holder:has(.superset-legacy-chart-big-number)"
+        " .header-controls,\n"
+        ".dashboard--editing .dashboard-component-chart-holder:has(.superset-legacy-chart-big-number)"
+        " [data-test='dashboard-slice-header-controls'] {\n"
+        "  display: flex !important;\n"
+        "  visibility: visible !important;\n"
+        "  height: auto !important;\n"
+        "  max-height: none !important;\n"
+        "  overflow: visible !important;\n"
+        "  pointer-events: auto !important;\n"
+        "  opacity: 1 !important;\n"
         "}\n"
     )
 
@@ -1475,9 +1591,9 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "parents": col_parents + ["ROW-HDR-OBJ"],
             "meta": {
                 "text": "Objetivos Anuales",
-                "headerSize": "MEDIUM_HEADER",
+                "headerSize": "SMALL_HEADER",
                 "width": kpi_col_width,
-                "height": 4,
+                "height": 2,
             },
         },
         "HEADER-PLAN": {
@@ -1485,9 +1601,9 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "parents": col_parents + ["ROW-HDR-PLAN"],
             "meta": {
                 "text": "Planificación Actual",
-                "headerSize": "MEDIUM_HEADER",
+                "headerSize": "SMALL_HEADER",
                 "width": kpi_col_width,
-                "height": 4,
+                "height": 2,
             },
         },
         "ROW-OBJ": {
@@ -1523,14 +1639,15 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
     }
     sizes = {
         # Alturas UI: KPI 10; tablas Resumen/Proyectos misma altura; charts 36.
-        "obj": (1, 10),
-        "plan": (1, 10),
+        # Probabilidad: altura sync UI pull 2026-07-28 (28).
+        "obj": (1, 8),
+        "plan": (1, 8),
         "table": (4, 68),
         "projects": (8, 68),
         # Altura layout alta: el CSS :has fija calc(100dvh-210px) al activar tab;
         # este valor evita que el grid React pinte un card enano el primer frame.
         "unidad": (12, 78),
-        "prob": (6, 36),
+        "prob": (6, 26),
         "chart": (6, 36),
     }
     # Importes grandes (euros) más anchos; % compactos
@@ -1674,21 +1791,18 @@ def main() -> int:
 
     print("==> 4/4 Configurando dashboard...")
     existing_dash = client.find_dashboard()
+    dash_payload = {
+        "dashboard_title": DASHBOARD_TITLE,
+        "slug": DASHBOARD_SLUG,
+        "published": True,
+        "position_json": json.dumps(build_layout(charts)),
+        "owners": PROYECTOS_OWNER_IDS,  # admin + dbertona: editar layout en UI
+    }
     if existing_dash:
         dash_id = existing_dash["id"]
-        client._request("PUT", f"/api/v1/dashboard/{dash_id}", {
-            "dashboard_title": DASHBOARD_TITLE,
-            "slug": DASHBOARD_SLUG,
-            "published": True,
-            "position_json": json.dumps(build_layout(charts)),
-        })
+        client._request("PUT", f"/api/v1/dashboard/{dash_id}", dash_payload)
     else:
-        dash_id = client._request("POST", "/api/v1/dashboard/", {
-            "dashboard_title": DASHBOARD_TITLE,
-            "slug": DASHBOARD_SLUG,
-            "published": True,
-            "position_json": json.dumps(build_layout(charts)),
-        })["id"]
+        dash_id = client._request("POST", "/api/v1/dashboard/", dash_payload)["id"]
 
     client.attach_charts(dash_id, [c["id"] for c in charts])
     persist_dashboard_config(client, dash_id, dataset_ids, charts)
