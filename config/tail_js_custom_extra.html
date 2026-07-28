@@ -2047,7 +2047,9 @@
       "#" +
       PS_SIM_MOUNT_ID +
       " .ps-sim-item.active{background:#e3f2fd;}" +
-      "@media (max-width:900px){#" +
+      // Split "{#" so Jinja no lo toma como comentario de plantilla
+      "@media (max-width:900px){" +
+      "#" +
       PS_SIM_MOUNT_ID +
       "{right:8px;top:48px;}}";
     document.head.appendChild(style);
