@@ -6,7 +6,7 @@ Informe origen: Power BI `Seguimiento Económico PS.pbix` (dataset en la nube, f
 
 ## Objetivo
 
-Replicar en **Superset** (`http://192.168.36.100:8088/`) las páginas del informe Power BI con paridad numérica respecto al modelo semántico PBI.
+Replicar en **Superset** (`https://apps.powersolution.es/analytics/` — solo DNS; ⛔ no IP LAN en navegador) las páginas del informe Power BI con paridad numérica respecto al modelo semántico PBI.
 
 ## Repositorios
 
@@ -20,7 +20,7 @@ Replicar en **Superset** (`http://192.168.36.100:8088/`) las páginas del inform
 | Componente | Ubicación |
 |--------------|-----------|
 | PostgreSQL Analytics | VM 100 — `192.168.36.100:5433` (`supabase-db`) |
-| Superset | VM 100 — `http://192.168.36.100:8088/` |
+| Superset | VM 100 — `https://apps.powersolution.es/analytics/` (DNS; IP solo scripts) |
 | n8n workflow 004 | VM 101 — `https://apps.powersolution.es/n8n/` |
 | BC OData | Production (`BC_ENVIRONMENT=Production`) |
 
@@ -70,8 +70,8 @@ GROUP BY tipo;
 | **3** | ✅ | Dashboard Superset «Seguimiento Económico — Resumen» (`planificacion-ps-analytics`) |
 | **4** | En curso | Resto de páginas PBI — **Unidad** (Gastos Structure) ✅ |
 
-**Dashboard Fase 3:** http://192.168.36.100:8088/superset/dashboard/planificacion-ps-analytics/  
-Regenerar: `SKIP_APPLY_BI_VIEWS=1 SUPERSET_URL=http://192.168.36.100:8088 python3 scripts/setup-superset-planificacion.py`
+**Dashboard Fase 3:** https://apps.powersolution.es/analytics/superset/dashboard/planificacion-ps-analytics/  
+Regenerar (API LAN): `SKIP_APPLY_BI_VIEWS=1 SUPERSET_URL=http://192.168.36.100:8088/analytics python3 scripts/setup-superset-planificacion.py`
 
 ## Páginas del informe PBI
 

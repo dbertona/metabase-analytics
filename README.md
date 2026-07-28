@@ -24,13 +24,22 @@ cp env.example .env
 ./scripts/start.sh
 ```
 
-- **URL pública:** https://apps.powersolution.es/analytics/
-- **URL LAN:** http://192.168.36.100:8088/analytics/
-- **Dashboard Resumen:** https://apps.powersolution.es/analytics/superset/dashboard/planificacion-ps-analytics/
+### Acceso (usuarios / navegador)
+
+| Uso | URL |
+|-----|-----|
+| **Única URL válida para usuarios** | https://apps.powersolution.es/analytics/ |
+| Dashboard Resumen | https://apps.powersolution.es/analytics/superset/dashboard/planificacion-ps-analytics/ |
+
 - **Login:** Microsoft (Azure AD) — misma App Registration que Timesheet  
   Redirect: `https://apps.powersolution.es/analytics/oauth-authorized/azure`
 - **Usuario local (fallback sin `AZURE_CLIENT_SECRET`):** `admin`
 - **Idioma UI:** español (`BABEL_DEFAULT_LOCALE=es`; packs en `config/translations/es/`)
+
+> **⛔ No usar la IP LAN en el navegador** (`http://192.168.36.100:8088/…`).  
+> El SSO Azure y el path `/analytics` están publicados solo por DNS (`apps.powersolution.es`).  
+> Entrar por IP provoca login/OAuth rotos o sesión inválida.  
+> La IP `192.168.36.100:8088` queda **solo para scripts/API internos** (pull, setup, health).
 
 ## Gestión
 
@@ -42,6 +51,9 @@ cp env.example .env
 | Logs | `docker compose logs -f superset` |
 | **Pull UI → snapshot** | `SUPERSET_URL=http://192.168.36.100:8088/analytics python3 scripts/pull-superset-dashboard.py` |
 | Regenerar dashboard | `SUPERSET_URL=http://192.168.36.100:8088/analytics python3 scripts/setup-superset-planificacion.py` (hace pull UI antes) |
+
+> Los comandos de gestión usan IP LAN a propósito (API admin desde red interna).  
+> **Probar o usar el dashboard en el navegador:** siempre `https://apps.powersolution.es/analytics/`.
 
 **Importante:** cambios hechos a mano en la UI de Superset se **pisan** al regenerar.
 Antes de regenerar, el setup hace **pull** a `exports/superset-dashboard/latest/` y avisa si hay

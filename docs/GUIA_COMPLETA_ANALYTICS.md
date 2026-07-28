@@ -14,7 +14,7 @@ Documento de referencia único: qué tenemos, dónde vive cada cosa y cómo func
 | ¿Para qué sirve? | Réplica de datos BC para **Superset** (informe *Seguimiento Económico*, paridad con Power BI) |
 | ¿La app Timesheet/Gastos la usa? | **No** — BD Analytics es solo reporting |
 | ¿De dónde salen los datos? | **Business Central Production** vía workflow n8n **004** |
-| ¿Dónde está Superset? | VM **100** — `http://192.168.36.100:8088/` |
+| ¿Dónde está Superset? | VM **100** — usuarios: `https://apps.powersolution.es/analytics/` (⛔ no IP LAN en navegador; IP solo scripts/API) |
 | ¿Dónde está PostgreSQL Analytics? | VM **100** — `192.168.36.100:5433` (contenedor `supabase-db`) |
 | ¿Dónde corre el sync? | VM **101** — `https://apps.powersolution.es/n8n/` (contenedor `n8n-prod`) |
 
