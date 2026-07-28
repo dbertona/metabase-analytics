@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-28p] — KPI: etiquetas = fuente tablas
+
+### Changed
+- Etiquetas FACTURACIÓN/MARGEN/Δ%/BENEFICIO: **1.077em** (igual que celdas AG Grid
+  Resumen/Proyectos). Números KPI sin cambio.
+
 ## [2026-07-28o] — Probabilidad: fuente −10%
 
 ### Changed

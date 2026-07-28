@@ -510,7 +510,7 @@ def big_number_params(metric: dict[str, Any], fmt: str, *, currency: bool = Fals
         "metric": metric,
         "header_font_size": 0.58,  # ~35% más compacto (antes 0.9)
         "subheader": label,
-        "subheader_font_size": 0.46,  # etiquetas +15% vs 0.4 compact
+        "subheader_font_size": 0.9,  # CSS fuerza 1.077em (= tablas); param alineado
 
         "y_axis_format": fmt,
     }
@@ -1019,9 +1019,9 @@ def persist_dashboard_config(
         "  padding: 0 !important;\n"
         "  overflow: hidden !important;\n"
         "}\n"
-        "/* Etiqueta bajo el valor (FACTURACIÓN, MARGEN…): +15% vs 8px compact → 9.2px */\n"
+        "/* Etiqueta KPI = misma fuente que celdas AG Grid (Resumen/Proyectos) */\n"
         ".superset-legacy-chart-big-number .subheader-line {\n"
-        "  font-size: 9.2px !important; font-weight: 600 !important;\n"
+        "  font-size: 1.077em !important; font-weight: 600 !important;\n"
         "  letter-spacing: 0.02em !important;\n"
         "  text-transform: uppercase !important;\n"
         "  color: #64748b !important;\n"
