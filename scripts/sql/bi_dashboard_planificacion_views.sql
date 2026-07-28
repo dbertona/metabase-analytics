@@ -109,6 +109,11 @@ SELECT
     f.departamento::text AS department_code,
     d.department_name,
     f.tipo,
+    CASE f.tipo
+        WHEN 'P' THEN 'Planificado'
+        WHEN 'R' THEN 'Real'
+        ELSE COALESCE(f.tipo::text, '')
+    END AS tipo_label,
     f.job,
     f.encabezado AS proyecto,
     SUM(f.facturado) AS facturacion,
@@ -183,13 +188,19 @@ COMMENT ON VIEW bi_v_facturacion_probabilidad IS
 --   (= excluye Lost). Con PSI 2026: Fact 6.374.548 / Coste 4.350.042 / Margen 31,76 %.
 -- Encabezado = job || ' --- ' || left(descripcion,36) — ya en v_se_facturacion.
 -- -----------------------------------------------------------------------------
-CREATE OR REPLACE VIEW bi_v_resumen_proyectos AS
+DROP VIEW IF EXISTS bi_v_resumen_proyectos;
+CREATE VIEW bi_v_resumen_proyectos AS
 SELECT
     f.empresa,
     f.year,
     f.departamento AS department_code,
     d.department_name,
     f.tipo,
+    CASE f.tipo
+        WHEN 'P' THEN 'Planificado'
+        WHEN 'R' THEN 'Real'
+        ELSE COALESCE(f.tipo::text, '')
+    END AS tipo_label,
     f.tipo_proyecto,
     f.estado,
     f.job,
@@ -229,13 +240,19 @@ COMMENT ON VIEW bi_v_resumen_proyectos IS
 -- Dims year/empresa/department_code/tipo para filtros nativos del dashboard.
 -- TRIM(descripcion_ca) unifica duplicados por espacios en BC.
 -- -----------------------------------------------------------------------------
-CREATE OR REPLACE VIEW bi_v_unidad AS
+DROP VIEW IF EXISTS bi_v_unidad;
+CREATE VIEW bi_v_unidad AS
 SELECT
     c.empresa,
     c.year,
     c.departamento AS department_code,
     d.department_name,
     c.tipo,
+    CASE c.tipo
+        WHEN 'P' THEN 'Planificado'
+        WHEN 'R' THEN 'Real'
+        ELSE COALESCE(c.tipo::text, '')
+    END AS tipo_label,
     c.tipo_proyecto,
     TRIM(c.descripcion_ca) AS concepto_analitico,
     SUM(c.coste) FILTER (WHERE c.month = 1) AS m01,

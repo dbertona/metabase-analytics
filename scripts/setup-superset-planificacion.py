@@ -148,6 +148,11 @@ SELECT
     c.departamento AS department_code,
     d.department_name,
     c.tipo,
+    CASE c.tipo
+        WHEN 'P' THEN 'Planificado'
+        WHEN 'R' THEN 'Real'
+        ELSE COALESCE(c.tipo::text, '')
+    END AS tipo_label,
     c.tipo_proyecto,
     TRIM(c.descripcion_ca) AS concepto_analitico,
     SUM(c.coste) FILTER (WHERE c.month = 1) AS m01,
@@ -1607,10 +1612,10 @@ def persist_dashboard_config(
             },
             {
                 "id": "NATIVE_FILTER-TIPO",
-                "name": "Tipo P/R",
+                "name": "Planificado/Real",
                 "filterType": "filter_select",
                 "type": "NATIVE_FILTER",
-                "targets": [{"datasetId": evo_ds, "column": {"name": "tipo"}}],
+                "targets": [{"datasetId": evo_ds, "column": {"name": "tipo_label"}}],
                 "defaultDataMask": {"filterState": {"value": None}},
                 "controlValues": {"multiSelect": False, "enableEmptyFilter": False},
                 "cascadeParentIds": [],
