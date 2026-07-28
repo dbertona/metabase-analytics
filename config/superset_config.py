@@ -158,7 +158,7 @@ class PsAppInitializer(SupersetAppInitializer):
 
     def _register_ps_simulation_routes(self) -> None:
         """APIs PS: simulación (Admin/Alpha/PS_Testing) + ámbito departamento (todos)."""
-        from flask import jsonify, request, session
+        from flask import jsonify, request
 
         app = self.superset_app
 
@@ -203,7 +203,7 @@ class PsAppInitializer(SupersetAppInitializer):
 
         @app.route("/api/v1/ps/simulate", methods=["GET", "POST", "DELETE"])
         def ps_set_simulation():  # type: ignore[no-untyped-def]
-            """Guarda/limpia email simulado en session Flask (RLS Jinja lo lee).
+            """Guarda/limpia email simulado (session + cookie firmada ps_sim).
 
             GET ?email=...  → set (sin CSRF; uso desde tail_js)
             GET sin email   → clear
@@ -221,25 +221,23 @@ class PsAppInitializer(SupersetAppInitializer):
                 body = request.get_json(silent=True) or {}
                 email = (body.get("email") or "").strip().lower()
             else:
-                # GET: email vacío o ausente → clear
                 email = (request.args.get("email") or "").strip().lower()
 
             if not email:
-                session.pop(PS_SIMULATED_EMAIL_SESSION_KEY, None)
-                return jsonify({"result": {"simulated": False, "email": None}})
+                return _ps_simulate_response(
+                    {"simulated": False, "email": None}, None
+                )
             if "@" not in email:
                 return jsonify({"message": "Email inválido"}), 400
-            session[PS_SIMULATED_EMAIL_SESSION_KEY] = email
             scope = resolve_department_scope(email)
-            return jsonify(
+            return _ps_simulate_response(
                 {
-                    "result": {
-                        "simulated": True,
-                        "email": email,
-                        "see_all": scope["see_all"],
-                        "department_code": scope["department_code"],
-                    }
-                }
+                    "simulated": True,
+                    "email": email,
+                    "see_all": scope["see_all"],
+                    "department_code": scope["department_code"],
+                },
+                email,
             )
 
         logger.info(
@@ -398,6 +396,62 @@ def resolve_department_scope(email: str) -> dict[str, Any]:
 
 
 PS_SIMULATED_EMAIL_SESSION_KEY = "ps_simulated_email"
+PS_SIM_COOKIE = "ps_sim"
+
+
+def _ps_sim_serializer():
+    from flask import current_app
+    from itsdangerous import URLSafeSerializer
+
+    return URLSafeSerializer(
+        str(current_app.config.get("SECRET_KEY") or SECRET_KEY),
+        salt="ps-dept-sim-v1",
+    )
+
+
+def _ps_read_simulated_email() -> str:
+    """Email simulado: session Flask o cookie firmada ps_sim."""
+    from flask import request, session
+
+    sim = (session.get(PS_SIMULATED_EMAIL_SESSION_KEY) or "").strip().lower()
+    if sim and "@" in sim:
+        return sim
+    raw = request.cookies.get(PS_SIM_COOKIE) or ""
+    if not raw:
+        return ""
+    try:
+        email = _ps_sim_serializer().loads(raw)
+        email = (email or "").strip().lower()
+        return email if email and "@" in email else ""
+    except Exception:
+        return ""
+
+
+def _ps_simulate_response(payload: dict[str, Any], email: str | None):
+    """JSON + cookie firmada ps_sim (RLS la lee aunque falle la session)."""
+    from flask import jsonify, make_response, session
+
+    if email:
+        session[PS_SIMULATED_EMAIL_SESSION_KEY] = email
+        session.modified = True
+        token = _ps_sim_serializer().dumps(email)
+    else:
+        session.pop(PS_SIMULATED_EMAIL_SESSION_KEY, None)
+        session.modified = True
+        token = ""
+
+    resp = make_response(jsonify({"result": payload}))
+    # secure=False: también funciona en LAN HTTP; en HTTPS el navegador sigue OK.
+    resp.set_cookie(
+        PS_SIM_COOKIE,
+        token,
+        max_age=60 * 60 * 12 if token else 0,
+        httponly=True,
+        samesite="Lax",
+        secure=False,
+        path="/",
+    )
+    return resp
 
 
 def _ps_resolve_request_user() -> Any:
@@ -445,14 +499,12 @@ def _ps_can_simulate(user: Any) -> bool:
 
 
 def _ps_effective_email_for_rls() -> str:
-    """Email efectivo para RLS: simulación en session (si autorizada) o usuario real."""
-    from flask import session
-
+    """Email efectivo para RLS: simulación (si autorizada) o usuario real."""
     user = _ps_resolve_request_user()
     if not user:
         return ""
     real = _ps_user_email(user)
-    sim = (session.get(PS_SIMULATED_EMAIL_SESSION_KEY) or "").strip().lower()
+    sim = _ps_read_simulated_email()
     if sim and sim != real and _ps_can_simulate(user):
         return sim
     return real
@@ -465,11 +517,7 @@ def _ps_dept_jinja_filter() -> str:
     - Email efectivo con departamento → department_code = 'DEPT'
     - Sin usuario → 1=0
 
-    La simulación Admin → otro email se guarda en session Flask
-    (POST /api/v1/ps/simulate). Sin eso, Admin siempre veía todo aunque
-    el filtro nativo estuviera aplicado (y podía borrarlo).
-
-    Registrada como función Jinja en JINJA_CONTEXT_ADDONS.
+    Simulación Admin: cookie firmada `ps_sim` + session (GET /api/v1/ps/simulate).
     """
     try:
         email = _ps_effective_email_for_rls()
