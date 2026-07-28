@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [2026-07-28] — Cierre rama `feat/simular-usuario-recursos`
+
+### Summary
+- Combo Admin/Alpha/PS_Testing para simular usuario; ámbito departamento por usuario.
+- Dashboard chrome: navbar oculta, simulación en cabecera, botón Salir.
+- Banda KPI/Prob compacta, max-width 1440 ultrawide, tipografía y espaciados afinados.
+- Probabilidad: chart llena el card; altura sync UI (26); separación 12px vs tablas.
+- Docs Query IDs AL del workflow 004 (ExpedienteMes QRY50215).
+
 ## [2026-07-28r] — Separación KPI ↔ tablas + sync Prob 26
 
 ### Changed
