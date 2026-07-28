@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-28l] — Dashboard max-width 1440 (ultrawide)
+
+### Changed
+- Contenido del dashboard (header + grid) con `max-width: 1440px` centrado.
+  En pantallas ≤1440 sigue al 100%; en ultrawide evita estirar tablas/KPI.
+  Panel de filtros nativos queda fuera del techo (columna hermana).
+
 ## [2026-07-28k] — Probabilidad: fuente +10%
 
 ### Changed

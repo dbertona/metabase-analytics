@@ -24,6 +24,21 @@ Detalle: [`exports/superset-dashboard/README.md`](../exports/superset-dashboard/
 
 ---
 
+## Ancho en pantallas ultrawide
+
+El grid de Superset es fluido (100 % del viewport). En monitores ultrawide eso
+estiraba KPI/tablas de forma poco legible.
+
+**Solución (2026-07-28):** `max-width: 1440px` centrado en header + contenido
+(`--ps-dash-max-width` en `dashboard_css` del setup). En laptops ≤1440 px el
+layout sigue usando el 100 % del ancho disponible. El panel de filtros no entra
+en ese techo (sigue en su columna).
+
+Comparable a PBI en espíritu (lienzo acotado), pero adaptativo hacia abajo
+(sin `transform: scale`).
+
+---
+
 ## Diseño (Superset 6.1.0)
 
 ### Layout superior (KPI + Probabilidad)
