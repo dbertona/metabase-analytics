@@ -63,10 +63,8 @@ DATASETS = [
     "bi_v_unidad",
 ]
 
-# Vistas que tienen columna department_code y deben llevar RLS de departamento.
-# Se convierten a virtual SQL con {{ ps_dept_filter() }} (Jinja, server-side).
-# Admin/Alpha/see_all → 1=1 (sin restricción).
-# Usuario con departamento → department_code = 'DEPT' (imposible de bypassar desde UI).
+# Vistas con RLS server-side (Jinja): dept / see_all / project_team.
+# Admin/see_all → 1=1. Departamento → department_code. Team → job IN (bc_job_team).
 DEPT_FILTERED_VIEWS = [
     "bi_v_planificacion_kpi",
     "bi_v_evolucion_mensual",
@@ -74,6 +72,120 @@ DEPT_FILTERED_VIEWS = [
     "bi_v_resumen_proyectos",
     "bi_v_unidad",
 ]
+
+# Vistas con columna `job` → filtro team directo.
+JOB_GRAINED_VIEWS = {
+    "bi_v_evolucion_mensual",
+    "bi_v_facturacion_probabilidad",
+    "bi_v_resumen_proyectos",
+}
+
+
+def _virtual_sql_rls(view: str) -> str:
+    """SQL virtual con Jinja: dept / see_all / project_team.
+
+    KPI y Unidad no tienen grano job: en modo project_team se recalculan
+    desde v_se_* filtrando por bc_job_team del recurso.
+    """
+    if view in JOB_GRAINED_VIEWS:
+        return f"SELECT * FROM {view}\nWHERE {{{{ ps_row_filter('job') }}}}"
+
+    if view == "bi_v_planificacion_kpi":
+        return """\
+{% if ps_scope_mode() == 'project_team' %}
+SELECT
+    k.empresa,
+    k.year,
+    k.department_code,
+    k.department_name,
+    k.obj_facturacion,
+    k.obj_coste,
+    k.obj_beneficio,
+    k.obj_margen_pct,
+    k.facturacion_real_anterior,
+    k.obj_crecimiento_pct,
+    COALESCE(p.plan_facturacion, 0) AS plan_facturacion,
+    COALESCE(p.plan_coste, 0) AS plan_coste,
+    COALESCE(p.plan_beneficio, 0) AS plan_beneficio,
+    CASE
+        WHEN COALESCE(p.plan_facturacion, 0) > 0
+            THEN p.plan_beneficio / p.plan_facturacion * 100
+    END AS plan_margen_pct,
+    CASE
+        WHEN k.facturacion_real_anterior > 0
+            THEN (COALESCE(p.plan_facturacion, 0) - k.facturacion_real_anterior)
+                 / k.facturacion_real_anterior * 100
+    END AS plan_crecimiento_pct
+FROM bi_v_planificacion_kpi k
+INNER JOIN (
+    SELECT
+        f.empresa,
+        f.year,
+        f.departamento AS department_code,
+        SUM(f.facturado) AS plan_facturacion,
+        SUM(f.coste) AS plan_coste,
+        SUM(f.facturado - f.coste) AS plan_beneficio
+    FROM v_se_facturacion f
+    WHERE f.tipo IN ('P', 'R')
+      AND f.job IN ({{ ps_team_jobs_sql() }})
+    GROUP BY f.empresa, f.year, f.departamento
+) p
+  ON k.empresa = p.empresa
+ AND k.year = p.year
+ AND k.department_code = p.department_code
+{% else %}
+SELECT * FROM bi_v_planificacion_kpi
+WHERE {{ ps_dept_filter() }}
+{% endif %}
+"""
+
+    if view == "bi_v_unidad":
+        return """\
+{% if ps_scope_mode() == 'project_team' %}
+SELECT
+    c.empresa,
+    c.year,
+    c.departamento AS department_code,
+    d.department_name,
+    c.tipo,
+    c.tipo_proyecto,
+    TRIM(c.descripcion_ca) AS concepto_analitico,
+    SUM(c.coste) FILTER (WHERE c.month = 1) AS m01,
+    SUM(c.coste) FILTER (WHERE c.month = 2) AS m02,
+    SUM(c.coste) FILTER (WHERE c.month = 3) AS m03,
+    SUM(c.coste) FILTER (WHERE c.month = 4) AS m04,
+    SUM(c.coste) FILTER (WHERE c.month = 5) AS m05,
+    SUM(c.coste) FILTER (WHERE c.month = 6) AS m06,
+    SUM(c.coste) FILTER (WHERE c.month = 7) AS m07,
+    SUM(c.coste) FILTER (WHERE c.month = 8) AS m08,
+    SUM(c.coste) FILTER (WHERE c.month = 9) AS m09,
+    SUM(c.coste) FILTER (WHERE c.month = 10) AS m10,
+    SUM(c.coste) FILTER (WHERE c.month = 11) AS m11,
+    SUM(c.coste) FILTER (WHERE c.month = 12) AS m12,
+    SUM(c.coste) AS total
+FROM v_se_coste c
+LEFT JOIN mb_v_dim_departamento d
+    ON d.company_name = c.empresa
+   AND d.department_code = c.departamento
+WHERE c.tipo_proyecto = 'Structure'
+  AND COALESCE(TRIM(c.descripcion_ca), '') <> ''
+  AND c.job IN ({{ ps_team_jobs_sql() }})
+GROUP BY
+    c.empresa,
+    c.year,
+    c.departamento,
+    d.department_name,
+    c.tipo,
+    c.tipo_proyecto,
+    TRIM(c.descripcion_ca)
+HAVING ABS(SUM(c.coste)) > 0.0001
+{% else %}
+SELECT * FROM bi_v_unidad
+WHERE {{ ps_dept_filter() }}
+{% endif %}
+"""
+
+    return f"SELECT * FROM {view}\nWHERE {{{{ ps_dept_filter() }}}}"
 
 
 class SupersetClient:
@@ -178,26 +290,17 @@ class SupersetClient:
         print(f"  aviso: no se pudo refrescar columnas dataset id={ds_id}")
 
     def patch_dataset_virtual_sql(self, dataset_ids: dict[str, int]) -> None:
-        """Convierte datasets con department_code a virtual SQL con RLS Jinja.
+        """Convierte datasets a virtual SQL con RLS Jinja (dept / team / all).
 
-        Jinja: {{ ps_dept_filter() }} → se evalúa en cada consulta con el
-        usuario autenticado real → imposible de bypassar desde la UI.
-
-        - Admin/Alpha/see_all → WHERE 1=1 (sin restricción; simulación sigue
-          usando native_filters para restringir la vista visualmente).
-        - Usuario con departamento → WHERE department_code = 'DEPT'.
+        Jinja: ps_scope_mode / ps_row_filter / ps_team_jobs_sql / ps_dept_filter.
         """
-        print("==> RLS: parchando datasets con virtual SQL de departamento...")
+        print("==> RLS: parchando datasets (dept + project_team)...")
         for view in DEPT_FILTERED_VIEWS:
             ds_id = dataset_ids.get(view)
             if not ds_id:
                 print(f"  ⚠️  {view}: no encontrado en dataset_ids, omitido")
                 continue
-            # {{ ps_dept_filter() }} en el SQL: Jinja lo procesa en runtime.
-            virtual_sql = (
-                f"SELECT * FROM {view}\n"
-                "WHERE {{ ps_dept_filter() }}"
-            )
+            virtual_sql = _virtual_sql_rls(view)
             try:
                 self._request(
                     "PUT",

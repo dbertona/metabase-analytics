@@ -76,6 +76,20 @@ Debajo: separación ~12px · Resumen mensual + Proyectos.
 Valores del filtro Proyectos = mismos `encabezado` que la tabla Proyectos (Operational).
 No añade columna visible a Resumen/Probabilidad: solo restringe filas al Apply.
 
+### RLS server-side (`bc_user_configuration`)
+
+Además de los filtros nativos, cada dataset BI lleva SQL virtual Jinja
+(`ps_dept_filter` / `ps_row_filter` / `ps_team_jobs_sql`):
+
+| Config usuario | Modo | Efecto |
+|----------------|------|--------|
+| `projectteamfilter = true` | `project_team` | Solo `job` ∈ `bc_job_team` del recurso (prioridad) |
+| `departamento` vacío o `999` | `all` | Sin restricción RLS |
+| `departamento = '1-XX'` | `department` | `department_code = '1-XX'` |
+
+La UI muestra banner y oculta el filtro Departamentos cuando el ámbito está fijado.
+Simulación Admin: cookie `ps_sim` + `/api/v1/ps/simulate`.
+
 ### Scopes y controlValues
 
 - `enableEmptyFilter: false` — en el código de Superset esta flag equivale al

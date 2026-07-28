@@ -2741,7 +2741,7 @@
     if (s) s.remove();
   }
 
-  function markDeptFilterLocked(locked, deptLabel) {
+  function markDeptFilterLocked(locked, label, mode) {
     var existing = document.getElementById("ps-dept-scope-banner");
     if (existing) existing.remove();
 
@@ -2758,8 +2758,15 @@
       "position:fixed;top:8px;left:12px;z-index:2050;padding:4px 10px;" +
       "background:#e3f2fd;border:1px solid #90caf9;border-radius:4px;" +
       "font-size:12px;color:#0d47a1;box-shadow:0 1px 3px rgba(0,0,0,.1);";
-    ban.textContent =
-      "Departamento: " + deptLabel + " (fijado por servidor — no editable)";
+    if (mode === "project_team") {
+      ban.textContent =
+        "Ámbito: proyectos del equipo" +
+        (label ? " (" + label + ")" : "") +
+        " — fijado por servidor";
+    } else {
+      ban.textContent =
+        "Departamento: " + label + " (fijado por servidor — no editable)";
+    }
     document.body.appendChild(ban);
   }
 
@@ -2799,10 +2806,15 @@
       );
       if (!scope) return;
 
+      var mode = scope.mode || (scope.see_all ? "all" : "department");
       var token =
         effective +
         "|" +
-        (scope.see_all ? "ALL" : scope.department_code || "");
+        mode +
+        "|" +
+        (scope.department_code || scope.resource_code || "") +
+        "|" +
+        String(scope.team_job_count || 0);
       var prev = "";
       try {
         prev = sessionStorage.getItem(PS_DEPT_SCOPE_KEY) || "";
@@ -2810,13 +2822,17 @@
         prev = "";
       }
 
-      var locked = !scope.see_all;
+      var locked = mode === "department" || mode === "project_team";
+      var bannerLabel =
+        mode === "project_team"
+          ? (scope.team_job_count || 0) + " jobs · " + (scope.resource_code || "")
+          : scope.department_code || "";
 
       // ⛔ NO reaplicar por URL: Superset sustituye native_filters → native_filters_key
       // y un guard que mira la URL provoca bucle infinito de location.replace.
       // Seguridad = RLS Jinja (cookie ps_sim). UI = ocultar widget + 1 reload máx.
       if (prev === token) {
-        markDeptFilterLocked(locked, scope.department_code || "");
+        markDeptFilterLocked(locked, bannerLabel, mode);
         return;
       }
 
@@ -2830,14 +2846,30 @@
         /* ignore */
       }
 
-      if (scope.see_all) {
+      if (mode === "all" || scope.see_all) {
         urlNow.searchParams.delete("native_filters");
-        markDeptFilterLocked(false, "");
+        markDeptFilterLocked(false, "", mode);
         if (urlNow.href !== window.location.href) {
-          console.log("[PS] Ámbito dept: ver todo (vacío/999)");
+          console.log("[PS] Ámbito: ver todo (vacío/999)");
           window.location.replace(urlNow.pathname + urlNow.search + urlNow.hash);
         } else {
-          console.log("[PS] Ámbito dept: ver todo (sin cambio URL)");
+          console.log("[PS] Ámbito: ver todo (sin cambio URL)");
+        }
+        return;
+      }
+
+      if (mode === "project_team") {
+        // No forzar filtro Departamentos: el RLS filtra por job_team.
+        urlNow.searchParams.delete("native_filters");
+        console.log(
+          "[PS] Ámbito project_team →",
+          scope.resource_code,
+          "jobs=",
+          scope.team_job_count
+        );
+        markDeptFilterLocked(true, bannerLabel, mode);
+        if (urlNow.href !== window.location.href) {
+          window.location.replace(urlNow.pathname + urlNow.search + urlNow.hash);
         }
         return;
       }
@@ -2845,10 +2877,10 @@
       var dept = scope.department_code;
       urlNow.searchParams.set("native_filters", buildDeptNativeFiltersRison(dept));
       console.log("[PS] Ámbito dept →", dept, "(RLS servidor; 1 reload)");
-      markDeptFilterLocked(true, dept);
+      markDeptFilterLocked(true, dept, mode);
       window.location.replace(urlNow.pathname + urlNow.search + urlNow.hash);
     } catch (err) {
-      console.warn("[PS] No se pudo aplicar ámbito departamento", err);
+      console.warn("[PS] No se pudo aplicar ámbito", err);
     }
   }
 
