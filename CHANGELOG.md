@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-28o] — Probabilidad: fuente −10%
+
+### Changed
+- Tipografía ECharts Probabilidad: factor **0.715 → 0.6435** (−10%).
+- Sin regenerar layout (pull: divergencias solo de alias de nombres KPI).
+
 ## [2026-07-28n] — Probabilidad: chart llena el card
 
 ### Changed

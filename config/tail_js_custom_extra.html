@@ -1668,8 +1668,8 @@
   }
 
   function bumpProbabilidadChartFonts() {
-    /* Compactación −35% + +10% legibilidad en Probabilidad (0.65→0.715) */
-    var fontPx = Math.max(9, Math.round(getTableFontPx() * 0.715));
+    /* Probabilidad: −10% vs 0.715 → 0.6435 */
+    var fontPx = Math.max(9, Math.round(getTableFontPx() * 0.6435));
     var roots = document.querySelectorAll(
       '[data-test-chart-name*="Facturación por Probabilidad"]'
     );
