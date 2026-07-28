@@ -1563,7 +1563,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
     }
     sizes = {
         # Alturas UI: KPI 10; tablas Resumen/Proyectos misma altura; charts 36.
-        # Probabilidad = alto KPI band (hdr 4+4 + cards 10+10 = 28), sin hueco debajo.
+        # Probabilidad: altura traída de UI Superset (pull 2026-07-28) = 34.
         "obj": (1, 10),
         "plan": (1, 10),
         "table": (4, 68),
@@ -1571,7 +1571,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         # Altura layout alta: el CSS :has fija calc(100dvh-210px) al activar tab;
         # este valor evita que el grid React pinte un card enano el primer frame.
         "unidad": (12, 78),
-        "prob": (6, 28),
+        "prob": (6, 34),
         "chart": (6, 36),
     }
     # Importes grandes (euros) más anchos; % compactos

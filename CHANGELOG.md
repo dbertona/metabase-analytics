@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-28i] — Probabilidad height 34 desde UI
+
+### Changed
+
+- Layout `Facturación por Probabilidad`: height **34** (pull UI Superset;
+  antes 28 en script). Así no se pierde al regenerar el dashboard.
+
 ## [2026-07-28h] — Edición UI: resize KPIs/Probabilidad + Salir
 
 ### Fixed
