@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-28n] — Probabilidad: chart llena el card
+
+### Changed
+- Pull UI previo: sin divergencias vs previous; altura Probabilidad **28** (sync script).
+- ECharts `grid` más ajustado + CSS flex/`height:100%` para ocupar el contenedor.
+- Margen inferior ~10px (padding + `grid.bottom`).
+
 ## [2026-07-28m] — KPI: etiquetas +15%
 
 ### Changed

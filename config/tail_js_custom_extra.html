@@ -1608,6 +1608,15 @@
       inst.setOption(
         {
           textStyle: labelStyle,
+          /* Llenar el card: márgenes mínimos; containLabel reserva ejes/valores.
+             bottom un poco mayor = margen inferior pedido. */
+          grid: {
+            left: 4,
+            right: 8,
+            top: 2,
+            bottom: 10,
+            containLabel: true,
+          },
           // Valor (importes) en horizontal → xAxis
           xAxis: [
             {
@@ -1647,6 +1656,11 @@
         },
         false
       );
+      try {
+        if (typeof inst.resize === "function") inst.resize();
+      } catch (eResize) {
+        /* ignore */
+      }
       inst.__psProbFmt = fontPx;
     } catch (err) {
       /* remount */

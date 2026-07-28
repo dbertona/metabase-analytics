@@ -46,7 +46,7 @@ Comparable a PBI en espíritu (lienzo acotado), pero adaptativo hacia abajo
 ```text
 ROW-KPI-BAND
 ├── COLUMN-KPIS (width 6) — Facturación/Beneficio=2, Margen/Crecimiento=1
-└── Facturación por Probabilidad (width 6, height **22** — compact −35% 2026-07-28)
+└── Facturación por Probabilidad (width 6, height **28** — sync UI 2026-07-28)
 ```
 
 Debajo: Resumen mensual (ancho 12) · Evolución + Margen (6+6).
@@ -55,7 +55,7 @@ Debajo: Resumen mensual (ancho 12) · Evolución + Margen (6+6).
 |-------|----------------------------|-------|
 | KPI cards Obj/Plan | height **7** | Antes 10; padding/fuentes compactas |
 | Headers Objetivos / Planificación | height **3**, `SMALL_HEADER` | Antes 4 / MEDIUM |
-| Facturación por Probabilidad | height **22** | Antes 34 |
+| Facturación por Probabilidad | height **28** | Sync UI; chart llena el card con margen inferior |
 | Pieza | Dataset | Motivo |
 |-------|---------|--------|
 | 8 tarjetas KPI (Obj/Plan) | `bi_v_planificacion_kpi` | Tiene `department_code` + `facturacion_real_anterior` → filtro Departamento y Crecimiento |

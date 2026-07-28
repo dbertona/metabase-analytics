@@ -923,7 +923,7 @@ def persist_dashboard_config(
         "  display: flex !important;\n"
         "  align-items: center !important;\n"
         "}\n"
-        "/* Probabilidad compacta: título (+10% vs 12px compact) */\n"
+        "/* Probabilidad: título compacto + chart llena el card (margen inferior) */\n"
         ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
         " .header-title,\n"
         ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
@@ -933,6 +933,29 @@ def persist_dashboard_config(
         ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
         " .editable-title span {\n"
         "  font-size: 13px !important;\n"
+        "}\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad'] {\n"
+        "  display: flex !important;\n"
+        "  flex-direction: column !important;\n"
+        "  overflow: hidden !important;\n"
+        "}\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
+        " .chart-slice,\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
+        " .slice_container,\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
+        " .misc-chart-table-controls ~ div,\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
+        " .slice_container > div {\n"
+        "  flex: 1 1 auto !important;\n"
+        "  height: 100% !important;\n"
+        "  min-height: 0 !important;\n"
+        "  max-height: 100% !important;\n"
+        "}\n"
+        ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
+        " .slice_container {\n"
+        "  padding: 0 4px 10px 4px !important;\n"
+        "  box-sizing: border-box !important;\n"
         "}\n"
         "/* Valor KPI base */\n"
         ".superset-legacy-chart-big-number .header-line {\n"
@@ -1593,7 +1616,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
     }
     sizes = {
         # Alturas UI: KPI 10; tablas Resumen/Proyectos misma altura; charts 36.
-        # Banda KPI+Prob ~−35% vs UI previa (KPI 10/hdr 4/prob 34 → 7/3/22).
+        # Probabilidad: altura sync UI pull 2026-07-28 (28).
         "obj": (1, 7),
         "plan": (1, 7),
         "table": (4, 68),
@@ -1601,7 +1624,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         # Altura layout alta: el CSS :has fija calc(100dvh-210px) al activar tab;
         # este valor evita que el grid React pinte un card enano el primer frame.
         "unidad": (12, 78),
-        "prob": (6, 22),
+        "prob": (6, 28),
         "chart": (6, 36),
     }
     # Importes grandes (euros) más anchos; % compactos
