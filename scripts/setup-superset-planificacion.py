@@ -672,12 +672,14 @@ def persist_dashboard_config(
         "  min-height: 0 !important;\n"
         "  overflow: hidden !important;\n"
         "}\n"
-        "/* Fila de tablas: resto del viewport bajo KPIs */\n"
+        "/* Fila de tablas: resto del viewport bajo KPIs + separación suave */\n"
         ".grid-row:has([data-test-chart-name*='Resumen mensual']),\n"
         ".dragdroppable-row:has([data-test-chart-name*='Resumen mensual']) {\n"
         "  height: calc(100dvh - var(--ps-tables-top)) !important;\n"
         "  max-height: calc(100dvh - var(--ps-tables-top)) !important;\n"
         "  min-height: 220px !important;\n"
+        "  margin-top: 12px !important;\n"
+        "  padding-top: 0 !important;\n"
         "}\n"
         "/* Solo el card externo usa calc; el interior es 100% (si no, el pie se recorta) */\n"
         ".dashboard-component-chart-holder[data-test-chart-name*='Resumen mensual'],\n"
@@ -1645,7 +1647,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         # Altura layout alta: el CSS :has fija calc(100dvh-210px) al activar tab;
         # este valor evita que el grid React pinte un card enano el primer frame.
         "unidad": (12, 78),
-        "prob": (6, 28),
+        "prob": (6, 26),
         "chart": (6, 36),
     }
     # Importes grandes (euros) más anchos; % compactos

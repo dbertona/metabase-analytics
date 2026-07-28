@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-28r] — Separación KPI ↔ tablas + sync Prob 26
+
+### Changed
+- Pull UI: Probabilidad height **28→26** (edit manual) incorporado al script.
+- Margen superior **12px** en la fila Resumen/Proyectos (menos “pegado” a KPIs).
+
 ## [2026-07-28q] — KPI: menos hueco + etiquetas sin recorte
 
 ### Fixed
