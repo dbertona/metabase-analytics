@@ -1102,7 +1102,7 @@ def persist_dashboard_config(
         "}\n"
         ".dashboard-component-chart-holder[data-test-chart-name*='Facturación por Probabilidad']"
         " .slice_container {\n"
-        "  padding: 0 4px 10px 4px !important;\n"
+        "  padding: 0 14px 10px 12px !important;\n"
         "  box-sizing: border-box !important;\n"
         "}\n"
         "/* Valor KPI base */\n"

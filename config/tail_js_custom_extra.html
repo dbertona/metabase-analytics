@@ -1608,13 +1608,13 @@
       inst.setOption(
         {
           textStyle: labelStyle,
-          /* Llenar el card: márgenes mínimos; containLabel reserva ejes/valores.
-             bottom un poco mayor = margen inferior pedido. */
+          /* Márgenes: left/right suficientes para «100%» y «NNNN K€» sin clip.
+             containLabel suma el ancho real de ejes; left/right son mínimos. */
           grid: {
-            left: 4,
-            right: 8,
-            top: 2,
-            bottom: 10,
+            left: 12,
+            right: 40,
+            top: 4,
+            bottom: 12,
             containLabel: true,
           },
           // Valor (importes) en horizontal → xAxis
