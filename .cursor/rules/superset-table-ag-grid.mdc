@@ -6,20 +6,22 @@ description: Patrón obligatorio para crear o modificar tablas AG Grid en Supers
 # Tablas AG Grid en Superset — patrón canónico (agentes)
 
 > **Guía completa (OBLIGATORIA):** `docs/TABLAS_AG_GRID.md`  
-> **Última actualización:** 2026-07-28
+> **Última actualización:** 2026-07-29
 
 ## Antes de tocar nada
 
 1. Leer `.cursor/DOCUMENTATION_INDEX.md` → sección Analytics.
 2. Leer `docs/TABLAS_AG_GRID.md` completo (empezar por §0 Receta).
-3. Pull UI: `.cursor/rules/superset-dashboard-ui-sync.mdc`.
-4. Confirmar con el usuario: chart, columnas, buscador, persistencia.
-5. Trabajar en rama `feat/` o `fix/` — nunca en `main`.
+3. Si es **matriz mes×dim** (Gastos/Facturación): leer **`docs/TABLAS_AG_GRID.md` §12** completo.
+4. Pull UI: `.cursor/rules/superset-dashboard-ui-sync.mdc`.
+5. Confirmar con el usuario: chart, columnas, buscador, persistencia.
+6. Trabajar en rama `feat/` o `fix/` — nunca en `main`.
 
-**Patrón de referencia:** chart **Proyectos** (`id=21`).  
-**Tabla ancha de referencia:** **Gastos** (`id=22`) — scroll horizontal permitido.
+**Patrón de referencia (corta):** chart **Proyectos** (`id=21`).  
+**Patrón de referencia (matriz):** **Gastos** (`id=22`) + **Facturación** — §12.  
+**Tabla ancha:** scroll horizontal permitido (nunca ocultar la barra H).
 
-Una tabla “lista” = **Python + CSS + JS**. Renderizar el chart no basta.
+Una tabla “lista” = **Python + CSS + JS**. Matriz mes×dim = eso **+ SQL MV + REFRESH 004**.
 
 ---
 
@@ -123,6 +125,8 @@ En `tail_js_custom_extra.html`, con **IDs y storage keys propios**:
 - Persistencia solo en `columnResized` / `source="uiColumnResized"`.
 - Buscador: proxy nativo antes de ⋮; no mover el input React.
 - Idempotencia en la instancia `GridApi`.
+- **Matriz mes×dim:** anti-N/A vía `ensureMatrixNullBlank` / `isMatrixNaChart` (modo **light**);
+  `tuneAgGridScrollPerf(api)`; **no** añadir `MutationObserver` por chart. Detalle: guía §12.
 
 ---
 
@@ -132,9 +136,10 @@ En `tail_js_custom_extra.html`, con **IDs y storage keys propios**:
 - [ ] `AG_GRID_TABLE_ENABLED: True`
 - [ ] `viz_type = "ag-grid-table"`
 - [ ] CSS altura + **scroll condicional** (sin ocultar barra H)
-- [ ] JS propio (no reutilizar keys de Proyectos/Gastos)
+- [ ] JS propio (no reutilizar keys de Proyectos/Gastos/Facturación)
 - [ ] Buscador en cabecera si aplica
-- [ ] Probar ventana ancha **y** estrecha
+- [ ] Si matriz: SQL MV + REFRESH 004 + checklist §12.8
+- [ ] Probar ventana ancha **y** estrecha (**Chrome Retina**, no solo Cursor)
 - [ ] Commit + push `gitea` **antes** de regenerar
 - [ ] Regenerar con `SUPERSET_URL=…/analytics`
 - [ ] Restart si cambió `tail_js`
@@ -142,4 +147,4 @@ En `tail_js_custom_extra.html`, con **IDs y storage keys propios**:
 
 ---
 
-**Última actualización:** 2026-07-28
+**Última actualización:** 2026-07-29

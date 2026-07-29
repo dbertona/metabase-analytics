@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-29m] — Docs: receta matriz mes×dim (Gastos/Facturación)
+
+- `docs/TABLAS_AG_GRID.md` **§12**: SQL MV, `_month_pivot_params`, CSS `:is`, JS
+  (anti-N/A light, tune AG Grid, polls), checklist y mapa de funciones.
+- Índice + regla `superset-table-ag-grid.mdc` apuntan a §12.
+
 ## [2026-07-29l] — Mano de Obra solo `type_line = Resource`
 
 ### Fixed

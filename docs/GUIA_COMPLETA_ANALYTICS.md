@@ -392,6 +392,7 @@ Luego sync PSI + PSLAB vía webhook. Validar KPIs con SQL §6.3.
 | Vistas SQL canónicas | `sql/views/seguimiento_economico_views.sql` |
 | Capa BI Superset (`bi_v_*`) | `scripts/sql/bi_dashboard_planificacion_views.sql` |
 | **Tablas AG Grid — patrón y CSS** | [TABLAS_AG_GRID.md](./TABLAS_AG_GRID.md) |
+| **Matrices mes×dim (Gastos/Facturación)** | [TABLAS_AG_GRID.md §12](./TABLAS_AG_GRID.md) |
 | Guía n8n | `docs/shared/n8n/N8N_GUIDE.md` |
 
 ---

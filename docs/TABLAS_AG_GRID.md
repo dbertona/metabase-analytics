@@ -1,8 +1,9 @@
 # Tablas AG Grid en Superset — Guía operativa (agentes)
 
 > **Regla breve (alwaysApply):** `.cursor/rules/superset-table-ag-grid.mdc`  
-> **Última actualización:** 2026-07-28  
-> **Patrón de referencia:** chart **Proyectos** (`id=21`) — copiar comportamiento completo, no solo el render.
+> **Última actualización:** 2026-07-29  
+> **Patrón de referencia (tabla corta):** chart **Proyectos** (`id=21`).  
+> **Patrón de referencia (matriz mes×dim):** **Gastos** (`id=22`) + **Facturación** — ver **§12**.
 
 Esta guía evita el calvario típico: tabla que “pinta” pero no llena el card, buscador en fila extra,
 resize que vuelve atrás, anchos que no persisten, o **scroll horizontal inexistente** cuando no caben
@@ -63,12 +64,23 @@ docker restart superset   # o el nombre del contenedor en el compose de este rep
 ### Checklist mínimo (tabla “lista”)
 
 - [ ] `viz_type = "ag-grid-table"`
-- [ ] CSS altura completa + fuente (bloque §3)
-- [ ] **NO** ocultar `.ag-body-horizontal-scroll` (§3.1)
-- [ ] JS: IDs/claves propios (no reutilizar Proyectos/Gastos)
+- [ ] CSS altura completa + fuente (bloque §4)
+- [ ] **NO** ocultar `.ag-body-horizontal-scroll` (§4.2)
+- [ ] JS: IDs/claves propios (no reutilizar Proyectos/Gastos/Facturación)
 - [ ] Buscador en cabecera (si `include_search`)
 - [ ] Interceptar `sizeColumnsToFit` (evitar snapback)
 - [ ] Pull UI → commit → push → regenerar → probar
+- [ ] **Si es matriz mes×dim (estilo Gastos/Facturación):** seguir **§12** completo
+
+---
+
+## 0b. ¿Qué patrón clonar?
+
+| Pedido del usuario | Clonar | Sección |
+|--------------------|--------|---------|
+| Tabla corta (dimensión + 2–4 métricas) | **Proyectos** | §0–§5 |
+| Matriz **mes a mes** (dimensión + 01–12 + Total) | **Gastos / Facturación** | **§12** |
+| Otra pestaña con otra matriz | §12 (una matriz por pestaña; reutilizar helpers) | **§12** |
 
 ---
 
@@ -79,10 +91,10 @@ docker restart superset   # o el nombre del contenedor en el compose de este rep
 | Resumen mensual | 17 | Resumen | `ano_mes` + 3 métricas | No | Encaja casi siempre; orden cronológico vía SQL/JS |
 | Proyectos | 21 | Resumen | `proyecto` + 3 métricas | Sí | **Patrón canónico** de UX |
 | Gastos | 22 | Unidad | concepto + 12 meses + Total | Sí | Muchas columnas → **scroll horizontal real** si no caben |
-| Facturación | (nuevo) | Facturación | Encabezado + 12 meses + Total | Sí | Misma matriz que Gastos; filtros Operational + estados |
+| Facturación | 23 | Facturación | Encabezado + 12 meses + Total | Sí | Misma matriz que Gastos; filtros Operational + estados |
 
-Si el usuario pide “otra tabla como Proyectos”, clonar el patrón Proyectos.
-Si pide “matriz mes a mes”, mirar Gastos (pinned Total, anchos por mes, scroll).
+Si el usuario pide “otra tabla como Proyectos”, clonar el patrón Proyectos.  
+Si pide “matriz mes a mes” o “otra pestaña como Gastos/Facturación”, **§12** (no reinventar).
 
 ---
 
@@ -409,19 +421,228 @@ Usar `data-test-*`. Evitar `.slice_header` (legacy).
 | **No hay scroll horizontal** | CSS oculta barra / `overflow-x: hidden` | §4.2 — quitar hide, usar `auto` |
 | Scroll fantasma vacío | `display:block !important` forzado | Dejar comportamiento nativo AG Grid |
 | Pie Total recortado | Overflow del card / altura mal | Revisar flex altura; no `overflow:visible` agresivo |
+| Flash `"N/A"` en meses vacíos | Plugin AG Grid formatea NULL | §12.6 — `valueFormatter` + modo light |
+| Scroll lento en Chrome Retina | DPR 2 + DOM AG Grid + JS pesado | §12.7 — no observer en scroll; `tuneAgGridScrollPerf` |
 
 ---
 
-## 11. Fuente de verdad
+## 12. Receta matriz mes × dimensión (Gastos / Facturación) ⭐
+
+> **Usar esta sección** al crear **otra pestaña** con tabla ancha (concepto/proyecto/… × meses 01–12 + Total).  
+> Referencias de código: Gastos (`id≈22`) y Facturación (`id≈23`).  
+> **No meter varias matrices en Resumen** — una matriz por pestaña.
+
+### 12.1 Piezas obligatorias (todas)
+
+| # | Pieza | Archivo | Qué clonar |
+|---|-------|---------|------------|
+| 1 | SQL materializado | `scripts/sql/bi_dashboard_planificacion_views.sql` | `bi_mv_unidad` / `bi_mv_facturacion` → `bi_mv_<nombre>` + wrapper `bi_v_<nombre>` |
+| 2 | REFRESH en sync | `src/workflows/004_sync_bc_to_ps_analytics.json` | Incluir la MV nueva en el nodo *Refresh BI Materialized Views* |
+| 3 | Params chart | `scripts/setup-superset-planificacion.py` | `_month_pivot_params(...)` + pestaña + `charts_config` |
+| 4 | CSS altura/scroll | mismo setup → `dashboard_css` | Selectores `:is([...])` (nunca coma suelta) |
+| 5 | JS runtime | `config/tail_js_custom_extra.html` | Detector + persistencia + buscador + anti-N/A + tune scroll |
+| 6 | Apply SQL | `./scripts/apply-bi-views.sh` | Tras commit; en prod/VM según runbook |
+
+Una matriz “lista” = **SQL + Python + CSS + JS + REFRESH 004**. Falta una → se rompe al regenerar o al sync.
+
+### 12.2 Reglas de producto / rendimiento
+
+1. **Una sola AG Grid matriz por pestaña** (nunca 2 matrices visibles a la vez).
+2. Resumen no debe ganar charts de este tipo (carga inicial).
+3. SQL debe devolver **NULL** en meses sin actividad (`SUM(...) FILTER`), **no** `0` ni `''` — el `"N/A"` lo inventa el plugin AG Grid en el cliente; **no se arregla en SQL** (cambiar a texto rompe totales/`d3NumberFormat`).
+4. Chrome Retina (DPR 2) será más pesado que Cursor (DPR 1); es esperado. Ver §12.7.
+5. Reutilizar helpers existentes; **no** copiar/pegar un segundo `MutationObserver` por chart.
+
+### 12.3 SQL — plantilla `bi_mv_*` + wrapper
+
+Patrón canónico (Facturación):
+
+```sql
+CREATE MATERIALIZED VIEW bi_mv_<slug> AS
+SELECT
+    f.empresa,
+    f.year,
+    f.departamento AS department_code,
+    d.department_name,
+    f.tipo,
+    CASE f.tipo
+        WHEN 'P' THEN 'Planificado'
+        WHEN 'R' THEN 'Real'
+        ELSE COALESCE(f.tipo::text, '')
+    END AS tipo_label,
+    -- … filtros de negocio (tipo_proyecto, estado, …)
+    <dim_expr> AS <dim_col>,          -- p. ej. encabezado AS proyecto
+    SUM(<metrica>) FILTER (WHERE f.month = 1) AS m01,
+    -- … m02 … m12
+    SUM(<metrica>) AS total
+FROM <fuente_v_se_*> f
+LEFT JOIN mb_v_dim_departamento d
+  ON d.company_name = f.empresa AND d.department_code = f.departamento
+WHERE … filtros PBI …
+GROUP BY …
+HAVING ABS(SUM(<metrica>)) > 0.0001;
+
+CREATE INDEX … ON bi_mv_<slug> (empresa, year);
+CREATE INDEX … ON bi_mv_<slug> (department_code);
+CREATE INDEX … ON bi_mv_<slug> (tipo_label);
+CREATE INDEX … ON bi_mv_<slug> (<dim_col>);
+
+CREATE VIEW bi_v_<slug> AS SELECT * FROM bi_mv_<slug>;
+```
+
+| Existente | Dimensión | Métrica | Filtros típicos |
+|-----------|-----------|---------|-----------------|
+| `bi_v_unidad` | `concepto_analitico` | `coste` | Structure (ver SQL) |
+| `bi_v_facturacion` | `proyecto` (encabezado) | `facturado` | Operational + Completed/Open/Planning |
+
+Tras crear la MV: añadirla al **REFRESH** del workflow **004** y aplicar con `./scripts/apply-bi-views.sh` (+ `--refresh` si solo refrescas).
+
+### 12.4 Python — params y pestaña
+
+Usar el helper existente (no duplicar la lista de meses a mano):
+
+```python
+def mi_matriz_params() -> dict[str, Any]:
+    """Matriz mes a mes — mismo contrato que Gastos/Facturación."""
+    return _month_pivot_params(
+        dim_col="<dim_col>",          # columna en bi_v_*
+        dim_label="<Etiqueta UI>",    # cabecera (Concepto / Encabezado / …)
+        dim_width=280,                # o 220 como Gastos
+        order_label="<orden_*>",      # SQL ORDER BY dimensión
+    )
+```
+
+`_month_pivot_params` ya fija: `query_mode=aggregate`, métricas `m01`…`m12`+`total` con formato EUR, `row_limit=5000`, `show_totals=True`, `include_search=True`, `show_cell_bars=False`, `order_by_cols` por dimensión.
+
+En `charts_config` / tabs del setup:
+
+```python
+("Mi Matriz", "mi-matriz-slug", dataset_id, "ag-grid-table", mi_matriz_params()),
+```
+
+- Crear **pestaña propia** en el layout del dashboard.
+- Registrar el chart en `chartsInScope` de los filtros nativos que apliquen (Año, Empresa, Dept, Tipo, Proyecto…).
+- Dataset: apuntar a `bi_v_<slug>` (no a la MV cruda si el wrapper es lo que usa RLS/Superset).
+
+### 12.5 CSS — altura + scroll (coma prohibida)
+
+Copiar el bloque de Gastos/Facturación en `dashboard_css`. **Obligatorio** usar `:is(...)`:
+
+```css
+/* ✅ Correcto — ambos charts */
+:is([data-test-chart-name*='Gastos'],[data-test-chart-name='Facturación'],[data-test-chart-name='Mi Matriz']) .ag-root {
+  height: 100% !important;
+}
+
+/* ❌ Incorrecto — la coma hace que .hijo solo aplique al último selector */
+[data-test-chart-name*='Gastos'],[data-test-chart-name='Facturación'] .ag-root { … }
+```
+
+Scroll horizontal: §4.2 — **nunca** `display: none` en `.ag-body-horizontal-scroll`.
+
+Nombre del chart en `data-test-chart-name` debe coincidir con el título del chart en el setup.
+
+### 12.6 JS — checklist por matriz nueva
+
+En `config/tail_js_custom_extra.html`, para **cada** matriz nueva (IDs y storage keys **propios**):
+
+| Paso | Qué | Notas |
+|------|-----|-------|
+| A | `isMiMatrizChart(chart)` | Por `data-test-chart-name` exacto o prefijo |
+| B | Persistencia anchos | Clonar `initGastosColPersist` / `initFacturacionColPersist` — **otra** key `localStorage` / PUT |
+| C | `sizeColumnsToFit` parcheado | Anti-snapback (como Gastos) |
+| D | Buscador en cabecera | `place*SearchInHeader` — proxy, no mover input React |
+| E | Anti-N/A | Incluir el chart en `isMatrixNaChart` **o** llamar `ensureMatrixNullBlank` desde el poll (mismo pipeline) |
+| F | Tune scroll | `tuneAgGridScrollPerf(api)` al obtener el `api` (idempotente) |
+| G | Poll 800 ms | Registrar init persistencia + `ensure*ColumnsFit` como Gastos/Facturación |
+
+#### Anti-N/A (NULL → celda en blanco) — comportamiento canónico 2026-07-29
+
+El plugin `ag-grid-table` pinta NULL numérico como `"N/A"`. Solución:
+
+1. **`valueFormatter` envuelto** (`patchAgGridNullAsBlank`) — barato; AG Grid lo llama al virtualizar.
+2. **Modo `light` (default):** sin `MutationObserver` ni barrido DOM en cada `bodyScroll`. Una pasada DOM al montar; poll 600 ms solo si aún hay N/A visibles.
+3. **Modo `heavy` (rollback):** listeners de scroll + `MutationObserver` + barrido DOM (más fluido visual ante edge cases, más CPU en Retina).
+
+| Control | Cómo |
+|---------|------|
+| Forzar heavy | `?_psna=heavy` o `window.__PS_MATRIX_NA_MODE='heavy'` + reload |
+| Forzar light | `?_psna=light` (o default) |
+| Modo activo | `window.__psMatrixNaModeActive` |
+
+**No** añadir un observer nuevo “por si acaso” en matrices nuevas: enganchar al pipeline `isMatrixNaChart` / `ensureMatrixNullBlank`.
+
+#### Tuning AG Grid (scroll)
+
+`tuneAgGridScrollPerf(api)` aplica una vez por instancia:
+
+- `rowBuffer: 6`
+- `debounceVerticalScrollbar: true`
+- `animateRows: false`
+
+Rollback: `?_psgridtune=off` o `window.__PS_GRID_TUNE_DISABLED=true`.
+
+#### Polls globales (todos los charts)
+
+- Pausados si `document.hidden` (`psPollEnabled`).
+- Rollback: `?_pspoll=always`.
+- Poll anti-N/A: default 600 ms (`?_psnapoll=120` para el ritmo antiguo).
+
+Tras cambiar `tail_js`: **reiniciar** contenedor `superset` (caché Jinja).
+
+### 12.7 Expectativa de fluidez (Chrome vs PBI)
+
+| Entorno | Qué esperar |
+|---------|-------------|
+| Cursor browser (DPR 1) | Más fluido — no usar como única prueba |
+| Chrome Mac Retina (DPR 2) | Scroll más pesado; normal en AG Grid DOM |
+| Power BI | Motor propio, no comparable 1:1 |
+
+Medir en Chrome: `({ dpr: devicePixelRatio, w: innerWidth, h: innerHeight })` (antes: `allow pasting` en consola).
+
+Si hace falta sensación “casi instantánea” con cientos/miles de filas: **paginación** o filtro previo — no más workers Gunicorn.
+
+### 12.8 Checklist de entrega (matriz nueva)
+
+- [ ] `bi_mv_<slug>` + `bi_v_<slug>` + índices + COMMENT
+- [ ] REFRESH en workflow **004**
+- [ ] `apply-bi-views.sh` aplicado y verificado en Analytics DB
+- [ ] `_month_pivot_params` / params + dataset + pestaña en setup
+- [ ] Filtros nativos `chartsInScope` actualizados
+- [ ] CSS `:is(...)` altura + scroll H condicional
+- [ ] JS: detector, persistencia (keys propias), buscador, anti-N/A compartido, `tuneAgGridScrollPerf`
+- [ ] Pull UI → commit → push `gitea` → regenerar setup → restart si cambió `tail_js`
+- [ ] Probar en **Chrome** (no solo Cursor): scroll V/H, sin flash N/A, buscador, totales, filtros
+- [ ] Documentar chart en §1 inventario de esta guía
+
+### 12.9 Mapa rápido de funciones (código)
+
+| Función / símbolo | Rol |
+|-------------------|-----|
+| `_month_pivot_params` | Params Python canónicos meses |
+| `gastos_unidad_params` / `facturacion_matriz_params` | Wrappers Gastos / Facturación |
+| `isGastosChart` / `isFacturacionMatrixChart` | Detectores |
+| `isMatrixNaChart` / `ensureMatrixNullBlank` | Anti-N/A compartido |
+| `getMatrixNaMode` / `attachMatrixNaScrollGuards` | light vs heavy |
+| `tuneAgGridScrollPerf` | rowBuffer / debounce / animateRows |
+| `psPollEnabled` / `psNaPollMs` | Polls pausables / ritmo N/A |
+| `initGastosColPersist` / `initFacturacionColPersist` | Anchos + anti-snapback |
+| `placeGastosSearchInHeader` / `placeFacturacionSearchInHeader` | Buscador |
+
+---
+
+## 13. Fuente de verdad
 
 | Área | Fuente |
 |------|--------|
 | Params, layout, CSS, owners | `scripts/setup-superset-planificacion.py` |
 | Runtime AG Grid | `config/tail_js_custom_extra.html` |
 | Feature flags | `config/superset_config.py` |
-| Vistas BI | `scripts/sql/bi_dashboard_planificacion_views.sql` |
+| Vistas BI / MVs | `scripts/sql/bi_dashboard_planificacion_views.sql` |
+| REFRESH MVs | `src/workflows/004_sync_bc_to_ps_analytics.json` |
 | Regla agentes | `.cursor/rules/superset-table-ag-grid.mdc` |
 | Pull UI | `exports/superset-dashboard/README.md` + `superset-dashboard-ui-sync.mdc` |
+| Matriz mes×dim | **Esta guía §12** |
 
 Si código y esta guía divergen: comprobar navegador primero y actualizar **ambos**
 en el mismo cambio.
