@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [2026-07-29g] — Perf: metadata Superset (WAL + StdOutEventLogger + Postgres)
+
+- Diagnóstico: cuello de botella en `superset.db` (SQLite `journal_mode=delete` +
+  `DBEventLogger` → tabla `logs` ~13k filas/24h), no en el volumen Analytics (~50k filas).
+- **Fase A/B:** `PRAGMA journal_mode=WAL`, `SQLALCHEMY_ENGINE_OPTIONS` busy_timeout,
+  `EVENT_LOGGER = StdOutEventLogger()` (Action Log UI deja de poblarse; eventos en
+  `docker logs`).
+- **Fase C:** base Postgres `superset_meta` en instancia `supabase-db` (VM 100);
+  `SQLALCHEMY_DATABASE_URI` por defecto a esa DB; script
+  `scripts/migrate-superset-metadata-to-postgres.py` (excluye `logs`/`query`).
+- Rollback: `SUPERSET_DATABASE_URI=sqlite:////app/superset_home/superset.db.bak` +
+  recreate; backups en VM 100 `backups/superset-pre-pg-migration-*.db`.
+- Verificación navegador: dashboard Resumen OK; span `/chart/data` ~1.1 s (16 charts).
+
 ## [2026-07-29f] — Perf: materializar capas BI + REFRESH en sync 004
 
 - `bi_v_planificacion_kpi`, `bi_v_evolucion_mensual`, `bi_v_facturacion_probabilidad`,

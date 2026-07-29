@@ -270,7 +270,7 @@ psql "postgresql://postgres:SuperSecurePassword2025@192.168.36.100:5433/postgres
 
 ⚠️ Aplicar cambios SQL solo tras validar impacto en KPI (`v_se_facturacion`, `v_se_kpi_cards`) contra Power BI.
 
-### 7.4 Rendimiento Superset (workers / caché / JIT / MVs)
+### 7.4 Rendimiento Superset (workers / caché / JIT / MVs / metadata)
 
 Diagnóstico 2026-07-29 (dataset ~50k filas; el cuello de botella no era volumen):
 
@@ -280,6 +280,29 @@ Diagnóstico 2026-07-29 (dataset ~50k filas; el cuello de botella no era volumen
 | Caché charts | `config/superset_config.py` → `DATA_CACHE_CONFIG` | FileSystemCache, TTL 600 s |
 | JIT Postgres | `ALTER DATABASE postgres SET jit_above_cost` | `10000000` (evita JIT en KPI) |
 | Capas BI pesadas | `bi_mv_*` + wrapper `bi_v_*` | Snapshot; REFRESH al final del sync **004** |
+| Metadata Superset | DB `superset_meta` en `supabase-db` | Postgres (antes SQLite `superset.db`) |
+| Event logger | `EVENT_LOGGER = StdOutEventLogger()` | No escribe en tabla `logs` |
+
+**Cuello de botella real (metadata):** con SQLite (`journal_mode=delete`) + `DBEventLogger`
+escribiendo ~13k filas/día en `logs`, las ~18 peticiones `/chart/data` del dashboard se
+serializaban 1–2 s. Mitigación aplicada:
+
+1. **WAL** en `superset.db` (transición) + `busy_timeout`.
+2. **`StdOutEventLogger`** — Action Log UI vacío; eventos en `docker logs superset`.
+3. **Migración a Postgres** — base `superset_meta` (misma instancia `supabase-db:5432`,
+   no mezcla datos `bc_*` / `v_se_*`). Script:
+   `scripts/migrate-superset-metadata-to-postgres.py`.
+
+URI metadata (override con env):
+
+```bash
+# Default en config: postgresql+psycopg2://postgres:…@supabase-db:5432/superset_meta
+# Rollback a SQLite (emergencia):
+# SUPERSET_DATABASE_URI=sqlite:////app/superset_home/superset.db.bak
+```
+
+Backup pre-migración en VM 100: `backups/superset-pre-pg-migration-*.db` y
+`data/superset-home/superset.db.bak`.
 
 Superset sigue leyendo `bi_v_*` (nombres y RLS Jinja sin cambio). Las consultas pesadas
 (`bi_v_unidad`, `bi_v_facturacion`, KPI, evolución, etc.) leen el snapshot `bi_mv_*`.
@@ -302,8 +325,8 @@ Tras cambiar compose/config en VM 100:
 docker compose up -d --force-recreate superset
 # Verificar workers: docker exec superset printenv SERVER_WORKER_AMOUNT
 # Verificar JIT: SHOW jit_above_cost;  → 10000000
+# Verificar metadata Postgres: docker logs superset 2>&1 | grep PostgresqlImpl
 ```
-
 ### 7.5 Resync completo (prueba o recuperación)
 
 ```sql

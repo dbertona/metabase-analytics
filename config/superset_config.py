@@ -65,18 +65,41 @@ EXPLORE_FORM_DATA_CACHE_CONFIG = {
 # Metadata DB — rendimiento (2026-07-29)
 # Diagnóstico: journal_mode=delete + DBEventLogger escribiendo en `logs`
 # (~13k filas/24h) serializaba las ~18 peticiones /chart/data del dashboard.
-# - WAL + busy_timeout: lectores/escritores concurrentes en SQLite.
+# - WAL + busy_timeout: lectores/escritores concurrentes en SQLite (transición).
 # - StdOutEventLogger: deja de escribir en `logs` (Action Log UI vacío;
-#   eventos van a docker logs). Tras migrar a Postgres (SQLALCHEMY_DATABASE_URI
-#   vía env) se mantienen estas opciones salvo connect_args sqlite.
+#   eventos van a docker logs).
+# - SQLALCHEMY_DATABASE_URI → Postgres `superset_meta` (recomendado producción).
 # ---------------------------------------------------------------------------
-# Perf 2026-07-29: busy_timeout evita "database is locked" bajo concurrencia
-# (WAL se fija una vez sobre el fichero; busy_timeout es por conexión).
-SQLALCHEMY_ENGINE_OPTIONS = {"connect_args": {"timeout": 30}}
+# Metadata en Postgres (misma instancia supabase-db, DB dedicada). Override con
+# SUPERSET_DATABASE_URI en .env. Vacío → SQLite legacy en SUPERSET_HOME.
+_SUPERSET_DATABASE_URI = os.environ.get("SUPERSET_DATABASE_URI", "").strip()
+if not _SUPERSET_DATABASE_URI:
+    _meta_user = os.environ.get("SUPERSET_META_USER", "postgres").strip()
+    _meta_pass = os.environ.get(
+        "SUPERSET_META_PASSWORD", "SuperSecurePassword2025"
+    ).strip()
+    _meta_host = os.environ.get("SUPERSET_META_HOST", "supabase-db").strip()
+    _meta_port = os.environ.get("SUPERSET_META_PORT", "5432").strip()
+    _meta_db = os.environ.get("SUPERSET_META_DB", "superset_meta").strip()
+    _SUPERSET_DATABASE_URI = (
+        f"postgresql+psycopg2://{_meta_user}:{_meta_pass}"
+        f"@{_meta_host}:{_meta_port}/{_meta_db}"
+    )
+SQLALCHEMY_DATABASE_URI = _SUPERSET_DATABASE_URI
 
-# Perf 2026-07-29: DBEventLogger (default) escribe en `logs` (SQLite) en cada
-# acción/carga de chart → 13k filas/24h, causa principal de la contención
-# medida. StdOutEventLogger redirige a stdout (docker logs superset).
+if SQLALCHEMY_DATABASE_URI.startswith("sqlite"):
+    # busy_timeout (segundos) evita "database is locked" bajo concurrencia.
+    SQLALCHEMY_ENGINE_OPTIONS = {"connect_args": {"timeout": 30}}
+else:
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+        "pool_size": 5,
+        "max_overflow": 10,
+        "pool_recycle": 3600,
+    }
+
+# Perf 2026-07-29: DBEventLogger (default) escribe en `logs` en cada
+# acción/carga de chart → 13k filas/24h. StdOutEventLogger → stdout.
 EVENT_LOGGER = StdOutEventLogger()
 
 WTF_CSRF_ENABLED = True
