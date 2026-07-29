@@ -459,6 +459,8 @@ LEFT JOIN mb_v_dim_departamento d
 WHERE c.tipo IN ('P', 'R')
   AND c.tipo_proyecto = 'Operational'
   AND COALESCE(c.estado, '') IN ('Completed', 'Open', 'Planning')
+  -- PBI Gastos / Facturación: no sumar Mano de Obra Resource (solo G/L, Item, …)
+  AND COALESCE(c.type_line, '') <> 'Resource'
 GROUP BY
     c.empresa,
     c.year,
@@ -479,7 +481,7 @@ CREATE INDEX IF NOT EXISTS bi_mv_gastos_idx3 ON bi_mv_gastos (proyecto);
 CREATE VIEW bi_v_gastos AS SELECT * FROM bi_mv_gastos;
 
 COMMENT ON VIEW bi_v_gastos IS
-  'Gastos PBI: Operational + Completed/Open/Planning; pivot coste×mes Encabezado; total>0. (materializada: bi_mv_gastos; REFRESH tras sync 004).';
+  'Gastos PBI: Operational + Completed/Open/Planning; excl. type_line Resource; pivot coste×mes Encabezado; total>0. (materializada: bi_mv_gastos; REFRESH tras sync 004).';
 COMMENT ON MATERIALIZED VIEW bi_mv_gastos IS
   'Snapshot de bi_v_gastos; refrescar tras sync BC→Analytics.';
 

@@ -79,7 +79,7 @@ Regenerar (API LAN): `SKIP_APPLY_BI_VIEWS=1 SUPERSET_URL=http://192.168.36.100:8
 2. **Unidad** — Pivot por concepto analítico (`descripcionCA`) ✅ (`bi_v_unidad` + chart Unidad; Structure fijo)
 3. **Resumen Proyectos** — Tabla por encabezado de proyecto ✅ (`bi_v_resumen_proyectos` + chart Proyectos; filtros PBI: Operational + estado Completed/Open/Planning)
 4. **Facturación** — Pivot mensual facturado ✅ (`bi_v_facturacion` + chart Facturación; mismos filtros de estado + total > 0; meses 01–12)
-5. **Gastos** — Pivot mensual costes ✅ (`bi_v_gastos` + chart Gastos; Operational + Completed/Open/Planning; coste > 0; Encabezado × meses)
+5. **Gastos** — Pivot mensual costes ✅ (`bi_v_gastos` + chart Gastos; Operational + Completed/Open/Planning; **excl. `type_line=Resource`**; coste > 0; Encabezado × meses)
 6. **Mano de Obra** — Recursos y costes
 7. **Mano de Obra Recursos/Perfiles** — Gauges horas planificadas vs imputables
 

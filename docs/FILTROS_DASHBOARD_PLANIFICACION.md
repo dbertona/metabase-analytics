@@ -62,7 +62,7 @@ Debajo: separación ~12px · Resumen mensual + Proyectos.
 | Resumen / Evolución / Margen | `bi_v_evolucion_mensual` | Fuente de **valores** del filtro Planificado/Real (`tipo_label`); dims también en Resumen |
 | Facturación por Probabilidad | `bi_v_facturacion_probabilidad` | Al lado de KPIs (7+5); fuera del scope de filtros Año/Empresa/Dept; etiquetas `N%` e importes en `K€` (params + `tail_js`); sí entra en filtro **Proyectos** |
 | Gastos (pestaña Unidad) → **Unidad** | `bi_v_unidad` | Pivot coste por concepto×mes; Structure fijo en la vista |
-| Gastos (pestaña Gastos) | `bi_v_gastos` | Pivot coste Encabezado×mes; Operational + Completed/Open/Planning; total>0 |
+| Gastos (pestaña Gastos) | `bi_v_gastos` | Pivot coste Encabezado×mes; Operational + Completed/Open/Planning; excl. Resource; total>0 |
 | Facturación (pestaña) | `bi_v_facturacion` | Pivot facturado Encabezado×mes; Operational + Completed/Open/Planning; total>0 |
 
 ### Filtros configurados
