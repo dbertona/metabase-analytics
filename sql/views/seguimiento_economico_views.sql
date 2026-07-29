@@ -238,6 +238,12 @@ CREATE OR REPLACE VIEW public.v_se_lineas_movimientos AS
            FROM bc_job_ledger_entry_month m
              LEFT JOIN bc_job j ON j.company_name = m.company_name AND j.no::text = m.job_no::text
           WHERE m.job_no IS NOT NULL
+            -- Mano de Obra* solo type_line Resource (excluye G/L Account p.ej. nr 0000003)
+            AND (
+              COALESCE(m.concepto_analitico_descripcion, ''::character varying)::text
+                NOT LIKE 'Mano de Obra%'
+              OR m.type_line::text = 'Resource'::text
+            )
         )
  SELECT s.empresa,
     s.job,
@@ -271,7 +277,9 @@ CREATE OR REPLACE VIEW public.v_se_lineas_movimientos AS
     (s.empresa || ':'::text) || s.year::text AS empresa_ano,
     (s.empresa || ':'::text) || COALESCE(s.nr, ''::character varying)::text AS empresa_recurso
    FROM src s;
-COMMENT ON VIEW public.v_se_lineas_movimientos IS 'Replica M de Power BI para movimientosProyectosMes: invoice ya transformado en sync (OData * -1); sin ABS.';
+COMMENT ON VIEW public.v_se_lineas_movimientos IS
+  'Replica M de Power BI para movimientosProyectosMes: invoice ya transformado en sync (OData * -1); sin ABS. '
+  'Mano de Obra* solo type_line=Resource (excluye G/L Account).';
 
 -- ---------------------------------------------------------------------------
 -- View: v_se_lineas_expedientes
