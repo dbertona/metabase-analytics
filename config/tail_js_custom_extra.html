@@ -1087,8 +1087,17 @@
     }
   }
 
+  function scheduleBlankGastosNA(chart) {
+    if (!chart || chart.__psNaBlankRaf) return;
+    chart.__psNaBlankRaf = window.requestAnimationFrame(function () {
+      chart.__psNaBlankRaf = 0;
+      blankGastosNA(chart);
+    });
+  }
+
   function wrapNullAsBlankFormatter(orig) {
-    return function (params) {
+    if (orig && orig.__psNullBlankWrapper) return orig;
+    var wrapped = function (params) {
       var raw = params && params.value;
       var empty =
         raw === null ||
@@ -1106,46 +1115,108 @@
       if (out === "N/A" || out === "n/a" || out == null) return "";
       return out;
     };
+    wrapped.__psNullBlankWrapper = true;
+    return wrapped;
   }
 
+  function wrapColDefFormatter(d) {
+    if (!d || (d.children && d.children.length)) return false;
+    var vf = d.valueFormatter;
+    if (vf && vf.__psNullBlankWrapper) return false;
+    d.valueFormatter = wrapNullAsBlankFormatter(vf);
+    return true;
+  }
+
+  /**
+   * Re-aplica siempre: al hacer scroll AG Grid virtualiza filas y React/Superset
+   * puede restaurar valueFormatter originales → vuelve el flash N/A.
+   * Preferimos mutar colDef en vivo (sin setColumnDefs en cada scroll).
+   */
   function patchAgGridNullAsBlank(api) {
-    if (!api || api.__psNullBlankPatched) return !!api && !!api.__psNullBlankPatched;
-    var defs = null;
-    try {
-      defs = typeof api.getColumnDefs === "function" ? api.getColumnDefs() : null;
-    } catch (e) {
-      return false;
-    }
-    if (!defs || !defs.length) return false;
+    if (!api) return false;
+    var changed = false;
 
-    function walk(list) {
-      var changed = false;
-      for (var i = 0; i < list.length; i++) {
-        var d = list[i];
-        if (!d) continue;
-        if (d.children && d.children.length) {
-          if (walk(d.children)) changed = true;
-          continue;
+    try {
+      if (typeof api.getColumns === "function") {
+        var cols = api.getColumns() || [];
+        for (var c = 0; c < cols.length; c++) {
+          var col = cols[c];
+          if (!col || typeof col.getColDef !== "function") continue;
+          if (wrapColDefFormatter(col.getColDef())) changed = true;
         }
-        if (d.__psNullBlankWrapped) continue;
-        d.valueFormatter = wrapNullAsBlankFormatter(d.valueFormatter);
-        d.__psNullBlankWrapped = true;
-        changed = true;
       }
-      return changed;
+    } catch (eCols) { /* ignore */ }
+
+    try {
+      var defs =
+        typeof api.getColumnDefs === "function" ? api.getColumnDefs() : null;
+      if (defs && defs.length) {
+        function walk(list) {
+          for (var i = 0; i < list.length; i++) {
+            var d = list[i];
+            if (!d) continue;
+            if (d.children && d.children.length) {
+              walk(d.children);
+              continue;
+            }
+            if (wrapColDefFormatter(d)) changed = true;
+          }
+        }
+        walk(defs);
+        // Solo setColumnDefs la 1ª vez o si React restauró defs sin wrapper
+        if (changed && !api.__psNullBlankPatched && typeof api.setColumnDefs === "function") {
+          api.setColumnDefs(defs);
+        }
+      }
+    } catch (eDefs) { /* ignore */ }
+
+    if (changed || !api.__psNullBlankPatched) {
+      api.__psNullBlankPatched = true;
+    }
+    return !!api.__psNullBlankPatched;
+  }
+
+  function attachMatrixNaScrollGuards(api, chart) {
+    if (!api || !chart || api.__psNaScrollGuards) return;
+    api.__psNaScrollGuards = true;
+
+    function onVirt() {
+      patchAgGridNullAsBlank(api);
+      scheduleBlankGastosNA(chart);
     }
 
-    walk(defs);
     try {
-      if (typeof api.setColumnDefs === "function") api.setColumnDefs(defs);
-      api.__psNullBlankPatched = true;
-      if (typeof api.refreshCells === "function") {
-        api.refreshCells({ force: true });
-      }
-      return true;
-    } catch (err) {
-      return false;
-    }
+      [
+        "bodyScroll",
+        "modelUpdated",
+        "viewportChanged",
+        "virtualColumnsChanged",
+        "firstDataRendered",
+        "rowDataUpdated",
+      ].forEach(function (evName) {
+        try {
+          api.addEventListener(evName, onVirt);
+        } catch (eEv) { /* ignore */ }
+      });
+    } catch (eAdd) { /* ignore */ }
+
+    if (chart.__psNaDomObserver) return;
+    var root =
+      chart.querySelector(".ag-center-cols-viewport") ||
+      chart.querySelector(".ag-body-viewport") ||
+      chart.querySelector('[class*="ag-theme"]') ||
+      chart;
+    try {
+      var obs = new MutationObserver(function () {
+        scheduleBlankGastosNA(chart);
+      });
+      obs.observe(root, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+      chart.__psNaDomObserver = obs;
+    } catch (eObs) { /* ignore */ }
   }
 
   function isMatrixNaChart(chart) {
@@ -1172,7 +1243,6 @@
     if (!agTheme) return;
     var api = findAgGridApi(agTheme);
     if (!api) {
-      // No dejar el cuerpo oculto para siempre si el API tarda
       if (!chart.__psNaFailSafe) {
         chart.__psNaFailSafe = setTimeout(function () {
           blankGastosNA(chart);
@@ -1182,6 +1252,7 @@
       return;
     }
     patchAgGridNullAsBlank(api);
+    attachMatrixNaScrollGuards(api, chart);
     blankGastosNA(chart);
     if (api.__psNullBlankPatched) {
       if (chart.__psNaFailSafe) {

@@ -7,6 +7,8 @@
 - Cause: plugin AG Grid de Superset formatea NULL numérico como `"N/A"` (`formatValue.ts`).
 - `tail_js`: parche `valueFormatter` → `""` + clase `ps-na-pending` (opacity 0) hasta listo.
 - Aplica a matrices **Facturación** y **Gastos** (mismo patrón).
+- Scroll/virtualización: re-parche en `bodyScroll`/`viewportChanged` + MutationObserver
+  (Superset restauraba el formatter al pintar filas nuevas → flash N/A al desplazarse).
 
 ## [2026-07-29d] — Perf Superset: workers + FileSystemCache + JIT
 
