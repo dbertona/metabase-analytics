@@ -59,11 +59,14 @@
       9: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1,
     };
     var resumenHeavyIds = { 17: 1, 20: 1, 21: 1 }; // mensual, probabilidad, proyectos
+    // IDs típicos (setup actual): 22=Gastos Encabezado, 23=Facturación, 24=Unidad.
+    // Si cambian tras regenerar, bucketFor cae a slice_name.
     var otherTabIds = {
       18: "Gráficos",
       19: "Gráficos",
-      22: "Unidad",
+      22: "Gastos",
       23: "Facturación",
+      24: "Unidad",
     };
     var phaseBReady = false;
     var kpiAllowed = 0;
