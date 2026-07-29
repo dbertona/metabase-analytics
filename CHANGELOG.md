@@ -2,12 +2,81 @@
 
 ## [Unreleased]
 
-## [2026-07-29d] — Mano de Obra solo `type_line = Resource`
+## [2026-07-29l] — Mano de Obra solo `type_line = Resource`
 
 ### Fixed
 - `v_se_lineas_movimientos`: conceptos `Mano de Obra*` excluyen `G/L Account`
   (p. ej. nr `0000003` en PS Lab jun 2026 duplicaba Admin/Dirección/Oferta/…).
   Coste G/L de otros CA (p. ej. Structure sin depto) no se toca.
+
+## [2026-07-29k] — Perf: tuning interno AG Grid (rowBuffer/debounce/animateRows)
+
+- `tuneAgGridScrollPerf(api)`: `rowBuffer=6`, `debounceVerticalScrollbar=true`,
+  `animateRows=false` en Proyectos, Gastos, Facturación y Resumen mensual.
+- Aplicado una vez por instancia de grid (`api.__psScrollPerfTuned`), vía
+  `api.setGridOption()` con fallback silencioso si la versión de AG Grid no lo soporta.
+- Rollback: `?_psgridtune=off` o `window.__PS_GRID_TUNE_DISABLED=true`.
+
+## [2026-07-29j] — Perf: pausar polls JS si pestaña oculta + anti-N/A más lento
+
+- `psPollEnabled()`: los `setInterval` del dashboard no trabajan con `document.hidden`
+  (Chrome Retina). Rollback: `?_pspoll=always` / `__PS_POLL_ALWAYS=true`.
+- Poll anti-N/A: 120 ms → **600 ms**; en modo `light` deja de re-escanear si ya
+  `ps-na-ready`. Rollback: `?_psnapoll=120` / `__PS_NA_POLL_MS=120`.
+
+## [2026-07-29i] — Perf: anti-N/A Facturación/Gastos en modo light (reversible)
+
+- Default `light`: solo `valueFormatter` + re-parche en carga de datos (sin
+  `bodyScroll` / `MutationObserver` / barrido DOM en cada scroll).
+- Rollback sin redeploy: `?_psna=heavy` o `window.__PS_MATRIX_NA_MODE='heavy'` + reload.
+- Modo activo: `window.__psMatrixNaModeActive`.
+
+## [2026-07-29h] — Perf: carga progresiva charts en Resumen (tail_js)
+
+- Experimento en `config/tail_js_custom_extra.html`: prioriza KPIs (slices 9–16) y
+  difiere charts pesados de Resumen (17, 20, 21) ~150 ms tras 6 KPIs permitidos.
+- Otras pestañas (Unidad / Facturación / Gráficos) se cargan al montar la pestaña
+  (Superset ya no pide sus `/chart/data` al abrir Resumen).
+- Stats: `window.__psLazyTabStats` (`deferred`, `flushed`, `seenSids`).
+- Verificado en navegador: `deferred=3`, `flushed.ResumenHeavy=3`, Facturación OK al
+  cambiar de tab; dos oleadas `/chart/data` (~800 ms de separación).
+
+## [2026-07-29g] — Perf: metadata Superset (WAL + StdOutEventLogger + Postgres)
+
+- Diagnóstico: cuello de botella en `superset.db` (SQLite `journal_mode=delete` +
+  `DBEventLogger` → tabla `logs` ~13k filas/24h), no en el volumen Analytics (~50k filas).
+- **Fase A/B:** `PRAGMA journal_mode=WAL`, `SQLALCHEMY_ENGINE_OPTIONS` busy_timeout,
+  `EVENT_LOGGER = StdOutEventLogger()` (Action Log UI deja de poblarse; eventos en
+  `docker logs`).
+- **Fase C:** base Postgres `superset_meta` en instancia `supabase-db` (VM 100);
+  `SQLALCHEMY_DATABASE_URI` por defecto a esa DB; script
+  `scripts/migrate-superset-metadata-to-postgres.py` (excluye `logs`/`query`).
+- Rollback: `SUPERSET_DATABASE_URI=sqlite:////app/superset_home/superset.db.bak` +
+  recreate; backups en VM 100 `backups/superset-pre-pg-migration-*.db`.
+- Verificación navegador: dashboard Resumen OK; span `/chart/data` ~1.1 s (16 charts).
+
+## [2026-07-29f] — Perf: materializar capas BI + REFRESH en sync 004
+
+- `bi_v_planificacion_kpi`, `bi_v_evolucion_mensual`, `bi_v_facturacion_probabilidad`,
+  `bi_v_resumen_proyectos`, `bi_v_unidad`, `bi_v_facturacion` → **MATERIALIZED VIEW**
+  `bi_mv_*` + wrapper `bi_v_*` (Superset/RLS sin cambio de nombre).
+- Workflow **004**: nodo `Refresh BI Materialized Views` tras `Compute Execution Summary`
+  (antes de liberar mutex) + restore del payload de resumen.
+- `scripts/apply-bi-views.sh`: destino remoto/DSN + `--refresh`.
+
+## [2026-07-29e] — AG Grid: NULL de meses vacíos sin flash N/A
+
+- Cause: plugin AG Grid de Superset formatea NULL numérico como `"N/A"` (`formatValue.ts`).
+- `tail_js`: parche `valueFormatter` → `""` + clase `ps-na-pending` (opacity 0) hasta listo.
+- Aplica a matrices **Facturación** y **Gastos** (mismo patrón).
+- Scroll/virtualización: re-parche en `bodyScroll`/`viewportChanged` + MutationObserver
+  (Superset restauraba el formatter al pintar filas nuevas → flash N/A al desplazarse).
+
+## [2026-07-29d] — Perf Superset: workers + FileSystemCache + JIT
+
+- `docker-compose.yml`: `SERVER_WORKER_AMOUNT=3`, `SERVER_THREADS_AMOUNT=20`, `GUNICORN_TIMEOUT=120` (antes 1 worker por defecto).
+- `config/superset_config.py`: `CACHE_CONFIG` / `DATA_CACHE_CONFIG` / filter+explore con `FileSystemCache` bajo `/app/superset_home/cache` (TTL 5–10 min).
+- Analytics DB (`postgres`): `jit_above_cost = 10000000` (antes 100000) — evita JIT en vistas `bi_v_*`/`v_se_*` con coste estimado alto y filas pocas (~50 ms ahorrados por query KPI).
 
 ## [2026-07-29c] — Fix altura AG Grid pestaña Unidad (Gastos)
 

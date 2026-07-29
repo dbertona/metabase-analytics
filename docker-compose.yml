@@ -15,6 +15,12 @@ services:
       SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-PsSuperset#2026xK9!}
       # Path público: https://apps.powersolution.es/analytics/
       SUPERSET_APP_ROOT: ${SUPERSET_APP_ROOT:-/analytics}
+      # Perf (2026-07-29): run-server.sh default = 1 worker. VM 100 tiene
+      # 4 vCPU / ~13 GiB libres; 3 workers × 20 threads evita serializar
+      # dashboards concurrentes sin saturar RAM (~300 MiB → ~1 GiB).
+      SERVER_WORKER_AMOUNT: ${SERVER_WORKER_AMOUNT:-3}
+      SERVER_THREADS_AMOUNT: ${SERVER_THREADS_AMOUNT:-20}
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-120}
       # Azure AD — IDs públicos; el secret SOLO desde .env (env_file),
       # no interpolar aquí o un vacío pisa el valor del fichero.
       AZURE_TENANT_ID: ${AZURE_TENANT_ID:-a18dc497-a8b8-4740-b723-65362ab7a3fb}

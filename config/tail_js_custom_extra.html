@@ -4,6 +4,289 @@
     return window.location.pathname.indexOf("/analytics/") === 0 ? "/analytics" : "";
   }
 
+  /**
+   * Polls del dashboard — pausar si la pestaña del navegador está oculta.
+   * Reduce CPU/GPU en Chrome Retina cuando el usuario cambia de pestaña/app.
+   * Rollback: ?_pspoll=always  o  window.__PS_POLL_ALWAYS = true
+   */
+  function psPollEnabled() {
+    try {
+      if (window.__PS_POLL_ALWAYS === true) return true;
+      var q = new URLSearchParams(window.location.search || "");
+      if ((q.get("_pspoll") || "").toLowerCase() === "always") return true;
+    } catch (ePoll) { /* ignore */ }
+    if (typeof document.hidden === "boolean" && document.hidden) return false;
+    return true;
+  }
+
+  /**
+   * Intervalo del poll anti-N/A (Gastos/Facturación).
+   * Default 600 ms (antes 120). Rollback: ?_psnapoll=120  o  __PS_NA_POLL_MS=120
+   */
+  function psNaPollMs() {
+    try {
+      var q = new URLSearchParams(window.location.search || "");
+      var v = parseInt(q.get("_psnapoll") || "", 10);
+      if (v >= 50 && v <= 5000) return v;
+    } catch (eMs) { /* ignore */ }
+    if (typeof window.__PS_NA_POLL_MS === "number" && window.__PS_NA_POLL_MS >= 50) {
+      return window.__PS_NA_POLL_MS;
+    }
+    return 600;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Lazy / progressive charts (prueba 2026-07-29)
+  // Hallazgo: Superset YA no pide Gastos/Facturación/Gráficos al abrir Resumen
+  // (no aparecen en seenSids). El coste percibido son los charts de Resumen.
+  // Estrategia:
+  //  1) Fase A — solo KPIs (Obj/Plan) al abrir
+  //  2) Fase B — Probabilidad + Resumen mensual + Proyectos tras KPIs o 400ms
+  //  3) Otras pestañas — diferir si algún día piden datos antes de abrirse
+  // ---------------------------------------------------------------------------
+  (function psLazyTabCharts() {
+    if (window.__psLazyTabCharts) return;
+    window.__psLazyTabCharts = true;
+    if (!window.fetch) return;
+
+    var pending = []; // { tab, run }
+    var warmed = {};
+    var stats = { allowed: 0, deferred: 0, flushed: {}, phase: "A" };
+    window.__psLazyTabStats = stats;
+
+    // KPIs Resumen (fase A). El resto de Resumen = fase B.
+    var kpiIds = {
+      9: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1,
+    };
+    var resumenHeavyIds = { 17: 1, 20: 1, 21: 1 }; // mensual, probabilidad, proyectos
+    var otherTabIds = {
+      18: "Gráficos",
+      19: "Gráficos",
+      22: "Unidad",
+      23: "Facturación",
+    };
+    var phaseBReady = false;
+    var kpiAllowed = 0;
+
+    function activeTabLabel() {
+      var t = document.querySelector(".ant-tabs-tab-active");
+      return (t && t.textContent && t.textContent.trim()) || "Resumen";
+    }
+
+    function parseSliceId(body, url) {
+      var raw = "";
+      if (typeof body === "string") raw = body;
+      else if (body != null) {
+        try {
+          raw = JSON.stringify(body);
+        } catch (e) {
+          raw = "";
+        }
+      }
+      if (url) raw += " " + String(url);
+      var m = raw.match(/"slice_id"\s*:\s*(\d+)/);
+      if (m) return Number(m[1]);
+      m = String(url || "").match(/form_data=([^&]+)/);
+      if (m) {
+        try {
+          var fd = JSON.parse(decodeURIComponent(m[1]));
+          if (fd && fd.slice_id != null) return Number(fd.slice_id);
+        } catch (e) {}
+      }
+      return null;
+    }
+
+    function parseChartName(body) {
+      if (body == null) return "";
+      var raw = typeof body === "string" ? body : "";
+      if (!raw) {
+        try {
+          raw = JSON.stringify(body);
+        } catch (e) {
+          return "";
+        }
+      }
+      var m = raw.match(/"slice_name"\s*:\s*"([^"]+)"/);
+      return m ? m[1] : "";
+    }
+
+    function bucketFor(sid, name) {
+      if (sid != null && otherTabIds[sid]) return otherTabIds[sid];
+      if (name === "Gastos") return "Unidad";
+      if (name === "Facturación") return "Facturación";
+      if (name === "Evolución mensual" || name === "Margen acumulado")
+        return "Gráficos";
+      if (sid != null && kpiIds[sid]) return "ResumenKPI";
+      if (sid != null && resumenHeavyIds[sid]) return "ResumenHeavy";
+      if (/^Obj ·|^Plan ·/.test(name || "")) return "ResumenKPI";
+      if (
+        name === "Resumen mensual" ||
+        name === "Proyectos" ||
+        name === "Facturación por Probabilidad"
+      )
+        return "ResumenHeavy";
+      // Peticiones sin slice_id (a menudo réplicas/filtros del dataset KPI):
+      // dejarlas en fase A para no romper filtros.
+      return "ResumenKPI";
+    }
+
+    function flushBucket(bucket) {
+      warmed[bucket] = true;
+      var keep = [];
+      var run = [];
+      for (var i = 0; i < pending.length; i++) {
+        if (pending[i].tab === bucket) run.push(pending[i]);
+        else keep.push(pending[i]);
+      }
+      pending = keep;
+      stats.flushed[bucket] = (stats.flushed[bucket] || 0) + run.length;
+      for (var j = 0; j < run.length; j++) {
+        try {
+          run[j].run();
+        } catch (e) {}
+      }
+    }
+
+    function enablePhaseB(reason) {
+      if (phaseBReady) return;
+      phaseBReady = true;
+      stats.phase = "B:" + reason;
+      flushBucket("ResumenHeavy");
+    }
+
+    function maybeEnablePhaseB() {
+      // No habilitar en el mismo tick que el burst inicial: si no, los heavy
+      // del mismo lote pasan tras el 6º KPI. Esperar un frame de red.
+      if (kpiAllowed >= 6) {
+        setTimeout(function () {
+          enablePhaseB("kpi>=6");
+        }, 150);
+      }
+    }
+
+    function allowOrDefer(bucket, sendFn) {
+      // Marcar primer chart/data para timeout relativo al burst real
+      if (!stats.firstChartAt) {
+        stats.firstChartAt = Date.now();
+        setTimeout(function () {
+          enablePhaseB("300ms-after-first-chart");
+        }, 300);
+        setTimeout(function () {
+          enablePhaseB("2000ms-after-first-chart");
+        }, 2000);
+      }
+      var active = activeTabLabel();
+      // Pestañas laterales
+      if (bucket === "Unidad" || bucket === "Facturación" || bucket === "Gráficos") {
+        if (active === bucket || warmed[bucket]) {
+          stats.allowed += 1;
+          return sendFn();
+        }
+        stats.deferred += 1;
+        pending.push({ tab: bucket, run: sendFn });
+        return;
+      }
+      // Resumen KPI — siempre en apertura
+      if (bucket === "ResumenKPI") {
+        stats.allowed += 1;
+        kpiAllowed += 1;
+        maybeEnablePhaseB();
+        return sendFn();
+      }
+      // Resumen heavy — tras fase B
+      if (bucket === "ResumenHeavy") {
+        if (phaseBReady || warmed.ResumenHeavy) {
+          stats.allowed += 1;
+          return sendFn();
+        }
+        stats.deferred += 1;
+        pending.push({ tab: "ResumenHeavy", run: sendFn });
+        return;
+      }
+      stats.allowed += 1;
+      return sendFn();
+    }
+
+    // Sin timeout desde carga del script: React monta el dashboard a los 2–4s
+    // y un timer temprano dejaba phaseB=true antes del burst real.
+
+    var origFetch = window.fetch.bind(window);
+    window.fetch = function (input, init) {
+      var url = "";
+      try {
+        url =
+          typeof input === "string"
+            ? input
+            : input && input.url
+              ? String(input.url)
+              : String(input);
+      } catch (e) {
+        return origFetch(input, init);
+      }
+      if (url.indexOf("/chart/data") === -1) return origFetch(input, init);
+      var body = init && init.body != null ? init.body : null;
+      var sid = parseSliceId(body, url);
+      var name = parseChartName(body);
+      var bucket = bucketFor(sid, name);
+      stats.last = { bucket: bucket, sid: sid, name: name };
+      if (!stats.seenSids) stats.seenSids = [];
+      if (sid != null && stats.seenSids.indexOf(sid) === -1) stats.seenSids.push(sid);
+
+      return new Promise(function (resolve, reject) {
+        allowOrDefer(bucket, function () {
+          return origFetch(input, init).then(resolve, reject);
+        });
+      });
+    };
+
+    var OrigXHR = window.XMLHttpRequest;
+    function PsLazyXHR() {
+      var xhr = new OrigXHR();
+      var _url = "";
+      var origOpen = xhr.open;
+      xhr.open = function (method, url) {
+        _url = url == null ? "" : String(url);
+        return origOpen.apply(xhr, arguments);
+      };
+      var origSend = xhr.send;
+      xhr.send = function (body) {
+        if (_url.indexOf("/chart/data") === -1) {
+          return origSend.apply(xhr, arguments);
+        }
+        var sid = parseSliceId(body, _url);
+        var name = parseChartName(body);
+        var bucket = bucketFor(sid, name);
+        stats.last = { bucket: bucket, sid: sid, name: name };
+        if (!stats.seenSids) stats.seenSids = [];
+        if (sid != null && stats.seenSids.indexOf(sid) === -1)
+          stats.seenSids.push(sid);
+        allowOrDefer(bucket, function () {
+          origSend.call(xhr, body);
+        });
+      };
+      return xhr;
+    }
+    PsLazyXHR.prototype = OrigXHR.prototype;
+    window.XMLHttpRequest = PsLazyXHR;
+
+    document.addEventListener(
+      "click",
+      function (ev) {
+        var t = ev.target;
+        if (!t || !t.closest) return;
+        var tab = t.closest(".ant-tabs-tab");
+        if (!tab) return;
+        var label = (tab.textContent || "").trim();
+        if (!label) return;
+        setTimeout(function () {
+          flushBucket(label);
+          if (label === "Resumen") enablePhaseB("tab-resumen");
+        }, 0);
+      },
+      true
+    );
+  })();
+
   // Bug APP_ROOT: ensureAppRoot() duplica /analytics en logout (y otros links).
   // Bootstrap ya trae /analytics/logout/ → el menú navega a /analytics/analytics/logout/.
   function collapseDoubleAppRoot(url) {
@@ -104,7 +387,10 @@
     }
   }
   window.addEventListener("resize", publishDashboardViewportVars);
-  setInterval(publishDashboardViewportVars, 1200);
+  setInterval(function () {
+    if (!psPollEnabled()) return;
+    publishDashboardViewportVars();
+  }, 1200);
   setTimeout(publishDashboardViewportVars, 0);
   setTimeout(publishDashboardViewportVars, 400);
 
@@ -241,6 +527,41 @@
       if (f.sibling) queue.push(f.sibling);
     }
     return null;
+  }
+
+  /**
+   * Tuning de rendimiento AG Grid (scroll en Proyectos/Gastos/Facturación/Resumen mensual).
+   * rowBuffer más bajo → menos filas fuera de viewport pre-renderizadas (menos DOM).
+   * debounceVerticalScrollbar → agrupa updates durante scroll rápido (menos repintados).
+   * animateRows:false → sin transición CSS al reposicionar filas virtualizadas.
+   * Reversible sin redeploy: ?_psgridtune=off  o  window.__PS_GRID_TUNE_DISABLED=true
+   */
+  function psGridTuneEnabled() {
+    try {
+      if (window.__PS_GRID_TUNE_DISABLED === true) return false;
+      var q = new URLSearchParams(window.location.search || "");
+      if ((q.get("_psgridtune") || "").toLowerCase() === "off") return false;
+    } catch (eTune) { /* ignore */ }
+    return true;
+  }
+
+  function tuneAgGridScrollPerf(api) {
+    if (!api || api.__psScrollPerfTuned) return;
+    if (!psGridTuneEnabled()) return;
+    api.__psScrollPerfTuned = true;
+    var opts = { rowBuffer: 6, debounceVerticalScrollbar: true, animateRows: false };
+    Object.keys(opts).forEach(function (key) {
+      try {
+        if (typeof api.setGridOption === "function") {
+          api.setGridOption(key, opts[key]);
+        } else if (
+          api.gridOptionsService &&
+          typeof api.gridOptionsService.set === "function"
+        ) {
+          api.gridOptionsService.set(key, opts[key]);
+        }
+      } catch (eOpt) { /* versión de AG Grid no soporta esta opción */ }
+    });
   }
 
   function findAgGridApi(rootEl) {
@@ -1052,6 +1373,30 @@
     }
   }
 
+  /**
+   * Superset AG Grid (formatValue.ts) pinta NULL de métricas como "N/A".
+   * En matrices mes×dim (Gastos/Facturación) el vacío de PBI es celda en blanco.
+   * Parcheamos valueFormatter en origen + red de seguridad DOM; ocultamos el
+   * cuerpo hasta que el formatter esté listo para no flash N/A → blanco.
+   */
+  function injectMatrixNaCss() {
+    if (document.getElementById("ps-matrix-na-css")) return;
+    var style = document.createElement("style");
+    style.id = "ps-matrix-na-css";
+    style.textContent =
+      '[data-test-chart-name*="Gastos"].ps-na-pending .ag-center-cols-container,' +
+      '[data-test-chart-name*="Gastos"].ps-na-pending .ag-floating-bottom,' +
+      '[data-test-chart-name="Facturación"].ps-na-pending .ag-center-cols-container,' +
+      '[data-test-chart-name="Facturación"].ps-na-pending .ag-floating-bottom' +
+      "{opacity:0 !important;}" +
+      '[data-test-chart-name*="Gastos"].ps-na-ready .ag-center-cols-container,' +
+      '[data-test-chart-name*="Gastos"].ps-na-ready .ag-floating-bottom,' +
+      '[data-test-chart-name="Facturación"].ps-na-ready .ag-center-cols-container,' +
+      '[data-test-chart-name="Facturación"].ps-na-ready .ag-floating-bottom' +
+      "{opacity:1 !important;}";
+    document.head.appendChild(style);
+  }
+
   function blankGastosNA(chart) {
     var cells = chart.querySelectorAll(".ag-cell, .ag-floating-bottom .ag-cell");
     for (var i = 0; i < cells.length; i++) {
@@ -1060,6 +1405,229 @@
       if (t === "N/A" || t === "n/a") {
         cell.textContent = "";
       }
+    }
+  }
+
+  function scheduleBlankGastosNA(chart) {
+    if (!chart || chart.__psNaBlankRaf) return;
+    chart.__psNaBlankRaf = window.requestAnimationFrame(function () {
+      chart.__psNaBlankRaf = 0;
+      blankGastosNA(chart);
+    });
+  }
+
+  function wrapNullAsBlankFormatter(orig) {
+    if (orig && orig.__psNullBlankWrapper) return orig;
+    var wrapped = function (params) {
+      var raw = params && params.value;
+      var empty =
+        raw === null ||
+        raw === undefined ||
+        raw === "" ||
+        (typeof raw === "number" && isNaN(raw));
+      if (empty) return "";
+      var out;
+      try {
+        if (typeof orig === "function") out = orig(params);
+        else out = raw;
+      } catch (err) {
+        out = raw;
+      }
+      if (out === "N/A" || out === "n/a" || out == null) return "";
+      return out;
+    };
+    wrapped.__psNullBlankWrapper = true;
+    return wrapped;
+  }
+
+  function wrapColDefFormatter(d) {
+    if (!d || (d.children && d.children.length)) return false;
+    var vf = d.valueFormatter;
+    if (vf && vf.__psNullBlankWrapper) return false;
+    d.valueFormatter = wrapNullAsBlankFormatter(vf);
+    return true;
+  }
+
+  /**
+   * Re-aplica siempre: al hacer scroll AG Grid virtualiza filas y React/Superset
+   * puede restaurar valueFormatter originales → vuelve el flash N/A.
+   * Preferimos mutar colDef en vivo (sin setColumnDefs en cada scroll).
+   */
+  function patchAgGridNullAsBlank(api) {
+    if (!api) return false;
+    var changed = false;
+
+    try {
+      if (typeof api.getColumns === "function") {
+        var cols = api.getColumns() || [];
+        for (var c = 0; c < cols.length; c++) {
+          var col = cols[c];
+          if (!col || typeof col.getColDef !== "function") continue;
+          if (wrapColDefFormatter(col.getColDef())) changed = true;
+        }
+      }
+    } catch (eCols) { /* ignore */ }
+
+    try {
+      var defs =
+        typeof api.getColumnDefs === "function" ? api.getColumnDefs() : null;
+      if (defs && defs.length) {
+        function walk(list) {
+          for (var i = 0; i < list.length; i++) {
+            var d = list[i];
+            if (!d) continue;
+            if (d.children && d.children.length) {
+              walk(d.children);
+              continue;
+            }
+            if (wrapColDefFormatter(d)) changed = true;
+          }
+        }
+        walk(defs);
+        // Solo setColumnDefs la 1ª vez o si React restauró defs sin wrapper
+        if (changed && !api.__psNullBlankPatched && typeof api.setColumnDefs === "function") {
+          api.setColumnDefs(defs);
+        }
+      }
+    } catch (eDefs) { /* ignore */ }
+
+    if (changed || !api.__psNullBlankPatched) {
+      api.__psNullBlankPatched = true;
+    }
+    return !!api.__psNullBlankPatched;
+  }
+
+  /**
+   * Modo anti-N/A (Facturación/Gastos) — reversible sin redeploy:
+   *   light (default) → solo valueFormatter + re-parche al cargar datos
+   *   heavy           → comportamiento anterior (scroll + MutationObserver + barrido DOM)
+   *
+   * Volver al modo pesado (si reaparece flash N/A al scroll):
+   *   ?_psna=heavy   en la URL del dashboard
+   *   o en consola:  window.__PS_MATRIX_NA_MODE = 'heavy'; location.reload()
+   * Forzar light: ?_psna=light
+   */
+  function getMatrixNaMode() {
+    try {
+      var q = new URLSearchParams(window.location.search || "");
+      var fromUrl = (q.get("_psna") || "").toLowerCase();
+      if (fromUrl === "heavy" || fromUrl === "light") return fromUrl;
+    } catch (eQ) { /* ignore */ }
+    var w = window.__PS_MATRIX_NA_MODE;
+    if (w === "heavy" || w === "light") return w;
+    return "light";
+  }
+
+  function attachMatrixNaScrollGuards(api, chart) {
+    if (!api || !chart || api.__psNaScrollGuards) return;
+    api.__psNaScrollGuards = true;
+
+    var mode = getMatrixNaMode();
+    window.__psMatrixNaModeActive = mode;
+
+    function onVirtLight() {
+      // Solo reaplicar formatter si Superset reseteó colDefs (carga / refresh).
+      patchAgGridNullAsBlank(api);
+    }
+
+    function onVirtHeavy() {
+      patchAgGridNullAsBlank(api);
+      scheduleBlankGastosNA(chart);
+    }
+
+    try {
+      var lightEvents = ["firstDataRendered", "rowDataUpdated", "modelUpdated"];
+      var heavyEvents = [
+        "bodyScroll",
+        "modelUpdated",
+        "viewportChanged",
+        "virtualColumnsChanged",
+        "firstDataRendered",
+        "rowDataUpdated",
+      ];
+      var events = mode === "heavy" ? heavyEvents : lightEvents;
+      var handler = mode === "heavy" ? onVirtHeavy : onVirtLight;
+      events.forEach(function (evName) {
+        try {
+          api.addEventListener(evName, handler);
+        } catch (eEv) { /* ignore */ }
+      });
+    } catch (eAdd) { /* ignore */ }
+
+    // MutationObserver + barrido DOM: solo modo heavy (caro en scroll Retina).
+    if (mode !== "heavy") return;
+    if (chart.__psNaDomObserver) return;
+    var root =
+      chart.querySelector(".ag-center-cols-viewport") ||
+      chart.querySelector(".ag-body-viewport") ||
+      chart.querySelector('[class*="ag-theme"]') ||
+      chart;
+    try {
+      var obs = new MutationObserver(function () {
+        scheduleBlankGastosNA(chart);
+      });
+      obs.observe(root, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+      chart.__psNaDomObserver = obs;
+    } catch (eObs) { /* ignore */ }
+  }
+
+  function isMatrixNaChart(chart) {
+    return isGastosChart(chart) || isFacturacionMatrixChart(chart);
+  }
+
+  function markMatrixNaPending(chart) {
+    if (!chart || !isMatrixNaChart(chart)) return;
+    injectMatrixNaCss();
+    if (chart.classList.contains("ps-na-ready")) return;
+    chart.classList.add("ps-na-pending");
+  }
+
+  function markMatrixNaReady(chart) {
+    if (!chart) return;
+    chart.classList.remove("ps-na-pending");
+    chart.classList.add("ps-na-ready");
+  }
+
+  function matrixHasVisibleNA(chart) {
+    if (!chart) return false;
+    var cells = chart.querySelectorAll(".ag-cell, .ag-floating-bottom .ag-cell");
+    for (var i = 0; i < cells.length; i++) {
+      var t = (cells[i].textContent || "").replace(/\u00a0/g, " ").trim();
+      if (t === "N/A" || t === "n/a") return true;
+    }
+    return false;
+  }
+
+  function ensureMatrixNullBlank(chart) {
+    if (!chart || !isMatrixNaChart(chart)) return;
+    markMatrixNaPending(chart);
+    var agTheme = chart.querySelector('[class*="ag-theme"]');
+    if (!agTheme) return;
+    var api = findAgGridApi(agTheme);
+    if (!api) {
+      if (!chart.__psNaFailSafe) {
+        chart.__psNaFailSafe = setTimeout(function () {
+          blankGastosNA(chart);
+          markMatrixNaReady(chart);
+        }, 2500);
+      }
+      return;
+    }
+    tuneAgGridScrollPerf(api);
+    patchAgGridNullAsBlank(api);
+    attachMatrixNaScrollGuards(api, chart);
+    // Una pasada DOM al montar (light y heavy). El coste caro era repetirla en scroll.
+    blankGastosNA(chart);
+    if (api.__psNullBlankPatched) {
+      if (chart.__psNaFailSafe) {
+        clearTimeout(chart.__psNaFailSafe);
+        chart.__psNaFailSafe = null;
+      }
+      markMatrixNaReady(chart);
     }
   }
 
@@ -1139,12 +1707,16 @@
     api.__psGastosColPersistInit = true;
     chart.__psGastosColPersistInit = true;
 
+    patchAgGridNullAsBlank(api);
+    ensureMatrixNullBlank(chart);
+
     function applyFit() {
       applyGastosColumnLayout(api, chart);
       clearGastosClientSortOnce(api);
       fixGastosConceptoColumn(api, chart);
       blankGastosNA(chart);
       labelAgGridTotalsRow(chart);
+      markMatrixNaReady(chart);
     }
 
     api.sizeColumnsToFit = function () {
@@ -1164,10 +1736,12 @@
         saveGastosWidthsLocal(map);
       });
       api.addEventListener("modelUpdated", function () {
+        patchAgGridNullAsBlank(api);
         fixGastosConceptoColumn(api, chart);
         blankGastosNA(chart);
       });
       api.addEventListener("firstDataRendered", function () {
+        patchAgGridNullAsBlank(api);
         applyFit();
       });
     } catch (err) { /* grid aún montando */ }
@@ -1396,12 +1970,16 @@
     api.__psFactColPersistInit = true;
     chart.__psFactColPersistInit = true;
 
+    patchAgGridNullAsBlank(api);
+    ensureMatrixNullBlank(chart);
+
     function applyFit() {
       applyFacturacionColumnLayout(api, chart);
       clearFacturacionClientSortOnce(api);
       fixFacturacionProyectoColumn(api, chart);
       blankFacturacionNA(chart);
       labelAgGridTotalsRow(chart);
+      markMatrixNaReady(chart);
     }
 
     api.sizeColumnsToFit = function () {
@@ -1419,10 +1997,12 @@
         saveFacturacionWidthsLocal(map);
       });
       api.addEventListener("modelUpdated", function () {
+        patchAgGridNullAsBlank(api);
         fixFacturacionProyectoColumn(api, chart);
         blankFacturacionNA(chart);
       });
       api.addEventListener("firstDataRendered", function () {
+        patchAgGridNullAsBlank(api);
         applyFit();
       });
     } catch (err) { /* grid aún montando */ }
@@ -1624,6 +2204,7 @@
         var api = findAgGridApi(agTheme);
         if (!api) return;
 
+        tuneAgGridScrollPerf(api);
         patchSizeColumnsToFit(api);
         try {
           collapseHiddenSortColumns(api);
@@ -1666,6 +2247,7 @@
   }
 
   setInterval(function () {
+    if (!psPollEnabled()) return;
     fixDoubleAppRootAnchors(document);
     fixUsersAnchors(document);
     autoSizeAgGridColumns();
@@ -1683,37 +2265,64 @@
       var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
       if (!rows.length) return;
       var api = findAgGridApi(agTheme);
+      if (api) tuneAgGridScrollPerf(api);
       // La guardia está en la instancia de API para sobrevivir recreaciones del DOM
       if (api && !api.__psColPersistInit) initProyectosColPersist(chart, api);
     });
+    var heavyNa = typeof getMatrixNaMode === "function" && getMatrixNaMode() === "heavy";
     var gastosCharts = document.querySelectorAll('[data-test-chart-name*="Gastos"]');
     Array.prototype.forEach.call(gastosCharts, function (chart) {
       if (!isGastosChart(chart)) return;
-      blankGastosNA(chart);
+      ensureMatrixNullBlank(chart);
       ensureGastosColumnsFit(chart);
       var agTheme = chart.querySelector('[class*="ag-theme"]');
       if (!agTheme) return;
+      var api = findAgGridApi(agTheme);
+      // Parche NULL→blanco antes de esperar filas (evita flash N/A)
+      if (api) patchAgGridNullAsBlank(api);
       var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
       if (!rows.length) return;
-      var api = findAgGridApi(agTheme);
       if (api && !api.__psGastosColPersistInit) initGastosColPersist(chart, api);
-      else if (api) blankGastosNA(chart);
+      else if (api && heavyNa) blankGastosNA(chart);
     });
     var factCharts = document.querySelectorAll('[data-test-chart-name="Facturación"]');
     Array.prototype.forEach.call(factCharts, function (chart) {
       if (!isFacturacionMatrixChart(chart)) return;
-      blankFacturacionNA(chart);
+      ensureMatrixNullBlank(chart);
       ensureFacturacionColumnsFit(chart);
       var agTheme = chart.querySelector('[class*="ag-theme"]');
       if (!agTheme) return;
+      var api = findAgGridApi(agTheme);
+      if (api) patchAgGridNullAsBlank(api);
       var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
       if (!rows.length) return;
-      var api = findAgGridApi(agTheme);
       if (api && !api.__psFactColPersistInit) initFacturacionColPersist(chart, api);
-      else if (api) blankFacturacionNA(chart);
+      else if (api && heavyNa) blankFacturacionNA(chart);
     });
     labelAllAgGridTotals();
   }, 800);
+
+  // Poll anti-N/A: default 600 ms (antes 120). Se salta si pestaña oculta o matriz ya ready en light.
+  injectMatrixNaCss();
+  setInterval(function () {
+    if (!psPollEnabled()) return;
+    var light =
+      typeof getMatrixNaMode === "function" && getMatrixNaMode() === "light";
+    var charts = document.querySelectorAll(
+      '[data-test-chart-name*="Gastos"],[data-test-chart-name="Facturación"]'
+    );
+    Array.prototype.forEach.call(charts, function (chart) {
+      if (!isMatrixNaChart(chart)) return;
+      if (chart.classList.contains("ps-na-ready") && !chart.querySelector(".ag-cell")) {
+        return;
+      }
+      // En light, si ya ready y no hay N/A visibles → no re-escanear.
+      if (light && chart.classList.contains("ps-na-ready") && !matrixHasVisibleNA(chart)) {
+        return;
+      }
+      ensureMatrixNullBlank(chart);
+    });
+  }, psNaPollMs());
 
   /**
    * Facturación por Probabilidad (ECharts):
@@ -2410,6 +3019,7 @@
 
   // Reaplicar chrome al entrar/salir de edición (SPA)
   setInterval(function () {
+    if (!psPollEnabled()) return;
     if (!isDashboardPage()) return;
     var editing = isDashboardEditing();
     var marked = document.body.classList.contains("ps-dashboard-editing");

@@ -270,7 +270,70 @@ psql "postgresql://postgres:SuperSecurePassword2025@192.168.36.100:5433/postgres
 
 ⚠️ Aplicar cambios SQL solo tras validar impacto en KPI (`v_se_facturacion`, `v_se_kpi_cards`) contra Power BI.
 
-### 7.4 Resync completo (prueba o recuperación)
+### 7.4 Rendimiento Superset (workers / caché / JIT / MVs / metadata)
+
+Diagnóstico 2026-07-29 (dataset ~50k filas; el cuello de botella no era volumen):
+
+| Pieza | Dónde | Valor |
+|-------|-------|-------|
+| Gunicorn workers | `docker-compose.yml` → `SERVER_WORKER_AMOUNT` | `3` (default imagen = 1) |
+| Caché charts | `config/superset_config.py` → `DATA_CACHE_CONFIG` | FileSystemCache, TTL 600 s |
+| JIT Postgres | `ALTER DATABASE postgres SET jit_above_cost` | `10000000` (evita JIT en KPI) |
+| Capas BI pesadas | `bi_mv_*` + wrapper `bi_v_*` | Snapshot; REFRESH al final del sync **004** |
+| Metadata Superset | DB `superset_meta` en `supabase-db` | Postgres (antes SQLite `superset.db`) |
+| Event logger | `EVENT_LOGGER = StdOutEventLogger()` | No escribe en tabla `logs` |
+| Carga progresiva UI | `config/tail_js_custom_extra.html` | KPIs primero; difiere 17/20/21 ~150 ms |
+
+**Carga progresiva (Resumen):** el JS intercepta `/chart/data` (fetch + XHR). Fase A =
+slices KPI 9–16; fase B = charts pesados 17, 20, 21 tras ≥6 KPIs (o 300 ms / 2 s tras
+el primer chart). Stats en consola: `window.__psLazyTabStats`. Reiniciar contenedor
+`superset` tras cambiar el HTML (caché Jinja).
+
+**Cuello de botella real (metadata):** con SQLite (`journal_mode=delete`) + `DBEventLogger`
+escribiendo ~13k filas/día en `logs`, las ~18 peticiones `/chart/data` del dashboard se
+serializaban 1–2 s. Mitigación aplicada:
+
+1. **WAL** en `superset.db` (transición) + `busy_timeout`.
+2. **`StdOutEventLogger`** — Action Log UI vacío; eventos en `docker logs superset`.
+3. **Migración a Postgres** — base `superset_meta` (misma instancia `supabase-db:5432`,
+   no mezcla datos `bc_*` / `v_se_*`). Script:
+   `scripts/migrate-superset-metadata-to-postgres.py`.
+
+URI metadata (override con env):
+
+```bash
+# Default en config: postgresql+psycopg2://postgres:…@supabase-db:5432/superset_meta
+# Rollback a SQLite (emergencia):
+# SUPERSET_DATABASE_URI=sqlite:////app/superset_home/superset.db.bak
+```
+
+Backup pre-migración en VM 100: `backups/superset-pre-pg-migration-*.db` y
+`data/superset-home/superset.db.bak`.
+
+Superset sigue leyendo `bi_v_*` (nombres y RLS Jinja sin cambio). Las consultas pesadas
+(`bi_v_unidad`, `bi_v_facturacion`, KPI, evolución, etc.) leen el snapshot `bi_mv_*`.
+
+Tras sync BC→Analytics, el nodo **Refresh BI Materialized Views** del workflow 004 ejecuta
+`REFRESH MATERIALIZED VIEW` antes de liberar el mutex / responder al webhook.
+
+```bash
+# Aplicar / recrear MVs + wrappers (VM 100 o desde Mac con Docker):
+./scripts/apply-bi-views.sh
+
+# Solo REFRESH (sin recrear), p. ej. tras cambio manual de datos:
+./scripts/apply-bi-views.sh --refresh
+```
+
+Tras cambiar compose/config en VM 100:
+
+```bash
+# En el directorio del stack Superset (VM 100):
+docker compose up -d --force-recreate superset
+# Verificar workers: docker exec superset printenv SERVER_WORKER_AMOUNT
+# Verificar JIT: SHOW jit_above_cost;  → 10000000
+# Verificar metadata Postgres: docker logs superset 2>&1 | grep PostgresqlImpl
+```
+### 7.5 Resync completo (prueba o recuperación)
 
 ```sql
 -- 1) Vaciar datos BC
