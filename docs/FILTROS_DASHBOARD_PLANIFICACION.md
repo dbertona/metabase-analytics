@@ -58,7 +58,7 @@ Debajo: separación ~12px · Resumen mensual + Proyectos.
 | Facturación por Probabilidad | height **26** | Sync UI pull 2026-07-28 |
 | Pieza | Dataset | Motivo |
 |-------|---------|--------|
-| 8 tarjetas KPI (Obj/Plan) | `bi_v_planificacion_kpi` | Tiene `department_code` + `facturacion_real_anterior` → filtro Departamento y Crecimiento |
+| 8 tarjetas KPI (Obj/Plan) | `bi_v_planificacion_kpi` | Plan por `tipo_label`; Obj solo filas P. Filtro Planificado/Real → tarjetas **Plan** |
 | Resumen / Evolución / Margen | `bi_v_evolucion_mensual` | Fuente de **valores** del filtro Planificado/Real (`tipo_label`); dims también en Resumen |
 | Facturación por Probabilidad | `bi_v_facturacion_probabilidad` | Al lado de KPIs (7+5); fuera del scope de filtros Año/Empresa/Dept; etiquetas `N%` e importes en `K€` (params + `tail_js`); sí entra en filtro **Proyectos** |
 | Gastos (pestaña Unidad) | `bi_v_unidad` | Pivot coste por concepto×mes; Structure fijo en la vista |
@@ -70,7 +70,7 @@ Debajo: separación ~12px · Resumen mensual + Proyectos.
 | `NATIVE_FILTER-YEAR` | Año | `year` | KPI (ds planificacion) | Resumen + Gráficos + Unidad |
 | `NATIVE_FILTER-EMPRESA` | Empresas | `empresa` | KPI | Resumen + Gráficos + Unidad |
 | `NATIVE_FILTER-DEPT` | Departamentos | `department_code` | KPI | Resumen + Gráficos + Unidad |
-| `NATIVE_FILTER-TIPO` | Planificado/Real | `tipo_label` | Evolución mensual | Resumen / Evolución / Margen / Proyectos / Gastos |
+| `NATIVE_FILTER-TIPO` | Planificado/Real | `tipo_label` | Evolución mensual | Resumen / Evolución / Margen / Proyectos / Gastos / **Plan KPI** |
 | `NATIVE_FILTER-PROYECTO` | Proyectos | `proyecto` | Resumen proyectos | Resumen mensual / Proyectos / Evolución / Margen / Probabilidad (**no** KPIs ni Gastos) |
 
 Valores del filtro Planificado/Real = `tipo_label` (Planificado|Real). Los charts

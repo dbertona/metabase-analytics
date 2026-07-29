@@ -98,6 +98,8 @@ SELECT
     k.year,
     k.department_code,
     k.department_name,
+    k.tipo,
+    k.tipo_label,
     k.obj_facturacion,
     k.obj_coste,
     k.obj_beneficio,
@@ -122,17 +124,24 @@ INNER JOIN (
         f.empresa,
         f.year,
         f.departamento AS department_code,
+        f.tipo,
+        CASE f.tipo
+            WHEN 'P' THEN 'Planificado'
+            WHEN 'R' THEN 'Real'
+            ELSE COALESCE(f.tipo::text, '')
+        END AS tipo_label,
         SUM(f.facturado) AS plan_facturacion,
         SUM(f.coste) AS plan_coste,
         SUM(f.facturado - f.coste) AS plan_beneficio
     FROM v_se_facturacion f
     WHERE f.tipo IN ('P', 'R')
       AND f.job IN ({{ ps_team_jobs_sql() }})
-    GROUP BY f.empresa, f.year, f.departamento
+    GROUP BY f.empresa, f.year, f.departamento, f.tipo
 ) p
   ON k.empresa = p.empresa
  AND k.year = p.year
  AND k.department_code = p.department_code
+ AND k.tipo = p.tipo
 {% else %}
 SELECT * FROM bi_v_planificacion_kpi
 WHERE {{ ps_dept_filter() }}
@@ -652,12 +661,18 @@ def gastos_unidad_params() -> dict[str, Any]:
     }
 
 
-def big_number_params(metric: dict[str, Any], fmt: str, *, currency: bool = False) -> dict[str, Any]:
+def big_number_params(
+    metric: dict[str, Any],
+    fmt: str,
+    *,
+    currency: bool = False,
+    extra_filter_cols: tuple[str, ...] = (),
+) -> dict[str, Any]:
     # header_font_size es factor × 16px; 1.25 ≈ 20px (Segoe UI solicitado)
     # subheader = etiqueta bajo el valor (Facturación, Margen, etc.) como en Power BI
     label = metric.get("label", "")
     params: dict[str, Any] = {
-        "adhoc_filters": dim_adhoc_filters(),
+        "adhoc_filters": dim_adhoc_filters(*extra_filter_cols),
         "metric": metric,
         "header_font_size": 0.58,  # ~35% más compacto (antes 0.9)
         "subheader": label,
@@ -701,6 +716,16 @@ def persist_dashboard_config(
             "Obj · Margen",
             "Obj · Crecimiento",
             "Obj · Beneficio",
+            "Plan · Facturación",
+            "Plan · Margen",
+            "Plan · Crecimiento",
+            "Plan · Beneficio",
+        )
+        if n in by_name
+    ]
+    plan_kpi_chart_ids = [
+        by_name[n]
+        for n in (
             "Plan · Facturación",
             "Plan · Margen",
             "Plan · Crecimiento",
@@ -1622,6 +1647,7 @@ def persist_dashboard_config(
                 "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
                 "chartsInScope": evo_chart_ids
                 + [table_id, projects_id]
+                + plan_kpi_chart_ids
                 + ([gastos_id] if gastos_id else []),
                 "tabsInScope": tabs_all,
             },
@@ -1884,26 +1910,42 @@ def main() -> int:
         ("Obj · Crecimiento", "obj", kpi_ds, "big_number_total",
          big_number_params(
              metric_sql(
-                 "(SUM(obj_facturacion)-SUM(facturacion_real_anterior))"
-                 "/NULLIF(SUM(facturacion_real_anterior),0)",
+                 "(SUM(obj_facturacion)-SUM(CASE WHEN tipo = 'P' THEN facturacion_real_anterior END))"
+                 "/NULLIF(SUM(CASE WHEN tipo = 'P' THEN facturacion_real_anterior END),0)",
                  "Δ %"),
              ".2%")),
         ("Obj · Beneficio", "obj", kpi_ds, "big_number_total",
          big_number_params(metric_sum("obj_beneficio", "Beneficio"), ",.0f", currency=True)),
         ("Plan · Facturación", "plan", kpi_ds, "big_number_total",
-         big_number_params(metric_sum("plan_facturacion", "Facturación"), ",.0f", currency=True)),
+         big_number_params(
+             metric_sum("plan_facturacion", "Facturación"),
+             ",.0f",
+             currency=True,
+             extra_filter_cols=("tipo_label",),
+         )),
         ("Plan · Margen", "plan", kpi_ds, "big_number_total",
          big_number_params(
-             metric_sql("SUM(plan_beneficio)/NULLIF(SUM(plan_facturacion),0)", "Margen"), ".2%")),
+             metric_sql("SUM(plan_beneficio)/NULLIF(SUM(plan_facturacion),0)", "Margen"),
+             ".2%",
+             extra_filter_cols=("tipo_label",),
+         )),
         ("Plan · Crecimiento", "plan", kpi_ds, "big_number_total",
          big_number_params(
              metric_sql(
-                 "(SUM(plan_facturacion)-SUM(facturacion_real_anterior))"
-                 "/NULLIF(SUM(facturacion_real_anterior),0)",
+                 "(SUM(plan_facturacion)"
+                 "-SUM(facturacion_real_anterior)/NULLIF(COUNT(DISTINCT tipo_label),0))"
+                 "/NULLIF(SUM(facturacion_real_anterior)/NULLIF(COUNT(DISTINCT tipo_label),0),0)",
                  "Δ %"),
-             ".2%")),
+             ".2%",
+             extra_filter_cols=("tipo_label",),
+         )),
         ("Plan · Beneficio", "plan", kpi_ds, "big_number_total",
-         big_number_params(metric_sum("plan_beneficio", "Beneficio"), ",.0f", currency=True)),
+         big_number_params(
+             metric_sum("plan_beneficio", "Beneficio"),
+             ",.0f",
+             currency=True,
+             extra_filter_cols=("tipo_label",),
+         )),
         # Table V2 (AG Grid): resize de columnas nativo en dashboard
         ("Resumen mensual", "table", evo_ds, "ag-grid-table", resumen_mensual_params()),
         # PBI Resumen Proyectos: Operational + estado Completed/Open/Planning
