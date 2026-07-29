@@ -181,7 +181,7 @@ class PsAppInitializer(SupersetAppInitializer):
 
         @app.get("/api/v1/ps/user-scope")
         def ps_user_department_scope():  # type: ignore[no-untyped-def]
-            """Ámbito de departamento (paridad PBI: vacío/999 = ver todo)."""
+            """Ámbito RLS: project_team | department | all (paridad BC/Imixs)."""
             user = _ps_resolve_request_user()
             if not user:
                 return jsonify({"message": "Unauthorized"}), 401
@@ -196,7 +196,7 @@ class PsAppInitializer(SupersetAppInitializer):
             if requested and requested != real_email and not _ps_can_simulate(user):
                 return jsonify({"message": "Forbidden", "can_simulate": False}), 403
 
-            scope = resolve_department_scope(effective)
+            scope = resolve_user_scope(effective)
             scope["real_email"] = real_email
             scope["simulated"] = bool(requested and requested != real_email)
             return jsonify({"result": scope})
@@ -229,13 +229,17 @@ class PsAppInitializer(SupersetAppInitializer):
                 )
             if "@" not in email:
                 return jsonify({"message": "Email inválido"}), 400
-            scope = resolve_department_scope(email)
+            scope = resolve_user_scope(email)
             return _ps_simulate_response(
                 {
                     "simulated": True,
                     "email": email,
+                    "mode": scope.get("mode"),
                     "see_all": scope["see_all"],
                     "department_code": scope["department_code"],
+                    "projectteamfilter": scope.get("projectteamfilter"),
+                    "resource_code": scope.get("resource_code"),
+                    "team_job_count": scope.get("team_job_count"),
                 },
                 email,
             )
@@ -353,8 +357,57 @@ def list_resources_for_simulation() -> list[dict[str, str]]:
     return out
 
 
+def _ps_truthy_flag(value: Any) -> bool:
+    if value is True:
+        return True
+    if value is False or value is None:
+        return False
+    return str(value).strip().lower() in {"true", "t", "1", "yes", "y", "s"}
+
+
+def lookup_user_configuration(email: str) -> dict[str, Any]:
+    """Config de permisos BC: departamento + projectteamfilter."""
+    email = (email or "").strip().lower()
+    empty = {"departamento": "", "projectteamfilter": False}
+    if not email or "@" not in email:
+        return empty
+    try:
+        with _analytics_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT trim(coalesce(departamento, '')),
+                           projectteamfilter
+                    FROM public.bc_user_configuration
+                    WHERE lower(trim(email)) = %s
+                    ORDER BY
+                      CASE WHEN coalesce(trim(departamento), '') <> '' THEN 0 ELSE 1 END,
+                      company_name
+                    LIMIT 1
+                    """,
+                    (email,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return empty
+                return {
+                    "departamento": str(row[0] or "").strip(),
+                    "projectteamfilter": _ps_truthy_flag(row[1]),
+                }
+    except Exception:
+        logger.exception(
+            "No se pudo leer bc_user_configuration para email=%s", email
+        )
+        return empty
+
+
 def lookup_user_departamento(email: str) -> str:
     """Departamento en bc_user_configuration por email (preferir valor no vacío)."""
+    return lookup_user_configuration(email).get("departamento") or ""
+
+
+def lookup_resource_code(email: str) -> str:
+    """Código recurso (bc_resource.code) por email."""
     email = (email or "").strip().lower()
     if not email or "@" not in email:
         return ""
@@ -363,10 +416,10 @@ def lookup_user_departamento(email: str) -> str:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT trim(departamento)
-                    FROM public.bc_user_configuration
+                    SELECT trim(code)
+                    FROM public.bc_resource
                     WHERE lower(trim(email)) = %s
-                      AND coalesce(trim(departamento), '') <> ''
+                      AND coalesce(trim(code), '') <> ''
                     ORDER BY company_name
                     LIMIT 1
                     """,
@@ -376,23 +429,76 @@ def lookup_user_departamento(email: str) -> str:
                 if row and row[0]:
                     return str(row[0]).strip()
     except Exception:
-        logger.exception(
-            "No se pudo leer bc_user_configuration.departamento para email=%s", email
-        )
+        logger.exception("No se pudo leer bc_resource.code para email=%s", email)
     return ""
 
 
-def resolve_department_scope(email: str) -> dict[str, Any]:
-    """Paridad PBI: vacío o '999' → ver todos los departamentos."""
+def count_team_jobs(resource_code: str) -> int:
+    code = (resource_code or "").strip()
+    if not code:
+        return 0
+    try:
+        with _analytics_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT COUNT(DISTINCT job_no)
+                    FROM public.bc_job_team
+                    WHERE resource_no = %s
+                      AND coalesce(trim(job_no), '') <> ''
+                    """,
+                    (code,),
+                )
+                row = cur.fetchone()
+                return int(row[0] or 0) if row else 0
+    except Exception:
+        logger.exception("No se pudo contar bc_job_team para resource=%s", code)
+        return 0
+
+
+def resolve_user_scope(email: str) -> dict[str, Any]:
+    """Ámbito RLS (paridad Apps/Imixs + PBI dept).
+
+    Prioridad:
+    1. projectteamfilter=true → solo jobs de bc_job_team del recurso
+    2. departamento vacío/999 → ver todo
+    3. departamento concreto → department_code = DEPT
+    """
     email_n = (email or "").strip().lower()
-    dept = lookup_user_departamento(email_n)
+    cfg = lookup_user_configuration(email_n)
+    dept = (cfg.get("departamento") or "").strip()
+    team = bool(cfg.get("projectteamfilter"))
+    resource_code = lookup_resource_code(email_n) if team else ""
+    team_jobs = count_team_jobs(resource_code) if resource_code else 0
+
+    if team:
+        return {
+            "email": email_n,
+            "mode": "project_team",
+            "departamento": dept or None,
+            "see_all": False,
+            "department_code": None,
+            "projectteamfilter": True,
+            "resource_code": resource_code or None,
+            "team_job_count": team_jobs,
+        }
+
     see_all = dept == "" or dept == "999"
     return {
         "email": email_n,
+        "mode": "all" if see_all else "department",
         "departamento": dept or None,
         "see_all": see_all,
         "department_code": None if see_all else dept,
+        "projectteamfilter": False,
+        "resource_code": None,
+        "team_job_count": 0,
     }
+
+
+def resolve_department_scope(email: str) -> dict[str, Any]:
+    """Compat: alias de resolve_user_scope (incluye mode project_team)."""
+    return resolve_user_scope(email)
 
 
 PS_SIMULATED_EMAIL_SESSION_KEY = "ps_simulated_email"
@@ -510,36 +616,110 @@ def _ps_effective_email_for_rls() -> str:
     return real
 
 
-def _ps_dept_jinja_filter() -> str:
-    """Cláusula SQL WHERE para RLS de departamento.
+def _ps_current_scope() -> dict[str, Any]:
+    email = _ps_effective_email_for_rls()
+    if not email or "@" not in email:
+        return {
+            "email": "",
+            "mode": "none",
+            "see_all": False,
+            "department_code": None,
+            "resource_code": None,
+            "team_job_count": 0,
+            "projectteamfilter": False,
+        }
+    return resolve_user_scope(email)
 
-    - Departamento vacío/999 del email efectivo → 1=1
-    - Email efectivo con departamento → department_code = 'DEPT'
-    - Sin usuario → 1=0
 
-    Simulación Admin: cookie firmada `ps_sim` + session (GET /api/v1/ps/simulate).
+def _ps_sql_quote_ident_literal(value: str) -> str:
+    """Escapa literal SQL entre comillas simples."""
+    return (value or "").replace("'", "''")
+
+
+def _ps_team_jobs_predicate(job_expr: str = "job") -> str:
+    """job_expr IN (SELECT job_no FROM bc_job_team WHERE resource_no = …)."""
+    scope = _ps_current_scope()
+    code = (scope.get("resource_code") or "").strip()
+    if not code:
+        return "1=0"
+    code_s = _ps_sql_quote_ident_literal(code)
+    return (
+        f"{job_expr} IN ("
+        f"SELECT DISTINCT job_no FROM public.bc_job_team "
+        f"WHERE resource_no = '{code_s}' "
+        f"AND coalesce(trim(job_no), '') <> '')"
+    )
+
+
+def _ps_dept_predicate(dept_expr: str = "department_code") -> str:
+    scope = _ps_current_scope()
+    mode = scope.get("mode")
+    if mode == "all":
+        return "1=1"
+    if mode == "none":
+        return "1=0"
+    if mode == "project_team":
+        return "1=1"
+    dept = (scope.get("department_code") or "").strip()
+    if not dept:
+        return "1=0"
+    return f"{dept_expr} = '{_ps_sql_quote_ident_literal(dept)}'"
+
+
+def _ps_row_jinja_filter(job_expr: str = "job") -> str:
+    """Cláusula WHERE para datasets con columna job (o department_code).
+
+    - all → 1=1
+    - department → department_code = 'DEPT'
+    - project_team → job IN (equipo del recurso)
+    - none → 1=0
     """
     try:
-        email = _ps_effective_email_for_rls()
-        if not email or "@" not in email:
-            return "1=0"
-        scope = resolve_department_scope(email)
-        if scope["see_all"]:
+        scope = _ps_current_scope()
+        mode = scope.get("mode")
+        if mode == "all":
             return "1=1"
-        dept = (scope.get("department_code") or "").strip()
-        if not dept:
+        if mode == "none":
             return "1=0"
-        dept_safe = dept.replace("'", "''")
-        return f"department_code = '{dept_safe}'"
+        if mode == "project_team":
+            return _ps_team_jobs_predicate(job_expr or "job")
+        return _ps_dept_predicate("department_code")
     except Exception:
-        logger.exception("ps_dept_filter: error determinando ámbito de departamento")
+        logger.exception("ps_row_filter: error determinando ámbito")
         return "1=0"
 
 
+def _ps_dept_jinja_filter() -> str:
+    """Alias histórico de ps_row_filter (department_code / job según modo)."""
+    return _ps_row_jinja_filter("job")
+
+
+def _ps_scope_mode_jinja() -> str:
+    return str(_ps_current_scope().get("mode") or "none")
+
+
+def _ps_team_jobs_sql_jinja() -> str:
+    """Subconsulta SQL (sin paréntesis exteriores) para IN (...)."""
+    scope = _ps_current_scope()
+    code = (scope.get("resource_code") or "").strip()
+    if not code:
+        return "SELECT NULL::text WHERE FALSE"
+    code_s = _ps_sql_quote_ident_literal(code)
+    return (
+        "SELECT DISTINCT job_no FROM public.bc_job_team "
+        f"WHERE resource_no = '{code_s}' "
+        "AND coalesce(trim(job_no), '') <> ''"
+    )
+
+
 # Función Jinja disponible en todos los datasets con ENABLE_TEMPLATE_PROCESSING=True.
-# Uso en virtual SQL: SELECT * FROM bi_v_xxx WHERE {{ ps_dept_filter() }}
+# Uso: SELECT * FROM bi_v_xxx WHERE {{ ps_dept_filter() }}
+#      o plantillas con {% if ps_scope_mode() == 'project_team' %}
 JINJA_CONTEXT_ADDONS = {
     "ps_dept_filter": _ps_dept_jinja_filter,
+    "ps_row_filter": _ps_row_jinja_filter,
+    "ps_scope_mode": _ps_scope_mode_jinja,
+    "ps_team_jobs_sql": _ps_team_jobs_sql_jinja,
 }
 
 

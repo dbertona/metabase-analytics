@@ -92,7 +92,7 @@ Réplica del panel **Resumen** de Power BI (slug estable `planificacion-ps-analy
 
 - 8 tarjetas KPI (Objetivos Anuales + Planificación Actual)
 - Tabla **Resumen mensual** agregada: AñoMes | Facturación | Coste | Margen % (filtro Tipo P/R)
-- Filtros: Año, Empresas, Departamentos, Tipo P/R
+- Filtros: Año, Empresas, Departamentos, Planificado/Real
 - Gráficos de evolución mensual y facturación por probabilidad
 
 **Filtros nativos (diseño canónico):** [`docs/FILTROS_DASHBOARD_PLANIFICACION.md`](docs/FILTROS_DASHBOARD_PLANIFICACION.md)  

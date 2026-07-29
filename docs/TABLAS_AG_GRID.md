@@ -120,7 +120,7 @@ def mi_tabla_params() -> dict:
             ),
         ],
         "percent_metrics": [],
-        "order_by_cols": ['["Fact.", false]'],
+        "order_by_cols": ['["Margen %", false]'],  # mayor → menor margen
         "row_limit": 5000,
         "server_pagination": False,   # True solo si >~10k filas
         "show_totals": True,
