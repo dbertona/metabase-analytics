@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-29] — Fix `v_se_lineas_expedientes` solo meses Open
+
+### Fixed
+- `v_se_lineas_expedientes`: filtro `month_closing_status = 'Open'` (+ Job no Completed/Lost).
+  Antes `NOT IN ('Completed','Lost')` dejaba entrar meses **Close** (~735 k€ en 1-02/2026)
+  y los sumaba al Tipo P junto al Real.
+
 ## [2026-07-29] — Cierre rama `feat/rls-projectteamfilter`
 
 ### Summary
