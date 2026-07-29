@@ -400,6 +400,7 @@ Usar `data-test-*`. Evitar `.slice_header` (legacy).
 | Tipo de chart desconocido | Flag AG Grid off | `AG_GRID_TABLE_ENABLED` + restart |
 | Login script 404 | URL sin `/analytics` | Corregir `SUPERSET_URL` |
 | Tabla no llena el card | Falta CSS/JS altura | §4 + registrar en JS |
+| Gastos ~560 px / card vacío; Facturación OK | Coma CSS: `[A],[B] .hijo` solo aplica a B | Usar `:is([A],[B]) .hijo` (nunca la coma suelta) |
 | Buscador en otra fila / no filtra | Sin proxy o sin setter nativo | §5.4 |
 | Resize vuelve atrás | `sizeColumnsToFit` de Superset | Parchear API |
 | Ancho no viaja a otro PC | Sin PUT `column_config` / 403 | Owners + `can_write Chart` |
