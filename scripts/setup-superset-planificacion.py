@@ -481,7 +481,7 @@ def resumen_mensual_params() -> dict[str, Any]:
     """Tabla PBI Resumen: AñoMes | Fact. | Coste | Margen % (agregada)."""
     # Orden backend robusto: year+month ASC (evita orden erróneo por Fact. DESC).
     return {
-        "adhoc_filters": dim_adhoc_filters("tipo", "proyecto"),
+        "adhoc_filters": dim_adhoc_filters("tipo_label", "proyecto"),
         "query_mode": "aggregate",
         "groupby": ["year", "month", "ano_mes"],
         "metrics": [
@@ -530,7 +530,7 @@ def resumen_mensual_params() -> dict[str, Any]:
 def resumen_proyectos_params() -> dict[str, Any]:
     """Tabla PBI Resumen Proyectos: Proyecto | Fact. | Coste | Margen %."""
     return {
-        "adhoc_filters": dim_adhoc_filters("tipo", "proyecto"),
+        "adhoc_filters": dim_adhoc_filters("tipo_label", "proyecto"),
         "query_mode": "aggregate",
         "groupby": ["proyecto"],
         "metrics": [
@@ -618,7 +618,7 @@ def gastos_unidad_params() -> dict[str, Any]:
             "columnWidth": 128 if label == "Total" else 70,
         }
     return {
-        "adhoc_filters": dim_adhoc_filters("tipo"),
+        "adhoc_filters": dim_adhoc_filters("tipo_label"),
         "query_mode": "aggregate",
         "groupby": ["concepto_analitico"],
         "metrics": metrics,
@@ -688,8 +688,8 @@ def persist_dashboard_config(
     charts: list[dict[str, Any]],
 ) -> None:
     # KPI cards (bi_v_planificacion_kpi) exponen year/empresa/department_code vía
-    # adhoc_filters IS NOT NULL (ver dim_adhoc_filters). Valores de filtro Tipo
-    # siguen en bi_v_evolucion_mensual; Proyectos en bi_v_resumen_proyectos.
+    # adhoc_filters IS NOT NULL (ver dim_adhoc_filters). Valores Planificado/Real
+    # (tipo_label) en bi_v_evolucion_mensual; Proyectos en bi_v_resumen_proyectos.
     detail_ds = dataset_ids["bi_v_planificacion_kpi"]
     evo_ds = dataset_ids["bi_v_evolucion_mensual"]
     proy_ds = dataset_ids["bi_v_resumen_proyectos"]
@@ -1913,11 +1913,11 @@ def main() -> int:
         ("Facturación por Probabilidad", "prob", prob_ds, "echarts_timeseries_bar",
          probabilidad_bar_params()),
         ("Evolución mensual", "chart", evo_ds, "echarts_timeseries_line",
-         {"adhoc_filters": dim_adhoc_filters("tipo", "proyecto"),
+         {"adhoc_filters": dim_adhoc_filters("tipo_label", "proyecto"),
           "x_axis": "ano_mes", "metrics": [metric_sum("facturacion", "Facturación")],
           "groupby": [], "row_limit": 1000}),
         ("Margen acumulado", "chart", evo_ds, "echarts_timeseries_line",
-         {"adhoc_filters": dim_adhoc_filters("tipo", "proyecto"),
+         {"adhoc_filters": dim_adhoc_filters("tipo_label", "proyecto"),
           "x_axis": "ano_mes",
           "metrics": [
               metric_sql(

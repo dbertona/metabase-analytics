@@ -73,8 +73,9 @@ Debajo: separación ~12px · Resumen mensual + Proyectos.
 | `NATIVE_FILTER-TIPO` | Planificado/Real | `tipo_label` | Evolución mensual | Resumen / Evolución / Margen / Proyectos / Gastos |
 | `NATIVE_FILTER-PROYECTO` | Proyectos | `proyecto` | Resumen proyectos | Resumen mensual / Proyectos / Evolución / Margen / Probabilidad (**no** KPIs ni Gastos) |
 
-Valores del filtro Proyectos = mismos `encabezado` que la tabla Proyectos (Operational).
-No añade columna visible a Resumen/Probabilidad: solo restringe filas al Apply.
+Valores del filtro Planificado/Real = `tipo_label` (Planificado|Real). Los charts
+en scope deben exponer `tipo_label` en `adhoc_filters` (IS NOT NULL); si solo
+exponen `tipo`, Apply no filtra.
 
 ### RLS server-side (`bc_user_configuration`)
 
