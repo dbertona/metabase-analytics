@@ -88,9 +88,13 @@
       }
     }
     var gastos = document.querySelector('[data-test-chart-name*="Gastos"]');
-    if (gastos && gastos.offsetParent !== null) {
+    var facturacion = document.querySelector('[data-test-chart-name="Facturación"]');
+    var matrix = null;
+    if (gastos && gastos.offsetParent !== null) matrix = gastos;
+    else if (facturacion && facturacion.offsetParent !== null) matrix = facturacion;
+    if (matrix) {
       /* Igual que Resumen: top del chart-slice (no del holder) → ~8–9px de aire abajo */
-      var gt = gastos.getBoundingClientRect().top;
+      var gt = matrix.getBoundingClientRect().top;
       if (gt > 60 && gt < window.innerHeight - 120) {
         document.documentElement.style.setProperty(
           "--ps-unidad-top",
@@ -166,6 +170,7 @@
   function labelAllAgGridTotals() {
     var sels = [
       '[data-test-chart-name*="Gastos"]',
+      '[data-test-chart-name="Facturación"]',
       '[data-test-chart-name*="Proyectos"]',
       '[data-test-chart-name*="Resumen mensual"]',
     ];
@@ -870,16 +875,36 @@
           if (!q) continue;
           var cols = q.columns || [];
           var hasConcepto = false;
+          var hasProyecto = false;
+          var hasMonthPivot = false;
           for (var j = 0; j < cols.length; j++) {
             var c = cols[j];
-            if (c === "concepto_analitico") hasConcepto = true;
-            else if (c && typeof c === "object" && (c.label === "concepto_analitico" || c.sqlExpression === "concepto_analitico")) {
-              hasConcepto = true;
+            var label = "";
+            if (typeof c === "string") label = c;
+            else if (c && typeof c === "object") {
+              label = c.label || c.sqlExpression || c.column_name || "";
             }
+            if (label === "concepto_analitico") hasConcepto = true;
+            if (label === "proyecto") hasProyecto = true;
+            if (/^m\d{2}$/.test(label) || label === "m01") hasMonthPivot = true;
           }
-          if (!hasConcepto) continue;
-          q.orderby = [["concepto_analitico", true]];
-          changed = true;
+          var metrics = q.metrics || [];
+          for (var m = 0; m < metrics.length; m++) {
+            var met = metrics[m];
+            var ml = "";
+            if (typeof met === "string") ml = met;
+            else if (met && typeof met === "object") {
+              ml = met.label || (met.column && met.column.column_name) || "";
+            }
+            if (ml === "01" || ml === "m01" || /^m\d{2}$/.test(ml)) hasMonthPivot = true;
+          }
+          if (hasConcepto) {
+            q.orderby = [["concepto_analitico", true]];
+            changed = true;
+          } else if (hasProyecto && hasMonthPivot) {
+            q.orderby = [["proyecto", true]];
+            changed = true;
+          }
         }
         return changed ? JSON.stringify(body) : bodyStr;
       } catch (e) {
@@ -1212,6 +1237,279 @@
     });
   }
 
+  // ─── Persistencia / layout — chart Facturación (pestaña Facturación) ────────
+  var PS_FACTURACION_COL_STORAGE_KEY = "ps-facturacion-col-widths-v1";
+
+  function isFacturacionMatrixChart(chart) {
+    var name = chart.getAttribute("data-test-chart-name") || "";
+    if (name === "Facturación") return true;
+    if (name.indexOf("Facturación por Probabilidad") !== -1) return false;
+    var title = chart.querySelector(
+      '[data-test="slice-header"] .header-title, [data-test="slice-header"] .editable-title'
+    );
+    var t = title ? (title.textContent || "").replace(/\s+/g, " ").trim() : "";
+    return t === "Facturación";
+  }
+
+  function getDefaultFacturacionWidths(chart) {
+    var holder =
+      chart.closest('[data-test="dashboard-component-chart-holder"]') || chart;
+    var available = Math.max(
+      520,
+      Math.floor(holder.getBoundingClientRect().width || chart.clientWidth || 1200) -
+        24
+    );
+    var totalW = 118;
+    var proyectoMin = 180;
+    var monthMin = 70;
+    var centerAvail = Math.max(400, available - totalW);
+    var monthW = Math.floor((centerAvail - proyectoMin) / 12);
+    if (monthW < monthMin) {
+      monthW = monthMin;
+      proyectoMin = Math.max(140, centerAvail - monthW * 12);
+    }
+    var proyecto = centerAvail - monthW * 12;
+    if (proyecto < 140) {
+      proyecto = 140;
+      monthW = Math.max(64, Math.floor((centerAvail - proyecto) / 12));
+      proyecto = Math.max(140, centerAvail - monthW * 12);
+    }
+    while (proyecto + monthW * 12 + totalW > available && monthW > 60) {
+      monthW -= 1;
+      proyecto = Math.max(140, available - totalW - monthW * 12);
+    }
+    var map = { proyecto: proyecto, Total: totalW };
+    var months = [
+      "01", "02", "03", "04", "05", "06",
+      "07", "08", "09", "10", "11", "12",
+    ];
+    for (var i = 0; i < months.length; i++) map[months[i]] = monthW;
+    return map;
+  }
+
+  function applyFacturacionColumnLayout(api, chart) {
+    if (!api || !chart) return;
+    var map = getDefaultFacturacionWidths(chart);
+    var state = Object.keys(map).map(function (id) {
+      var row = { colId: id, width: map[id] };
+      if (id === "Total") row.pinned = "right";
+      else row.pinned = null;
+      return row;
+    });
+    try {
+      api.applyColumnState({ state: state, applyOrder: false });
+    } catch (e) { /* ignore */ }
+  }
+
+  function isFacturacionTotalClipped(chart) {
+    var totalHeader =
+      chart.querySelector('.ag-header-cell[col-id="Total"]') ||
+      chart.querySelector('.ag-pinned-right-header .ag-header-cell[col-id="Total"]');
+    if (!totalHeader) return true;
+    var hr = totalHeader.getBoundingClientRect();
+    if (hr.width < 90) return true;
+    var holder =
+      chart.closest('[data-test="dashboard-component-chart-holder"]') || chart;
+    var cr = holder.getBoundingClientRect();
+    if (hr.right > cr.right + 4) return true;
+    var m12 = chart.querySelector('.ag-header-cell[col-id="12"]');
+    if (m12 && m12.getBoundingClientRect().width < 58) return true;
+    return false;
+  }
+
+  function blankFacturacionNA(chart) {
+    blankGastosNA(chart);
+  }
+
+  function fixFacturacionProyectoColumn(api, chart) {
+    if (!api) return;
+    try {
+      var defs = typeof api.getColumnDefs === "function" ? api.getColumnDefs() : null;
+      if (defs && defs.length) {
+        var changed = false;
+        for (var i = 0; i < defs.length; i++) {
+          var d = defs[i] || {};
+          var id = String(d.colId || d.field || "");
+          if (id === "proyecto" || id.indexOf("proyecto") === 0) {
+            if (d.headerName !== "Encabezado") {
+              d.headerName = "Encabezado";
+              changed = true;
+            }
+          }
+        }
+        if (changed && typeof api.setColumnDefs === "function") {
+          api.setColumnDefs(defs);
+        }
+      }
+      if (typeof api.getColumn === "function") {
+        var col = api.getColumn("proyecto");
+        if (col && col.getColDef) {
+          col.getColDef().headerName = "Encabezado";
+          if (typeof api.refreshHeader === "function") api.refreshHeader();
+        }
+      }
+    } catch (err) { /* grid aún montando */ }
+
+    if (chart) {
+      var headers = chart.querySelectorAll(".ag-header-cell");
+      Array.prototype.forEach.call(headers, function (h) {
+        var colId = h.getAttribute("col-id") || "";
+        if (colId !== "proyecto") return;
+        var label = h.querySelector(".ag-header-cell-text, .ag-header-cell-label");
+        if (label && /proyecto/i.test(label.textContent || "")) {
+          label.textContent = "Encabezado";
+        }
+      });
+    }
+  }
+
+  function clearFacturacionClientSortOnce(api) {
+    if (!api || api.__psFactSortCleared) return;
+    api.__psFactSortCleared = true;
+    try {
+      if (typeof api.applyColumnState === "function") {
+        api.applyColumnState({
+          state: [{ colId: "proyecto", sort: null }],
+          defaultState: { sort: null },
+        });
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function saveFacturacionWidthsLocal(map) {
+    try {
+      localStorage.setItem(PS_FACTURACION_COL_STORAGE_KEY, JSON.stringify(map));
+    } catch (e) { /* ignore */ }
+  }
+
+  function loadFacturacionWidthsLocal() {
+    try {
+      var raw = localStorage.getItem(PS_FACTURACION_COL_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function initFacturacionColPersist(chart, api) {
+    if (api.__psFactColPersistInit) return;
+    api.__psFactColPersistInit = true;
+    chart.__psFactColPersistInit = true;
+
+    function applyFit() {
+      applyFacturacionColumnLayout(api, chart);
+      clearFacturacionClientSortOnce(api);
+      fixFacturacionProyectoColumn(api, chart);
+      blankFacturacionNA(chart);
+      labelAgGridTotalsRow(chart);
+    }
+
+    api.sizeColumnsToFit = function () {
+      applyFit();
+    };
+
+    try {
+      api.addEventListener("columnResized", function (ev) {
+        if (!ev || ev.source !== "uiColumnResized") return;
+        var map = {};
+        var state = api.getColumnState() || [];
+        for (var i = 0; i < state.length; i++) {
+          if (state[i] && state[i].colId) map[state[i].colId] = state[i].width;
+        }
+        saveFacturacionWidthsLocal(map);
+      });
+      api.addEventListener("modelUpdated", function () {
+        fixFacturacionProyectoColumn(api, chart);
+        blankFacturacionNA(chart);
+      });
+      api.addEventListener("firstDataRendered", function () {
+        applyFit();
+      });
+    } catch (err) { /* grid aún montando */ }
+  }
+
+  function ensureFacturacionColumnsFit(chart) {
+    if (!isFacturacionMatrixChart(chart) || !isGastosChartVisible(chart)) return;
+    var agTheme = chart.querySelector('[class*="ag-theme"]');
+    if (!agTheme) return;
+    var api = findAgGridApi(agTheme);
+    if (!api) return;
+    if (!api.__psFactColPersistInit) {
+      initFacturacionColPersist(chart, api);
+      return;
+    }
+    if (isFacturacionTotalClipped(chart)) {
+      applyFacturacionColumnLayout(api, chart);
+      blankFacturacionNA(chart);
+      labelAgGridTotalsRow(chart);
+    }
+  }
+
+  function placeFacturacionSearchInHeader() {
+    var charts = document.querySelectorAll('[data-test-chart-name="Facturación"]');
+    Array.prototype.forEach.call(charts, function (chart) {
+      if (!isFacturacionMatrixChart(chart)) return;
+      var header = chart.querySelector('[data-test="slice-header"]');
+      var realInput = chart.querySelector(
+        ".dropdown-controls-container #filter-text-box"
+      );
+      var originalRow = chart.querySelector(".dropdown-controls-container");
+      if (!header || !realInput || !originalRow) return;
+
+      originalRow.style.setProperty("display", "none", "important");
+      if (originalRow.parentElement) {
+        originalRow.parentElement.style.setProperty("height", "100%", "important");
+      }
+
+      var proxy = header.querySelector(".ps-facturacion-search-proxy");
+      if (proxy) {
+        proxy.placeholder = realInput.placeholder || "Buscar";
+        return;
+      }
+
+      proxy = document.createElement("input");
+      proxy.type = "text";
+      proxy.placeholder = realInput.placeholder || "Buscar";
+      proxy.className = "ps-facturacion-search-proxy";
+      proxy.setAttribute("aria-label", "Buscar proyectos");
+      proxy.style.cssText = [
+        "border:1px solid #d9d9d9",
+        "border-radius:4px",
+        "padding:3px 9px",
+        "font-size:14px",
+        "height:28px",
+        "width:175px",
+        "outline:none",
+        "background:#fff",
+        "color:#333",
+        "flex:0 0 175px",
+        "margin-right:8px",
+      ].join(";");
+
+      proxy.addEventListener("input", function () {
+        var currentInput = chart.querySelector(
+          ".dropdown-controls-container #filter-text-box"
+        );
+        if (!currentInput) return;
+        var descriptor = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype,
+          "value"
+        );
+        descriptor.set.call(currentInput, proxy.value);
+        currentInput.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      proxy.addEventListener("focus", function () {
+        proxy.style.borderColor = "#007c89";
+      });
+      proxy.addEventListener("blur", function () {
+        proxy.style.borderColor = "#d9d9d9";
+      });
+
+      var headerControls = header.querySelector(".header-controls");
+      header.insertBefore(proxy, headerControls || header.lastChild);
+    });
+  }
+
   /**
    * Resumen mensual no tiene buscador, pero AG Grid deja una fila de controles
    * vacía que añade ~7–11px entre título y tabla (Proyectos la oculta).
@@ -1376,6 +1674,7 @@
     placeProyectosSearchInHeader();
     hideResumenDropdownControls();
     placeGastosSearchInHeader();
+    placeFacturacionSearchInHeader();
     // Inicializar persistencia de anchos en el chart Proyectos (idempotente)
     var proyCharts = document.querySelectorAll('[data-test-chart-name*="Proyectos"]');
     Array.prototype.forEach.call(proyCharts, function (chart) {
@@ -1399,6 +1698,19 @@
       var api = findAgGridApi(agTheme);
       if (api && !api.__psGastosColPersistInit) initGastosColPersist(chart, api);
       else if (api) blankGastosNA(chart);
+    });
+    var factCharts = document.querySelectorAll('[data-test-chart-name="Facturación"]');
+    Array.prototype.forEach.call(factCharts, function (chart) {
+      if (!isFacturacionMatrixChart(chart)) return;
+      blankFacturacionNA(chart);
+      ensureFacturacionColumnsFit(chart);
+      var agTheme = chart.querySelector('[class*="ag-theme"]');
+      if (!agTheme) return;
+      var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
+      if (!rows.length) return;
+      var api = findAgGridApi(agTheme);
+      if (api && !api.__psFactColPersistInit) initFacturacionColPersist(chart, api);
+      else if (api) blankFacturacionNA(chart);
     });
     labelAllAgGridTotals();
   }, 800);

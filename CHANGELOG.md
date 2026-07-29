@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [2026-07-29b] — Pestaña Facturación (matriz Encabezado × mes)
+
+### Added
+- Vista **`bi_v_facturacion`**: pivot facturado por encabezado × meses 01–12 + Total.
+  Filtros PBI: Operational, estado Completed/Open/Planning, total > 0 (PP/PY ya en `v_se_*`).
+- Pestaña **Facturación** en dashboard `planificacion-ps-analytics` (AG Grid, patrón Gastos).
+- JS/CSS propios (`tail_js` + `dashboard_css`) con Encabezado, scroll y buscador en cabecera.
+
+### Changed
+- Filtros nativos Año/Empresa/Dept/Tipo/Proyectos incluyen la nueva pestaña.
+
 ## [2026-07-29] — Fix `v_se_lineas_expedientes` solo meses Open
 
 ### Fixed

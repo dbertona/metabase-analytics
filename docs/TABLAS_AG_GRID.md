@@ -79,6 +79,7 @@ docker restart superset   # o el nombre del contenedor en el compose de este rep
 | Resumen mensual | 17 | Resumen | `ano_mes` + 3 métricas | No | Encaja casi siempre; orden cronológico vía SQL/JS |
 | Proyectos | 21 | Resumen | `proyecto` + 3 métricas | Sí | **Patrón canónico** de UX |
 | Gastos | 22 | Unidad | concepto + 12 meses + Total | Sí | Muchas columnas → **scroll horizontal real** si no caben |
+| Facturación | (nuevo) | Facturación | Encabezado + 12 meses + Total | Sí | Misma matriz que Gastos; filtros Operational + estados |
 
 Si el usuario pide “otra tabla como Proyectos”, clonar el patrón Proyectos.
 Si pide “matriz mes a mes”, mirar Gastos (pinned Total, anchos por mes, scroll).
