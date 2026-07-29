@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-29d] — Mano de Obra solo `type_line = Resource`
+
+### Fixed
+- `v_se_lineas_movimientos`: conceptos `Mano de Obra*` excluyen `G/L Account`
+  (p. ej. nr `0000003` en PS Lab jun 2026 duplicaba Admin/Dirección/Oferta/…).
+  Coste G/L de otros CA (p. ej. Structure sin depto) no se toca.
+
 ## [2026-07-29c] — Fix altura AG Grid pestaña Unidad (Gastos)
 
 ### Fixed
