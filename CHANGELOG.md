@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-29e] — AG Grid: NULL de meses vacíos sin flash N/A
+
+- Cause: plugin AG Grid de Superset formatea NULL numérico como `"N/A"` (`formatValue.ts`).
+- `tail_js`: parche `valueFormatter` → `""` + clase `ps-na-pending` (opacity 0) hasta listo.
+- Aplica a matrices **Facturación** y **Gastos** (mismo patrón).
+
 ## [2026-07-29d] — Perf Superset: workers + FileSystemCache + JIT
 
 - `docker-compose.yml`: `SERVER_WORKER_AMOUNT=3`, `SERVER_THREADS_AMOUNT=20`, `GUNICORN_TIMEOUT=120` (antes 1 worker por defecto).

@@ -1052,6 +1052,30 @@
     }
   }
 
+  /**
+   * Superset AG Grid (formatValue.ts) pinta NULL de métricas como "N/A".
+   * En matrices mes×dim (Gastos/Facturación) el vacío de PBI es celda en blanco.
+   * Parcheamos valueFormatter en origen + red de seguridad DOM; ocultamos el
+   * cuerpo hasta que el formatter esté listo para no flash N/A → blanco.
+   */
+  function injectMatrixNaCss() {
+    if (document.getElementById("ps-matrix-na-css")) return;
+    var style = document.createElement("style");
+    style.id = "ps-matrix-na-css";
+    style.textContent =
+      '[data-test-chart-name*="Gastos"].ps-na-pending .ag-center-cols-container,' +
+      '[data-test-chart-name*="Gastos"].ps-na-pending .ag-floating-bottom,' +
+      '[data-test-chart-name="Facturación"].ps-na-pending .ag-center-cols-container,' +
+      '[data-test-chart-name="Facturación"].ps-na-pending .ag-floating-bottom' +
+      "{opacity:0 !important;}" +
+      '[data-test-chart-name*="Gastos"].ps-na-ready .ag-center-cols-container,' +
+      '[data-test-chart-name*="Gastos"].ps-na-ready .ag-floating-bottom,' +
+      '[data-test-chart-name="Facturación"].ps-na-ready .ag-center-cols-container,' +
+      '[data-test-chart-name="Facturación"].ps-na-ready .ag-floating-bottom' +
+      "{opacity:1 !important;}";
+    document.head.appendChild(style);
+  }
+
   function blankGastosNA(chart) {
     var cells = chart.querySelectorAll(".ag-cell, .ag-floating-bottom .ag-cell");
     for (var i = 0; i < cells.length; i++) {
@@ -1060,6 +1084,111 @@
       if (t === "N/A" || t === "n/a") {
         cell.textContent = "";
       }
+    }
+  }
+
+  function wrapNullAsBlankFormatter(orig) {
+    return function (params) {
+      var raw = params && params.value;
+      var empty =
+        raw === null ||
+        raw === undefined ||
+        raw === "" ||
+        (typeof raw === "number" && isNaN(raw));
+      if (empty) return "";
+      var out;
+      try {
+        if (typeof orig === "function") out = orig(params);
+        else out = raw;
+      } catch (err) {
+        out = raw;
+      }
+      if (out === "N/A" || out === "n/a" || out == null) return "";
+      return out;
+    };
+  }
+
+  function patchAgGridNullAsBlank(api) {
+    if (!api || api.__psNullBlankPatched) return !!api && !!api.__psNullBlankPatched;
+    var defs = null;
+    try {
+      defs = typeof api.getColumnDefs === "function" ? api.getColumnDefs() : null;
+    } catch (e) {
+      return false;
+    }
+    if (!defs || !defs.length) return false;
+
+    function walk(list) {
+      var changed = false;
+      for (var i = 0; i < list.length; i++) {
+        var d = list[i];
+        if (!d) continue;
+        if (d.children && d.children.length) {
+          if (walk(d.children)) changed = true;
+          continue;
+        }
+        if (d.__psNullBlankWrapped) continue;
+        d.valueFormatter = wrapNullAsBlankFormatter(d.valueFormatter);
+        d.__psNullBlankWrapped = true;
+        changed = true;
+      }
+      return changed;
+    }
+
+    walk(defs);
+    try {
+      if (typeof api.setColumnDefs === "function") api.setColumnDefs(defs);
+      api.__psNullBlankPatched = true;
+      if (typeof api.refreshCells === "function") {
+        api.refreshCells({ force: true });
+      }
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function isMatrixNaChart(chart) {
+    return isGastosChart(chart) || isFacturacionMatrixChart(chart);
+  }
+
+  function markMatrixNaPending(chart) {
+    if (!chart || !isMatrixNaChart(chart)) return;
+    injectMatrixNaCss();
+    if (chart.classList.contains("ps-na-ready")) return;
+    chart.classList.add("ps-na-pending");
+  }
+
+  function markMatrixNaReady(chart) {
+    if (!chart) return;
+    chart.classList.remove("ps-na-pending");
+    chart.classList.add("ps-na-ready");
+  }
+
+  function ensureMatrixNullBlank(chart) {
+    if (!chart || !isMatrixNaChart(chart)) return;
+    markMatrixNaPending(chart);
+    var agTheme = chart.querySelector('[class*="ag-theme"]');
+    if (!agTheme) return;
+    var api = findAgGridApi(agTheme);
+    if (!api) {
+      // No dejar el cuerpo oculto para siempre si el API tarda
+      if (!chart.__psNaFailSafe) {
+        chart.__psNaFailSafe = setTimeout(function () {
+          blankGastosNA(chart);
+          markMatrixNaReady(chart);
+        }, 2500);
+      }
+      return;
+    }
+    patchAgGridNullAsBlank(api);
+    blankGastosNA(chart);
+    if (api.__psNullBlankPatched) {
+      if (chart.__psNaFailSafe) {
+        clearTimeout(chart.__psNaFailSafe);
+        chart.__psNaFailSafe = null;
+      }
+      markMatrixNaReady(chart);
     }
   }
 
@@ -1139,12 +1268,16 @@
     api.__psGastosColPersistInit = true;
     chart.__psGastosColPersistInit = true;
 
+    patchAgGridNullAsBlank(api);
+    ensureMatrixNullBlank(chart);
+
     function applyFit() {
       applyGastosColumnLayout(api, chart);
       clearGastosClientSortOnce(api);
       fixGastosConceptoColumn(api, chart);
       blankGastosNA(chart);
       labelAgGridTotalsRow(chart);
+      markMatrixNaReady(chart);
     }
 
     api.sizeColumnsToFit = function () {
@@ -1164,10 +1297,12 @@
         saveGastosWidthsLocal(map);
       });
       api.addEventListener("modelUpdated", function () {
+        patchAgGridNullAsBlank(api);
         fixGastosConceptoColumn(api, chart);
         blankGastosNA(chart);
       });
       api.addEventListener("firstDataRendered", function () {
+        patchAgGridNullAsBlank(api);
         applyFit();
       });
     } catch (err) { /* grid aún montando */ }
@@ -1396,12 +1531,16 @@
     api.__psFactColPersistInit = true;
     chart.__psFactColPersistInit = true;
 
+    patchAgGridNullAsBlank(api);
+    ensureMatrixNullBlank(chart);
+
     function applyFit() {
       applyFacturacionColumnLayout(api, chart);
       clearFacturacionClientSortOnce(api);
       fixFacturacionProyectoColumn(api, chart);
       blankFacturacionNA(chart);
       labelAgGridTotalsRow(chart);
+      markMatrixNaReady(chart);
     }
 
     api.sizeColumnsToFit = function () {
@@ -1419,10 +1558,12 @@
         saveFacturacionWidthsLocal(map);
       });
       api.addEventListener("modelUpdated", function () {
+        patchAgGridNullAsBlank(api);
         fixFacturacionProyectoColumn(api, chart);
         blankFacturacionNA(chart);
       });
       api.addEventListener("firstDataRendered", function () {
+        patchAgGridNullAsBlank(api);
         applyFit();
       });
     } catch (err) { /* grid aún montando */ }
@@ -1689,31 +1830,49 @@
     var gastosCharts = document.querySelectorAll('[data-test-chart-name*="Gastos"]');
     Array.prototype.forEach.call(gastosCharts, function (chart) {
       if (!isGastosChart(chart)) return;
-      blankGastosNA(chart);
+      ensureMatrixNullBlank(chart);
       ensureGastosColumnsFit(chart);
       var agTheme = chart.querySelector('[class*="ag-theme"]');
       if (!agTheme) return;
+      var api = findAgGridApi(agTheme);
+      // Parche NULL→blanco antes de esperar filas (evita flash N/A)
+      if (api) patchAgGridNullAsBlank(api);
       var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
       if (!rows.length) return;
-      var api = findAgGridApi(agTheme);
       if (api && !api.__psGastosColPersistInit) initGastosColPersist(chart, api);
       else if (api) blankGastosNA(chart);
     });
     var factCharts = document.querySelectorAll('[data-test-chart-name="Facturación"]');
     Array.prototype.forEach.call(factCharts, function (chart) {
       if (!isFacturacionMatrixChart(chart)) return;
-      blankFacturacionNA(chart);
+      ensureMatrixNullBlank(chart);
       ensureFacturacionColumnsFit(chart);
       var agTheme = chart.querySelector('[class*="ag-theme"]');
       if (!agTheme) return;
+      var api = findAgGridApi(agTheme);
+      if (api) patchAgGridNullAsBlank(api);
       var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
       if (!rows.length) return;
-      var api = findAgGridApi(agTheme);
       if (api && !api.__psFactColPersistInit) initFacturacionColPersist(chart, api);
       else if (api) blankFacturacionNA(chart);
     });
     labelAllAgGridTotals();
   }, 800);
+
+  // Poll rápido solo para ocultar/parchear N/A antes del intervalo de 800 ms
+  injectMatrixNaCss();
+  setInterval(function () {
+    var charts = document.querySelectorAll(
+      '[data-test-chart-name*="Gastos"],[data-test-chart-name="Facturación"]'
+    );
+    Array.prototype.forEach.call(charts, function (chart) {
+      if (!isMatrixNaChart(chart)) return;
+      if (chart.classList.contains("ps-na-ready") && !chart.querySelector(".ag-cell")) {
+        return;
+      }
+      ensureMatrixNullBlank(chart);
+    });
+  }, 120);
 
   /**
    * Facturación por Probabilidad (ECharts):
