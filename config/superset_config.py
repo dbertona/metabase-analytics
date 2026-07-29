@@ -25,6 +25,41 @@ FEATURE_FLAGS = {
     "AG_GRID_TABLE_ENABLED": True,
 }
 
+# ---------------------------------------------------------------------------
+# Caché de resultados (FileSystemCache — sin Redis)
+# Diagnóstico 2026-07-29: sin CACHE_CONFIG cada carga del dashboard Resumen
+# reejecutaba ~8–10 queries idénticas a bi_v_planificacion_kpi (~100–200 ms
+# c/u). TTL alineado con el sync 004 (PSI ~4–5 min). Volumen en
+# /app/superset_home (volumen docker ya montado).
+# ---------------------------------------------------------------------------
+_CACHE_DIR = os.path.join(
+    os.environ.get("SUPERSET_HOME", "/app/superset_home"), "cache"
+)
+CACHE_CONFIG = {
+    "CACHE_TYPE": "FileSystemCache",
+    "CACHE_DIR": os.path.join(_CACHE_DIR, "flask"),
+    "CACHE_DEFAULT_TIMEOUT": 300,
+    "CACHE_THRESHOLD": 20000,
+}
+DATA_CACHE_CONFIG = {
+    "CACHE_TYPE": "FileSystemCache",
+    "CACHE_DIR": os.path.join(_CACHE_DIR, "data"),
+    "CACHE_DEFAULT_TIMEOUT": 600,
+    "CACHE_THRESHOLD": 20000,
+}
+FILTER_STATE_CACHE_CONFIG = {
+    "CACHE_TYPE": "FileSystemCache",
+    "CACHE_DIR": os.path.join(_CACHE_DIR, "filter_state"),
+    "CACHE_DEFAULT_TIMEOUT": 86400,
+    "CACHE_THRESHOLD": 10000,
+}
+EXPLORE_FORM_DATA_CACHE_CONFIG = {
+    "CACHE_TYPE": "FileSystemCache",
+    "CACHE_DIR": os.path.join(_CACHE_DIR, "explore_form"),
+    "CACHE_DEFAULT_TIMEOUT": 86400,
+    "CACHE_THRESHOLD": 10000,
+}
+
 WTF_CSRF_ENABLED = True
 
 # Interfaz en español (pack montado en docker-compose; imagen lean no lo trae)

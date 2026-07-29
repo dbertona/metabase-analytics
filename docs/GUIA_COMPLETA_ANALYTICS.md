@@ -270,7 +270,26 @@ psql "postgresql://postgres:SuperSecurePassword2025@192.168.36.100:5433/postgres
 
 ⚠️ Aplicar cambios SQL solo tras validar impacto en KPI (`v_se_facturacion`, `v_se_kpi_cards`) contra Power BI.
 
-### 7.4 Resync completo (prueba o recuperación)
+### 7.4 Rendimiento Superset (workers / caché / JIT)
+
+Diagnóstico 2026-07-29 (dataset ~50k filas; el cuello de botella no era volumen):
+
+| Pieza | Dónde | Valor |
+|-------|-------|-------|
+| Gunicorn workers | `docker-compose.yml` → `SERVER_WORKER_AMOUNT` | `3` (default imagen = 1) |
+| Caché charts | `config/superset_config.py` → `DATA_CACHE_CONFIG` | FileSystemCache, TTL 600 s |
+| JIT Postgres | `ALTER DATABASE postgres SET jit_above_cost` | `10000000` (evita JIT en KPI) |
+
+Tras cambiar compose/config en VM 100:
+
+```bash
+# En el directorio del stack Superset (VM 100):
+docker compose up -d --force-recreate superset
+# Verificar workers: docker exec superset printenv SERVER_WORKER_AMOUNT
+# Verificar JIT: SHOW jit_above_cost;  → 10000000
+```
+
+### 7.5 Resync completo (prueba o recuperación)
 
 ```sql
 -- 1) Vaciar datos BC

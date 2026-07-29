@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-29d] — Perf Superset: workers + FileSystemCache + JIT
+
+- `docker-compose.yml`: `SERVER_WORKER_AMOUNT=3`, `SERVER_THREADS_AMOUNT=20`, `GUNICORN_TIMEOUT=120` (antes 1 worker por defecto).
+- `config/superset_config.py`: `CACHE_CONFIG` / `DATA_CACHE_CONFIG` / filter+explore con `FileSystemCache` bajo `/app/superset_home/cache` (TTL 5–10 min).
+- Analytics DB (`postgres`): `jit_above_cost = 10000000` (antes 100000) — evita JIT en vistas `bi_v_*`/`v_se_*` con coste estimado alto y filas pocas (~50 ms ahorrados por query KPI).
+
 ## [2026-07-29c] — Fix altura AG Grid pestaña Unidad (Gastos)
 
 ### Fixed
