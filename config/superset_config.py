@@ -12,6 +12,7 @@ from flask_appbuilder.security.manager import AUTH_DB, AUTH_OAUTH
 from flask import Flask
 from superset.initialization import SupersetAppInitializer
 from superset.security import SupersetSecurityManager
+from superset.utils.log import StdOutEventLogger
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,24 @@ EXPLORE_FORM_DATA_CACHE_CONFIG = {
     "CACHE_DEFAULT_TIMEOUT": 86400,
     "CACHE_THRESHOLD": 10000,
 }
+
+# ---------------------------------------------------------------------------
+# Metadata DB — rendimiento (2026-07-29)
+# Diagnóstico: journal_mode=delete + DBEventLogger escribiendo en `logs`
+# (~13k filas/24h) serializaba las ~18 peticiones /chart/data del dashboard.
+# - WAL + busy_timeout: lectores/escritores concurrentes en SQLite.
+# - StdOutEventLogger: deja de escribir en `logs` (Action Log UI vacío;
+#   eventos van a docker logs). Tras migrar a Postgres (SQLALCHEMY_DATABASE_URI
+#   vía env) se mantienen estas opciones salvo connect_args sqlite.
+# ---------------------------------------------------------------------------
+# Perf 2026-07-29: busy_timeout evita "database is locked" bajo concurrencia
+# (WAL se fija una vez sobre el fichero; busy_timeout es por conexión).
+SQLALCHEMY_ENGINE_OPTIONS = {"connect_args": {"timeout": 30}}
+
+# Perf 2026-07-29: DBEventLogger (default) escribe en `logs` (SQLite) en cada
+# acción/carga de chart → 13k filas/24h, causa principal de la contención
+# medida. StdOutEventLogger redirige a stdout (docker logs superset).
+EVENT_LOGGER = StdOutEventLogger()
 
 WTF_CSRF_ENABLED = True
 
