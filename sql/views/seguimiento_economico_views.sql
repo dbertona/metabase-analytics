@@ -298,7 +298,10 @@ CREATE OR REPLACE VIEW public.v_se_lineas_expedientes AS
           WHERE e.job_no IS NOT NULL AND btrim(e.job_no::text) <> ''::text
             AND e.job_no::text !~~ 'PP%'::text AND e.job_no::text !~~ 'PY%'::text
             AND e.budget_date_month = e.month AND e.budget_date_year = e.year
-            AND (COALESCE(e.month_closing_status, ''::character varying)::text <> ALL (ARRAY['Completed'::character varying, 'Lost'::character varying]::text[]))
+            -- status1 = cierre del MES (Open/Close), no estado del Job (Completed/Lost).
+            -- Solo meses Open entran en P; Close ya está cubierto por Tipo R.
+            AND e.month_closing_status = 'Open'
+            AND COALESCE(e.status, j.status, ''::character varying)::text <> ALL (ARRAY['Completed'::text, 'Lost'::text])
         ), dedup AS (
          SELECT DISTINCT ON (s.empresa, s.job, s.year, s.month, s.invoice) s.empresa,
             s.job,
@@ -345,7 +348,7 @@ CREATE OR REPLACE VIEW public.v_se_lineas_expedientes AS
     (d.empresa || ':'::text) || d.year::text AS empresa_ano,
     d.empresa || ':'::text AS empresa_recurso
    FROM dedup d;
-COMMENT ON VIEW public.v_se_lineas_expedientes IS 'PBI Lineas Expedientes: budget_date_month=month (lógica PBI — cada mes usa su propio presupuesto), Distinct(job,year,month,invoice), excluye Completed/Lost.';
+COMMENT ON VIEW public.v_se_lineas_expedientes IS 'PBI Lineas Expedientes: budget_date_month=month (lógica PBI — cada mes usa su propio presupuesto), Distinct(job,year,month,invoice), month_closing_status=Open (status1 del mes), excluye Job Completed/Lost.';
 
 -- ---------------------------------------------------------------------------
 -- View: v_se_lineas_meses_cerrados
