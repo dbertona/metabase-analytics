@@ -282,6 +282,12 @@ Diagnóstico 2026-07-29 (dataset ~50k filas; el cuello de botella no era volumen
 | Capas BI pesadas | `bi_mv_*` + wrapper `bi_v_*` | Snapshot; REFRESH al final del sync **004** |
 | Metadata Superset | DB `superset_meta` en `supabase-db` | Postgres (antes SQLite `superset.db`) |
 | Event logger | `EVENT_LOGGER = StdOutEventLogger()` | No escribe en tabla `logs` |
+| Carga progresiva UI | `config/tail_js_custom_extra.html` | KPIs primero; difiere 17/20/21 ~150 ms |
+
+**Carga progresiva (Resumen):** el JS intercepta `/chart/data` (fetch + XHR). Fase A =
+slices KPI 9–16; fase B = charts pesados 17, 20, 21 tras ≥6 KPIs (o 300 ms / 2 s tras
+el primer chart). Stats en consola: `window.__psLazyTabStats`. Reiniciar contenedor
+`superset` tras cambiar el HTML (caché Jinja).
 
 **Cuello de botella real (metadata):** con SQLite (`journal_mode=delete`) + `DBEventLogger`
 escribiendo ~13k filas/día en `logs`, las ~18 peticiones `/chart/data` del dashboard se

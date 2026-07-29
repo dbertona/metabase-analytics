@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [2026-07-29h] — Perf: carga progresiva charts en Resumen (tail_js)
+
+- Experimento en `config/tail_js_custom_extra.html`: prioriza KPIs (slices 9–16) y
+  difiere charts pesados de Resumen (17, 20, 21) ~150 ms tras 6 KPIs permitidos.
+- Otras pestañas (Unidad / Facturación / Gráficos) se cargan al montar la pestaña
+  (Superset ya no pide sus `/chart/data` al abrir Resumen).
+- Stats: `window.__psLazyTabStats` (`deferred`, `flushed`, `seenSids`).
+- Verificado en navegador: `deferred=3`, `flushed.ResumenHeavy=3`, Facturación OK al
+  cambiar de tab; dos oleadas `/chart/data` (~800 ms de separación).
+
 ## [2026-07-29g] — Perf: metadata Superset (WAL + StdOutEventLogger + Postgres)
 
 - Diagnóstico: cuello de botella en `superset.db` (SQLite `journal_mode=delete` +
