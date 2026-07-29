@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [2026-07-29f] — Perf: materializar capas BI + REFRESH en sync 004
+
+- `bi_v_planificacion_kpi`, `bi_v_evolucion_mensual`, `bi_v_facturacion_probabilidad`,
+  `bi_v_resumen_proyectos`, `bi_v_unidad`, `bi_v_facturacion` → **MATERIALIZED VIEW**
+  `bi_mv_*` + wrapper `bi_v_*` (Superset/RLS sin cambio de nombre).
+- Workflow **004**: nodo `Refresh BI Materialized Views` tras `Compute Execution Summary`
+  (antes de liberar mutex) + restore del payload de resumen.
+- `scripts/apply-bi-views.sh`: destino remoto/DSN + `--refresh`.
+
 ## [2026-07-29e] — AG Grid: NULL de meses vacíos sin flash N/A
 
 - Cause: plugin AG Grid de Superset formatea NULL numérico como `"N/A"` (`formatValue.ts`).

@@ -2,7 +2,13 @@
 -- Capa semántica BI: Dashboard Planificación (Power BI / Superset)
 -- Fuente única de verdad para KPIs, evolución mensual y probabilidad.
 -- Repo: superset-analytics — aplicar con scripts/apply-bi-views.sh
+--
+-- Rendimiento (2026-07-29): vistas pesadas = MATERIALIZED VIEW bi_mv_* +
+-- wrapper bi_v_* (mismos nombres en Superset / RLS Jinja).
+-- REFRESH tras sync 004 (nodo "Refresh BI Materialized Views") o:
+--   ./scripts/apply-bi-views.sh --refresh
 -- =============================================================================
+
 
 -- Real del año anterior a nivel empresa (base de crecimiento % en vista anual)
 CREATE OR REPLACE VIEW bi_v_real_anterior_empresa AS
@@ -13,14 +19,29 @@ SELECT
 FROM bc_job_ledger_entry_month
 GROUP BY year, company_name;
 
+
+
 -- -----------------------------------------------------------------------------
--- KPI detalle por empresa / año / departamento / tipo (P|R)
--- Planificación Actual = filas P y/o R según filtro nativo Planificado/Real.
--- Objetivos solo en filas tipo=P (SUM(obj_*) no duplica al ver P+R).
+-- Drop wrappers + MVs (dependientes primero)
 -- -----------------------------------------------------------------------------
-DROP VIEW IF EXISTS bi_v_kpi_anual_empresa;
-DROP VIEW IF EXISTS bi_v_planificacion_kpi;
-CREATE VIEW bi_v_planificacion_kpi AS
+DROP VIEW IF EXISTS bi_v_kpi_anual_empresa CASCADE;
+DROP VIEW IF EXISTS bi_v_planificacion_kpi CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS bi_mv_planificacion_kpi CASCADE;
+DROP VIEW IF EXISTS bi_v_evolucion_mensual CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS bi_mv_evolucion_mensual CASCADE;
+DROP VIEW IF EXISTS bi_v_facturacion_probabilidad CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS bi_mv_facturacion_probabilidad CASCADE;
+DROP VIEW IF EXISTS bi_v_resumen_proyectos CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS bi_mv_resumen_proyectos CASCADE;
+DROP VIEW IF EXISTS bi_v_unidad CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS bi_mv_unidad CASCADE;
+DROP VIEW IF EXISTS bi_v_facturacion CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS bi_mv_facturacion CASCADE;
+
+-- -----------------------------------------------------------------------------
+-- bi_v_planificacion_kpi  ←  wrapper sobre bi_mv_planificacion_kpi
+-- -----------------------------------------------------------------------------
+CREATE MATERIALIZED VIEW bi_mv_planificacion_kpi AS
 WITH plan_actual AS (
     SELECT
         f.empresa,
@@ -106,14 +127,21 @@ LEFT JOIN real_anterior_dept ra
    AND ra.year = plan_actual.year
    AND ra.department_code = plan_actual.department_code;
 
-COMMENT ON VIEW bi_v_planificacion_kpi IS
-  'KPIs Objetivos (solo filas P) / Plan por dept×tipo; filtro Planificado/Real vía tipo_label.';
+CREATE INDEX IF NOT EXISTS bi_mv_planificacion_kpi_idx0 ON bi_mv_planificacion_kpi (empresa, year);
+CREATE INDEX IF NOT EXISTS bi_mv_planificacion_kpi_idx1 ON bi_mv_planificacion_kpi (department_code);
+CREATE INDEX IF NOT EXISTS bi_mv_planificacion_kpi_idx2 ON bi_mv_planificacion_kpi (tipo_label);
 
--- Evolución mensual (tablas y gráficos + fuente de filtros nativos)
--- Grano: mes × tipo × dept × proyecto — permite filtrar por proyecto sin
--- cambiar las columnas visibles (Resumen agrupa solo por ano_mes).
-DROP VIEW IF EXISTS bi_v_evolucion_mensual;
-CREATE VIEW bi_v_evolucion_mensual AS
+CREATE VIEW bi_v_planificacion_kpi AS SELECT * FROM bi_mv_planificacion_kpi;
+
+COMMENT ON VIEW bi_v_planificacion_kpi IS
+  'KPIs Objetivos (solo filas P) / Plan por dept×tipo; filtro Planificado/Real vía tipo_label. (materializada: bi_mv_planificacion_kpi; REFRESH tras sync 004).';
+COMMENT ON MATERIALIZED VIEW bi_mv_planificacion_kpi IS
+  'Snapshot de bi_v_planificacion_kpi; refrescar tras sync BC→Analytics.';
+
+-- -----------------------------------------------------------------------------
+-- bi_v_evolucion_mensual  ←  wrapper sobre bi_mv_evolucion_mensual
+-- -----------------------------------------------------------------------------
+CREATE MATERIALIZED VIEW bi_mv_evolucion_mensual AS
 SELECT
     f.empresa,
     f.year,
@@ -154,12 +182,23 @@ GROUP BY
     f.job,
     f.encabezado;
 
--- Facturación por probabilidad (gráfico de barras — panel Resumen PBI)
--- PBI: % = probability=0 → 100; resto = probability. Total = P + R.
--- Grano con proyecto para filtro nativo (el chart agrupa solo por probabilidad).
--- PSI 2026 bucket 100%: ~5.707 mil €
-DROP VIEW IF EXISTS bi_v_facturacion_probabilidad;
-CREATE VIEW bi_v_facturacion_probabilidad AS
+CREATE INDEX IF NOT EXISTS bi_mv_evolucion_mensual_idx0 ON bi_mv_evolucion_mensual (empresa, year);
+CREATE INDEX IF NOT EXISTS bi_mv_evolucion_mensual_idx1 ON bi_mv_evolucion_mensual (department_code);
+CREATE INDEX IF NOT EXISTS bi_mv_evolucion_mensual_idx2 ON bi_mv_evolucion_mensual (tipo_label);
+CREATE INDEX IF NOT EXISTS bi_mv_evolucion_mensual_idx3 ON bi_mv_evolucion_mensual (ano_mes);
+CREATE INDEX IF NOT EXISTS bi_mv_evolucion_mensual_idx4 ON bi_mv_evolucion_mensual (proyecto);
+
+CREATE VIEW bi_v_evolucion_mensual AS SELECT * FROM bi_mv_evolucion_mensual;
+
+COMMENT ON VIEW bi_v_evolucion_mensual IS
+  'Evolución mensual facturación/coste/margen por tipo P/R y proyecto. Fuente filtros Año/Empresa/Dept/Tipo/Proyecto. (materializada: bi_mv_evolucion_mensual; REFRESH tras sync 004).';
+COMMENT ON MATERIALIZED VIEW bi_mv_evolucion_mensual IS
+  'Snapshot de bi_v_evolucion_mensual; refrescar tras sync BC→Analytics.';
+
+-- -----------------------------------------------------------------------------
+-- bi_v_facturacion_probabilidad  ←  wrapper sobre bi_mv_facturacion_probabilidad
+-- -----------------------------------------------------------------------------
+CREATE MATERIALIZED VIEW bi_mv_facturacion_probabilidad AS
 SELECT
     f.empresa,
     f.year,
@@ -189,19 +228,21 @@ GROUP BY
         ELSE COALESCE(f.probability, 0)
     END;
 
-COMMENT ON VIEW bi_v_evolucion_mensual IS
-  'Evolución mensual facturación/coste/margen por tipo P/R y proyecto. Fuente filtros Año/Empresa/Dept/Tipo/Proyecto.';
+CREATE INDEX IF NOT EXISTS bi_mv_facturacion_probabilidad_idx0 ON bi_mv_facturacion_probabilidad (empresa, year);
+CREATE INDEX IF NOT EXISTS bi_mv_facturacion_probabilidad_idx1 ON bi_mv_facturacion_probabilidad (department_code);
+CREATE INDEX IF NOT EXISTS bi_mv_facturacion_probabilidad_idx2 ON bi_mv_facturacion_probabilidad (probabilidad);
+
+CREATE VIEW bi_v_facturacion_probabilidad AS SELECT * FROM bi_mv_facturacion_probabilidad;
+
 COMMENT ON VIEW bi_v_facturacion_probabilidad IS
-  'Facturación P+R por probabilidad y proyecto (0→100 como PBI). Panel Resumen.';
+  'Facturación P+R por probabilidad y proyecto (0→100 como PBI). Panel Resumen. (materializada: bi_mv_facturacion_probabilidad; REFRESH tras sync 004).';
+COMMENT ON MATERIALIZED VIEW bi_mv_facturacion_probabilidad IS
+  'Snapshot de bi_v_facturacion_probabilidad; refrescar tras sync BC→Analytics.';
 
 -- -----------------------------------------------------------------------------
--- Resumen por proyecto (página PBI «Resumen Proyectos»)
--- Filtros PBI visual: tipo_proyecto = Operational; estado IN (Completed,Open,Planning)
---   (= excluye Lost). Con PSI 2026: Fact 6.374.548 / Coste 4.350.042 / Margen 31,76 %.
--- Encabezado = job || ' --- ' || left(descripcion,36) — ya en v_se_facturacion.
+-- bi_v_resumen_proyectos  ←  wrapper sobre bi_mv_resumen_proyectos
 -- -----------------------------------------------------------------------------
-DROP VIEW IF EXISTS bi_v_resumen_proyectos;
-CREATE VIEW bi_v_resumen_proyectos AS
+CREATE MATERIALIZED VIEW bi_mv_resumen_proyectos AS
 SELECT
     f.empresa,
     f.year,
@@ -243,17 +284,22 @@ GROUP BY
 -- PBI «Filtro no es 0»: excluir filas sin importe ni coste
 HAVING ABS(SUM(f.facturado)) > 0.0001 OR ABS(SUM(f.coste)) > 0.0001;
 
+CREATE INDEX IF NOT EXISTS bi_mv_resumen_proyectos_idx0 ON bi_mv_resumen_proyectos (empresa, year);
+CREATE INDEX IF NOT EXISTS bi_mv_resumen_proyectos_idx1 ON bi_mv_resumen_proyectos (department_code);
+CREATE INDEX IF NOT EXISTS bi_mv_resumen_proyectos_idx2 ON bi_mv_resumen_proyectos (tipo_label);
+CREATE INDEX IF NOT EXISTS bi_mv_resumen_proyectos_idx3 ON bi_mv_resumen_proyectos (proyecto);
+
+CREATE VIEW bi_v_resumen_proyectos AS SELECT * FROM bi_mv_resumen_proyectos;
+
 COMMENT ON VIEW bi_v_resumen_proyectos IS
-  'Resumen Proyectos PBI: Operational + Completed/Open/Planning; excluye filas 0/0.';
+  'Resumen Proyectos PBI: Operational + Completed/Open/Planning; excluye filas 0/0. (materializada: bi_mv_resumen_proyectos; REFRESH tras sync 004).';
+COMMENT ON MATERIALIZED VIEW bi_mv_resumen_proyectos IS
+  'Snapshot de bi_v_resumen_proyectos; refrescar tras sync BC→Analytics.';
 
 -- -----------------------------------------------------------------------------
--- Unidad / Gastos (página PBI «Unidad»)
--- Pivot coste por concepto analítico × mes. Filtro de página PBI: Structure.
--- Dims year/empresa/department_code/tipo para filtros nativos del dashboard.
--- TRIM(descripcion_ca) unifica duplicados por espacios en BC.
+-- bi_v_unidad  ←  wrapper sobre bi_mv_unidad
 -- -----------------------------------------------------------------------------
-DROP VIEW IF EXISTS bi_v_unidad;
-CREATE VIEW bi_v_unidad AS
+CREATE MATERIALIZED VIEW bi_mv_unidad AS
 SELECT
     c.empresa,
     c.year,
@@ -296,18 +342,22 @@ GROUP BY
     TRIM(c.descripcion_ca)
 HAVING ABS(SUM(c.coste)) > 0.0001;
 
+CREATE INDEX IF NOT EXISTS bi_mv_unidad_idx0 ON bi_mv_unidad (empresa, year);
+CREATE INDEX IF NOT EXISTS bi_mv_unidad_idx1 ON bi_mv_unidad (department_code);
+CREATE INDEX IF NOT EXISTS bi_mv_unidad_idx2 ON bi_mv_unidad (tipo_label);
+CREATE INDEX IF NOT EXISTS bi_mv_unidad_idx3 ON bi_mv_unidad (concepto_analitico);
+
+CREATE VIEW bi_v_unidad AS SELECT * FROM bi_mv_unidad;
+
 COMMENT ON VIEW bi_v_unidad IS
-  'Unidad/Gastos PBI: coste por concepto×mes; tipo_proyecto=Structure fijo.';
+  'Unidad/Gastos PBI: coste por concepto×mes; tipo_proyecto=Structure fijo. (materializada: bi_mv_unidad; REFRESH tras sync 004).';
+COMMENT ON MATERIALIZED VIEW bi_mv_unidad IS
+  'Snapshot de bi_v_unidad; refrescar tras sync BC→Analytics.';
 
 -- -----------------------------------------------------------------------------
--- Facturación (página PBI «Facturación»)
--- Pivot facturado por encabezado × mes. Filtros de página PBI:
---   estado Completed/Open/Planning; job no PP%/PY% (ya en v_se_*);
---   TotalFacturado > 0; tipo_proyecto Operational (como Resumen Proyectos).
--- Dims year/empresa/department_code/tipo_label + job/proyecto para filtros.
+-- bi_v_facturacion  ←  wrapper sobre bi_mv_facturacion
 -- -----------------------------------------------------------------------------
-DROP VIEW IF EXISTS bi_v_facturacion;
-CREATE VIEW bi_v_facturacion AS
+CREATE MATERIALIZED VIEW bi_mv_facturacion AS
 SELECT
     f.empresa,
     f.year,
@@ -355,8 +405,17 @@ GROUP BY
     f.encabezado
 HAVING ABS(SUM(f.facturado)) > 0.0001;
 
+CREATE INDEX IF NOT EXISTS bi_mv_facturacion_idx0 ON bi_mv_facturacion (empresa, year);
+CREATE INDEX IF NOT EXISTS bi_mv_facturacion_idx1 ON bi_mv_facturacion (department_code);
+CREATE INDEX IF NOT EXISTS bi_mv_facturacion_idx2 ON bi_mv_facturacion (tipo_label);
+CREATE INDEX IF NOT EXISTS bi_mv_facturacion_idx3 ON bi_mv_facturacion (proyecto);
+
+CREATE VIEW bi_v_facturacion AS SELECT * FROM bi_mv_facturacion;
+
 COMMENT ON VIEW bi_v_facturacion IS
-  'Facturación PBI: Operational + Completed/Open/Planning; pivot facturado×mes; total>0.';
+  'Facturación PBI: Operational + Completed/Open/Planning; pivot facturado×mes; total>0. (materializada: bi_mv_facturacion; REFRESH tras sync 004).';
+COMMENT ON MATERIALIZED VIEW bi_mv_facturacion IS
+  'Snapshot de bi_v_facturacion; refrescar tras sync BC→Analytics.';
 
 -- KPI agregados por empresa/año (referencia / legacy; tarjetas usan bi_v_planificacion_kpi)
 CREATE OR REPLACE VIEW bi_v_kpi_anual_empresa AS
@@ -408,3 +467,5 @@ LEFT JOIN bi_v_real_anterior_empresa ra
 
 COMMENT ON VIEW bi_v_kpi_anual_empresa IS
   'KPIs anuales por empresa con crecimiento vs real año anterior (PBI).';
+
+-- Fin capa BI (MVs + wrappers).

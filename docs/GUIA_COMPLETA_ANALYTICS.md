@@ -270,7 +270,7 @@ psql "postgresql://postgres:SuperSecurePassword2025@192.168.36.100:5433/postgres
 
 ⚠️ Aplicar cambios SQL solo tras validar impacto en KPI (`v_se_facturacion`, `v_se_kpi_cards`) contra Power BI.
 
-### 7.4 Rendimiento Superset (workers / caché / JIT)
+### 7.4 Rendimiento Superset (workers / caché / JIT / MVs)
 
 Diagnóstico 2026-07-29 (dataset ~50k filas; el cuello de botella no era volumen):
 
@@ -279,6 +279,21 @@ Diagnóstico 2026-07-29 (dataset ~50k filas; el cuello de botella no era volumen
 | Gunicorn workers | `docker-compose.yml` → `SERVER_WORKER_AMOUNT` | `3` (default imagen = 1) |
 | Caché charts | `config/superset_config.py` → `DATA_CACHE_CONFIG` | FileSystemCache, TTL 600 s |
 | JIT Postgres | `ALTER DATABASE postgres SET jit_above_cost` | `10000000` (evita JIT en KPI) |
+| Capas BI pesadas | `bi_mv_*` + wrapper `bi_v_*` | Snapshot; REFRESH al final del sync **004** |
+
+Superset sigue leyendo `bi_v_*` (nombres y RLS Jinja sin cambio). Las consultas pesadas
+(`bi_v_unidad`, `bi_v_facturacion`, KPI, evolución, etc.) leen el snapshot `bi_mv_*`.
+
+Tras sync BC→Analytics, el nodo **Refresh BI Materialized Views** del workflow 004 ejecuta
+`REFRESH MATERIALIZED VIEW` antes de liberar el mutex / responder al webhook.
+
+```bash
+# Aplicar / recrear MVs + wrappers (VM 100 o desde Mac con Docker):
+./scripts/apply-bi-views.sh
+
+# Solo REFRESH (sin recrear), p. ej. tras cambio manual de datos:
+./scripts/apply-bi-views.sh --refresh
+```
 
 Tras cambiar compose/config en VM 100:
 

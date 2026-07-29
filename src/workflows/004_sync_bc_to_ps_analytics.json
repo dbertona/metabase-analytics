@@ -3719,7 +3719,7 @@
         "name": "Release Mutex 004",
         "type": "n8n-nodes-base.postgres",
         "position": [
-          4256,
+          4312,
           2560
         ],
         "parameters": {
@@ -3917,6 +3917,40 @@
         },
         "typeVersion": 4.2,
         "continueOnFail": true
+      },
+      {
+        "id": "refresh-bi-mvs-004",
+        "name": "Refresh BI Materialized Views",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          4144,
+          2560
+        ],
+        "parameters": {
+          "query": "REFRESH MATERIALIZED VIEW bi_mv_planificacion_kpi;\nREFRESH MATERIALIZED VIEW bi_mv_evolucion_mensual;\nREFRESH MATERIALIZED VIEW bi_mv_facturacion_probabilidad;\nREFRESH MATERIALIZED VIEW bi_mv_resumen_proyectos;\nREFRESH MATERIALIZED VIEW bi_mv_unidad;\nREFRESH MATERIALIZED VIEW bi_mv_facturacion;\nSELECT 1 AS bi_mvs_refreshed;",
+          "options": {},
+          "operation": "executeQuery"
+        },
+        "typeVersion": 2.4,
+        "credentials": {
+          "postgres": {
+            "id": "TTHI6C7o3V8eVzzr",
+            "name": "Postgres PS_Analytics"
+          }
+        }
+      },
+      {
+        "id": "restore-summary-after-mv-refresh-004",
+        "name": "Restore Summary After MV Refresh",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          4200,
+          2560
+        ],
+        "parameters": {
+          "jsCode": "// Tras REFRESH de bi_mv_*, restaurar el payload de Compute Execution Summary\n// (el nodo Postgres sustituye $json por el resultado del SELECT).\nreturn [$('Compute Execution Summary').first()];\n"
+        },
+        "typeVersion": 2
       }
     ],
     "connections": {
@@ -4106,9 +4140,9 @@
         "main": [
           [
             {
-              "index": 0,
-              "node": "Release Mutex 004",
-              "type": "main"
+              "node": "Refresh BI Materialized Views",
+              "type": "main",
+              "index": 0
             }
           ]
         ]
@@ -6178,6 +6212,28 @@
           [
             {
               "node": "Transform ExpedienteMes",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Refresh BI Materialized Views": {
+        "main": [
+          [
+            {
+              "node": "Restore Summary After MV Refresh",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Restore Summary After MV Refresh": {
+        "main": [
+          [
+            {
+              "node": "Release Mutex 004",
               "type": "main",
               "index": 0
             }
