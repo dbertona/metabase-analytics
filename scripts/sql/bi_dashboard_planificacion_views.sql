@@ -299,6 +299,65 @@ HAVING ABS(SUM(c.coste)) > 0.0001;
 COMMENT ON VIEW bi_v_unidad IS
   'Unidad/Gastos PBI: coste por concepto×mes; tipo_proyecto=Structure fijo.';
 
+-- -----------------------------------------------------------------------------
+-- Facturación (página PBI «Facturación»)
+-- Pivot facturado por encabezado × mes. Filtros de página PBI:
+--   estado Completed/Open/Planning; job no PP%/PY% (ya en v_se_*);
+--   TotalFacturado > 0; tipo_proyecto Operational (como Resumen Proyectos).
+-- Dims year/empresa/department_code/tipo_label + job/proyecto para filtros.
+-- -----------------------------------------------------------------------------
+DROP VIEW IF EXISTS bi_v_facturacion;
+CREATE VIEW bi_v_facturacion AS
+SELECT
+    f.empresa,
+    f.year,
+    f.departamento AS department_code,
+    d.department_name,
+    f.tipo,
+    CASE f.tipo
+        WHEN 'P' THEN 'Planificado'
+        WHEN 'R' THEN 'Real'
+        ELSE COALESCE(f.tipo::text, '')
+    END AS tipo_label,
+    f.tipo_proyecto,
+    f.estado,
+    f.job,
+    f.encabezado AS proyecto,
+    SUM(f.facturado) FILTER (WHERE f.month = 1) AS m01,
+    SUM(f.facturado) FILTER (WHERE f.month = 2) AS m02,
+    SUM(f.facturado) FILTER (WHERE f.month = 3) AS m03,
+    SUM(f.facturado) FILTER (WHERE f.month = 4) AS m04,
+    SUM(f.facturado) FILTER (WHERE f.month = 5) AS m05,
+    SUM(f.facturado) FILTER (WHERE f.month = 6) AS m06,
+    SUM(f.facturado) FILTER (WHERE f.month = 7) AS m07,
+    SUM(f.facturado) FILTER (WHERE f.month = 8) AS m08,
+    SUM(f.facturado) FILTER (WHERE f.month = 9) AS m09,
+    SUM(f.facturado) FILTER (WHERE f.month = 10) AS m10,
+    SUM(f.facturado) FILTER (WHERE f.month = 11) AS m11,
+    SUM(f.facturado) FILTER (WHERE f.month = 12) AS m12,
+    SUM(f.facturado) AS total
+FROM v_se_facturacion f
+LEFT JOIN mb_v_dim_departamento d
+    ON d.company_name = f.empresa
+   AND d.department_code = f.departamento
+WHERE f.tipo IN ('P', 'R')
+  AND f.tipo_proyecto = 'Operational'
+  AND COALESCE(f.estado, '') IN ('Completed', 'Open', 'Planning')
+GROUP BY
+    f.empresa,
+    f.year,
+    f.departamento,
+    d.department_name,
+    f.tipo,
+    f.tipo_proyecto,
+    f.estado,
+    f.job,
+    f.encabezado
+HAVING ABS(SUM(f.facturado)) > 0.0001;
+
+COMMENT ON VIEW bi_v_facturacion IS
+  'Facturación PBI: Operational + Completed/Open/Planning; pivot facturado×mes; total>0.';
+
 -- KPI agregados por empresa/año (referencia / legacy; tarjetas usan bi_v_planificacion_kpi)
 CREATE OR REPLACE VIEW bi_v_kpi_anual_empresa AS
 WITH agg AS (
