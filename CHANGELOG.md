@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-29j] — Perf: pausar polls JS si pestaña oculta + anti-N/A más lento
+
+- `psPollEnabled()`: los `setInterval` del dashboard no trabajan con `document.hidden`
+  (Chrome Retina). Rollback: `?_pspoll=always` / `__PS_POLL_ALWAYS=true`.
+- Poll anti-N/A: 120 ms → **600 ms**; en modo `light` deja de re-escanear si ya
+  `ps-na-ready`. Rollback: `?_psnapoll=120` / `__PS_NA_POLL_MS=120`.
+
 ## [2026-07-29i] — Perf: anti-N/A Facturación/Gastos en modo light (reversible)
 
 - Default `light`: solo `valueFormatter` + re-parche en carga de datos (sin

@@ -4,6 +4,37 @@
     return window.location.pathname.indexOf("/analytics/") === 0 ? "/analytics" : "";
   }
 
+  /**
+   * Polls del dashboard — pausar si la pestaña del navegador está oculta.
+   * Reduce CPU/GPU en Chrome Retina cuando el usuario cambia de pestaña/app.
+   * Rollback: ?_pspoll=always  o  window.__PS_POLL_ALWAYS = true
+   */
+  function psPollEnabled() {
+    try {
+      if (window.__PS_POLL_ALWAYS === true) return true;
+      var q = new URLSearchParams(window.location.search || "");
+      if ((q.get("_pspoll") || "").toLowerCase() === "always") return true;
+    } catch (ePoll) { /* ignore */ }
+    if (typeof document.hidden === "boolean" && document.hidden) return false;
+    return true;
+  }
+
+  /**
+   * Intervalo del poll anti-N/A (Gastos/Facturación).
+   * Default 600 ms (antes 120). Rollback: ?_psnapoll=120  o  __PS_NA_POLL_MS=120
+   */
+  function psNaPollMs() {
+    try {
+      var q = new URLSearchParams(window.location.search || "");
+      var v = parseInt(q.get("_psnapoll") || "", 10);
+      if (v >= 50 && v <= 5000) return v;
+    } catch (eMs) { /* ignore */ }
+    if (typeof window.__PS_NA_POLL_MS === "number" && window.__PS_NA_POLL_MS >= 50) {
+      return window.__PS_NA_POLL_MS;
+    }
+    return 600;
+  }
+
   // ---------------------------------------------------------------------------
   // Lazy / progressive charts (prueba 2026-07-29)
   // Hallazgo: Superset YA no pide Gastos/Facturación/Gráficos al abrir Resumen
@@ -356,7 +387,10 @@
     }
   }
   window.addEventListener("resize", publishDashboardViewportVars);
-  setInterval(publishDashboardViewportVars, 1200);
+  setInterval(function () {
+    if (!psPollEnabled()) return;
+    publishDashboardViewportVars();
+  }, 1200);
   setTimeout(publishDashboardViewportVars, 0);
   setTimeout(publishDashboardViewportVars, 400);
 
@@ -1523,6 +1557,16 @@
     chart.classList.add("ps-na-ready");
   }
 
+  function matrixHasVisibleNA(chart) {
+    if (!chart) return false;
+    var cells = chart.querySelectorAll(".ag-cell, .ag-floating-bottom .ag-cell");
+    for (var i = 0; i < cells.length; i++) {
+      var t = (cells[i].textContent || "").replace(/\u00a0/g, " ").trim();
+      if (t === "N/A" || t === "n/a") return true;
+    }
+    return false;
+  }
+
   function ensureMatrixNullBlank(chart) {
     if (!chart || !isMatrixNaChart(chart)) return;
     markMatrixNaPending(chart);
@@ -1540,10 +1584,8 @@
     }
     patchAgGridNullAsBlank(api);
     attachMatrixNaScrollGuards(api, chart);
-    // Barrido DOM inicial solo en heavy; en light basta el valueFormatter.
-    if (getMatrixNaMode() === "heavy") {
-      blankGastosNA(chart);
-    }
+    // Una pasada DOM al montar (light y heavy). El coste caro era repetirla en scroll.
+    blankGastosNA(chart);
     if (api.__psNullBlankPatched) {
       if (chart.__psNaFailSafe) {
         clearTimeout(chart.__psNaFailSafe);
@@ -2168,6 +2210,7 @@
   }
 
   setInterval(function () {
+    if (!psPollEnabled()) return;
     fixDoubleAppRootAnchors(document);
     fixUsersAnchors(document);
     autoSizeAgGridColumns();
@@ -2188,6 +2231,7 @@
       // La guardia está en la instancia de API para sobrevivir recreaciones del DOM
       if (api && !api.__psColPersistInit) initProyectosColPersist(chart, api);
     });
+    var heavyNa = typeof getMatrixNaMode === "function" && getMatrixNaMode() === "heavy";
     var gastosCharts = document.querySelectorAll('[data-test-chart-name*="Gastos"]');
     Array.prototype.forEach.call(gastosCharts, function (chart) {
       if (!isGastosChart(chart)) return;
@@ -2201,7 +2245,7 @@
       var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
       if (!rows.length) return;
       if (api && !api.__psGastosColPersistInit) initGastosColPersist(chart, api);
-      else if (api) blankGastosNA(chart);
+      else if (api && heavyNa) blankGastosNA(chart);
     });
     var factCharts = document.querySelectorAll('[data-test-chart-name="Facturación"]');
     Array.prototype.forEach.call(factCharts, function (chart) {
@@ -2215,14 +2259,17 @@
       var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
       if (!rows.length) return;
       if (api && !api.__psFactColPersistInit) initFacturacionColPersist(chart, api);
-      else if (api) blankFacturacionNA(chart);
+      else if (api && heavyNa) blankFacturacionNA(chart);
     });
     labelAllAgGridTotals();
   }, 800);
 
-  // Poll rápido solo para ocultar/parchear N/A antes del intervalo de 800 ms
+  // Poll anti-N/A: default 600 ms (antes 120). Se salta si pestaña oculta o matriz ya ready en light.
   injectMatrixNaCss();
   setInterval(function () {
+    if (!psPollEnabled()) return;
+    var light =
+      typeof getMatrixNaMode === "function" && getMatrixNaMode() === "light";
     var charts = document.querySelectorAll(
       '[data-test-chart-name*="Gastos"],[data-test-chart-name="Facturación"]'
     );
@@ -2231,9 +2278,13 @@
       if (chart.classList.contains("ps-na-ready") && !chart.querySelector(".ag-cell")) {
         return;
       }
+      // En light, si ya ready y no hay N/A visibles → no re-escanear.
+      if (light && chart.classList.contains("ps-na-ready") && !matrixHasVisibleNA(chart)) {
+        return;
+      }
       ensureMatrixNullBlank(chart);
     });
-  }, 120);
+  }, psNaPollMs());
 
   /**
    * Facturación por Probabilidad (ECharts):
@@ -2930,6 +2981,7 @@
 
   // Reaplicar chrome al entrar/salir de edición (SPA)
   setInterval(function () {
+    if (!psPollEnabled()) return;
     if (!isDashboardPage()) return;
     var editing = isDashboardEditing();
     var marked = document.body.classList.contains("ps-dashboard-editing");
