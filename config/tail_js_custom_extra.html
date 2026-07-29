@@ -529,6 +529,41 @@
     return null;
   }
 
+  /**
+   * Tuning de rendimiento AG Grid (scroll en Proyectos/Gastos/Facturación/Resumen mensual).
+   * rowBuffer más bajo → menos filas fuera de viewport pre-renderizadas (menos DOM).
+   * debounceVerticalScrollbar → agrupa updates durante scroll rápido (menos repintados).
+   * animateRows:false → sin transición CSS al reposicionar filas virtualizadas.
+   * Reversible sin redeploy: ?_psgridtune=off  o  window.__PS_GRID_TUNE_DISABLED=true
+   */
+  function psGridTuneEnabled() {
+    try {
+      if (window.__PS_GRID_TUNE_DISABLED === true) return false;
+      var q = new URLSearchParams(window.location.search || "");
+      if ((q.get("_psgridtune") || "").toLowerCase() === "off") return false;
+    } catch (eTune) { /* ignore */ }
+    return true;
+  }
+
+  function tuneAgGridScrollPerf(api) {
+    if (!api || api.__psScrollPerfTuned) return;
+    if (!psGridTuneEnabled()) return;
+    api.__psScrollPerfTuned = true;
+    var opts = { rowBuffer: 6, debounceVerticalScrollbar: true, animateRows: false };
+    Object.keys(opts).forEach(function (key) {
+      try {
+        if (typeof api.setGridOption === "function") {
+          api.setGridOption(key, opts[key]);
+        } else if (
+          api.gridOptionsService &&
+          typeof api.gridOptionsService.set === "function"
+        ) {
+          api.gridOptionsService.set(key, opts[key]);
+        }
+      } catch (eOpt) { /* versión de AG Grid no soporta esta opción */ }
+    });
+  }
+
   function findAgGridApi(rootEl) {
     if (!rootEl) return null;
     var agRoot = rootEl.querySelector(".ag-root") || rootEl;
@@ -1582,6 +1617,7 @@
       }
       return;
     }
+    tuneAgGridScrollPerf(api);
     patchAgGridNullAsBlank(api);
     attachMatrixNaScrollGuards(api, chart);
     // Una pasada DOM al montar (light y heavy). El coste caro era repetirla en scroll.
@@ -2168,6 +2204,7 @@
         var api = findAgGridApi(agTheme);
         if (!api) return;
 
+        tuneAgGridScrollPerf(api);
         patchSizeColumnsToFit(api);
         try {
           collapseHiddenSortColumns(api);
@@ -2228,6 +2265,7 @@
       var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
       if (!rows.length) return;
       var api = findAgGridApi(agTheme);
+      if (api) tuneAgGridScrollPerf(api);
       // La guardia está en la instancia de API para sobrevivir recreaciones del DOM
       if (api && !api.__psColPersistInit) initProyectosColPersist(chart, api);
     });

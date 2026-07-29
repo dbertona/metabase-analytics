@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-29k] — Perf: tuning interno AG Grid (rowBuffer/debounce/animateRows)
+
+- `tuneAgGridScrollPerf(api)`: `rowBuffer=6`, `debounceVerticalScrollbar=true`,
+  `animateRows=false` en Proyectos, Gastos, Facturación y Resumen mensual.
+- Aplicado una vez por instancia de grid (`api.__psScrollPerfTuned`), vía
+  `api.setGridOption()` con fallback silencioso si la versión de AG Grid no lo soporta.
+- Rollback: `?_psgridtune=off` o `window.__PS_GRID_TUNE_DISABLED=true`.
+
 ## [2026-07-29j] — Perf: pausar polls JS si pestaña oculta + anti-N/A más lento
 
 - `psPollEnabled()`: los `setInterval` del dashboard no trabajan con `document.hidden`
