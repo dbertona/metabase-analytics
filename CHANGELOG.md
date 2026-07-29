@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [2026-07-29] — Cierre rama `feat/rls-projectteamfilter`
+
+### Summary
+- RLS por `projectteamfilter`: usuarios con flag BC solo ven proyectos de su `bc_job_team`.
+- Filtro nativo **Planificado/Real** (`tipo_label`) en lugar de P/R.
+- Tarjetas **Plan** KPI responden al filtro Tipo (grano dept×tipo); Objetivos solo en filas P.
+- Tabla Proyectos ordenada por Margen % desc; etiquetas Probabilidad sin corte; sin banner RLS.
+
+### Added
+- Modo `project_team` en `resolve_user_scope()` / Jinja (`ps_row_filter`, `ps_team_jobs_sql`).
+- `tipo_label` en vistas BI (evolución, resumen, unidad, KPI).
+
+### Fixed
+- Native filter Tipo ignorado en charts sin `tipo_label` en `adhoc_filters`.
+- Plan · Facturación fijo en P+R (7.149.796 €) al filtrar Real.
+- Scroll/corte de etiquetas en Facturación por Probabilidad.
+
+### Changed
+- `NATIVE_FILTER-TIPO`: nombre Planificado/Real; `chartsInScope` incluye Plan KPI (no Obj).
+
 ## [2026-07-28u] — Cierre rama `feat/rls-departamento-server-side`
 
 ### Summary
