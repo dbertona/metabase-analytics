@@ -112,7 +112,8 @@
 
     function bucketFor(sid, name) {
       if (sid != null && otherTabIds[sid]) return otherTabIds[sid];
-      if (name === "Gastos") return "Unidad";
+      if (name === "Unidad") return "Unidad";
+      if (name === "Gastos") return "Gastos";
       if (name === "Facturación") return "Facturación";
       if (name === "Evolución mensual" || name === "Margen acumulado")
         return "Gráficos";
@@ -177,7 +178,7 @@
       }
       var active = activeTabLabel();
       // Pestañas laterales
-      if (bucket === "Unidad" || bucket === "Facturación" || bucket === "Gráficos") {
+      if (bucket === "Unidad" || bucket === "Gastos" || bucket === "Facturación" || bucket === "Gráficos") {
         if (active === bucket || warmed[bucket]) {
           stats.allowed += 1;
           return sendFn();
@@ -370,10 +371,12 @@
         );
       }
     }
-    var gastos = document.querySelector('[data-test-chart-name*="Gastos"]');
+    var unidad = document.querySelector('[data-test-chart-name="Unidad"]');
+    var gastos = document.querySelector('[data-test-chart-name="Gastos"]');
     var facturacion = document.querySelector('[data-test-chart-name="Facturación"]');
     var matrix = null;
-    if (gastos && gastos.offsetParent !== null) matrix = gastos;
+    if (unidad && unidad.offsetParent !== null) matrix = unidad;
+    else if (gastos && gastos.offsetParent !== null) matrix = gastos;
     else if (facturacion && facturacion.offsetParent !== null) matrix = facturacion;
     if (matrix) {
       /* Igual que Resumen: top del chart-slice (no del holder) → ~8–9px de aire abajo */
@@ -455,7 +458,8 @@
 
   function labelAllAgGridTotals() {
     var sels = [
-      '[data-test-chart-name*="Gastos"]',
+      '[data-test-chart-name="Unidad"]',
+      '[data-test-chart-name="Gastos"]',
       '[data-test-chart-name="Facturación"]',
       '[data-test-chart-name*="Proyectos"]',
       '[data-test-chart-name*="Resumen mensual"]',
@@ -1171,7 +1175,7 @@
 
   // ─── Fin persistencia Proyectos ─────────────────────────────────────────────
 
-  // ─── Persistencia / layout — chart Gastos (pestaña Unidad) ──────────────────
+  // ─── Persistencia / layout — chart Unidad (concepto × mes) ─────────────────
   var PS_GASTOS_COL_STORAGE_KEY = "ps-gastos-col-widths-v1";
 
   /**
@@ -1262,13 +1266,25 @@
   })();
 
   function isGastosChart(chart) {
+    /* Chart pestaña Unidad (concepto analítico). Nombre histórico de helpers. */
     var name = chart.getAttribute("data-test-chart-name") || "";
-    if (name.indexOf("Gastos") !== -1) return true;
+    if (name === "Unidad") return true;
     var title = chart.querySelector(
       '[data-test="slice-header"] .header-title, [data-test="slice-header"] .editable-title'
     );
     var t = title ? (title.textContent || "").replace(/\s+/g, " ").trim() : "";
-    return t === "Gastos" || t.indexOf("Gastos") === 0;
+    return t === "Unidad";
+  }
+
+  function isGastosMatrixChart(chart) {
+    /* Chart pestaña Gastos (Encabezado × mes, coste). */
+    var name = chart.getAttribute("data-test-chart-name") || "";
+    if (name === "Gastos") return true;
+    var title = chart.querySelector(
+      '[data-test="slice-header"] .header-title, [data-test="slice-header"] .editable-title'
+    );
+    var t = title ? (title.textContent || "").replace(/\s+/g, " ").trim() : "";
+    return t === "Gastos";
   }
 
   function getDefaultGastosWidths(chart) {
@@ -1384,13 +1400,17 @@
     var style = document.createElement("style");
     style.id = "ps-matrix-na-css";
     style.textContent =
-      '[data-test-chart-name*="Gastos"].ps-na-pending .ag-center-cols-container,' +
-      '[data-test-chart-name*="Gastos"].ps-na-pending .ag-floating-bottom,' +
+      '[data-test-chart-name="Unidad"].ps-na-pending .ag-center-cols-container,' +
+      '[data-test-chart-name="Unidad"].ps-na-pending .ag-floating-bottom,' +
+      '[data-test-chart-name="Gastos"].ps-na-pending .ag-center-cols-container,' +
+      '[data-test-chart-name="Gastos"].ps-na-pending .ag-floating-bottom,' +
       '[data-test-chart-name="Facturación"].ps-na-pending .ag-center-cols-container,' +
       '[data-test-chart-name="Facturación"].ps-na-pending .ag-floating-bottom' +
       "{opacity:0 !important;}" +
-      '[data-test-chart-name*="Gastos"].ps-na-ready .ag-center-cols-container,' +
-      '[data-test-chart-name*="Gastos"].ps-na-ready .ag-floating-bottom,' +
+      '[data-test-chart-name="Unidad"].ps-na-ready .ag-center-cols-container,' +
+      '[data-test-chart-name="Unidad"].ps-na-ready .ag-floating-bottom,' +
+      '[data-test-chart-name="Gastos"].ps-na-ready .ag-center-cols-container,' +
+      '[data-test-chart-name="Gastos"].ps-na-ready .ag-floating-bottom,' +
       '[data-test-chart-name="Facturación"].ps-na-ready .ag-center-cols-container,' +
       '[data-test-chart-name="Facturación"].ps-na-ready .ag-floating-bottom' +
       "{opacity:1 !important;}";
@@ -1576,7 +1596,7 @@
   }
 
   function isMatrixNaChart(chart) {
-    return isGastosChart(chart) || isFacturacionMatrixChart(chart);
+    return isGastosChart(chart) || isGastosMatrixChart(chart) || isFacturacionMatrixChart(chart);
   }
 
   function markMatrixNaPending(chart) {
@@ -1748,7 +1768,7 @@
   }
 
   function placeGastosSearchInHeader() {
-    var charts = document.querySelectorAll('[data-test-chart-name*="Gastos"]');
+    var charts = document.querySelectorAll('[data-test-chart-name="Unidad"]');
     Array.prototype.forEach.call(charts, function (chart) {
       var header = chart.querySelector('[data-test="slice-header"]');
       var realInput = chart.querySelector(
@@ -2090,6 +2110,162 @@
     });
   }
 
+
+  // ─── Persistencia / layout — chart Gastos (Encabezado × mes, pestaña Gastos) ─
+  var PS_GASTOS_MATRIZ_COL_STORAGE_KEY = "ps-gastos-matriz-col-widths-v1";
+
+  function getDefaultGastosMatrizWidths(chart) {
+    return getDefaultFacturacionWidths(chart);
+  }
+
+  function applyGastosMatrizColumnLayout(api, chart) {
+    if (!api || !chart) return;
+    var map = getDefaultGastosMatrizWidths(chart);
+    var state = Object.keys(map).map(function (id) {
+      var row = { colId: id, width: map[id] };
+      if (id === "Total") row.pinned = "right";
+      else row.pinned = null;
+      return row;
+    });
+    try {
+      api.applyColumnState({ state: state, applyOrder: false });
+    } catch (e) { /* ignore */ }
+  }
+
+  function saveGastosMatrizWidthsLocal(map) {
+    try {
+      localStorage.setItem(PS_GASTOS_MATRIZ_COL_STORAGE_KEY, JSON.stringify(map));
+    } catch (e) { /* ignore */ }
+  }
+
+  function initGastosMatrizColPersist(chart, api) {
+    if (api.__psGastosMatColPersistInit) return;
+    api.__psGastosMatColPersistInit = true;
+    chart.__psGastosMatColPersistInit = true;
+
+    patchAgGridNullAsBlank(api);
+    ensureMatrixNullBlank(chart);
+    if (typeof tuneAgGridScrollPerf === "function") tuneAgGridScrollPerf(api);
+
+    function applyFit() {
+      applyGastosMatrizColumnLayout(api, chart);
+      clearFacturacionClientSortOnce(api);
+      fixFacturacionProyectoColumn(api, chart);
+      blankGastosNA(chart);
+      labelAgGridTotalsRow(chart);
+      markMatrixNaReady(chart);
+    }
+
+    api.sizeColumnsToFit = function () {
+      applyFit();
+    };
+
+    applyFit();
+    setTimeout(applyFit, 300);
+    setTimeout(applyFit, 900);
+    setTimeout(applyFit, 1800);
+
+    try {
+      api.addEventListener("columnResized", function (e) {
+        if (!e || !e.finished || e.source !== "uiColumnResized") return;
+        var map = getColWidthMap(api);
+        if (!map) return;
+        saveGastosMatrizWidthsLocal(map);
+      });
+      api.addEventListener("modelUpdated", function () {
+        patchAgGridNullAsBlank(api);
+        fixFacturacionProyectoColumn(api, chart);
+        blankGastosNA(chart);
+      });
+      api.addEventListener("firstDataRendered", function () {
+        patchAgGridNullAsBlank(api);
+        applyFit();
+      });
+    } catch (err) { /* grid aún montando */ }
+  }
+
+  function ensureGastosMatrizColumnsFit(chart) {
+    if (!isGastosMatrixChart(chart) || !isGastosChartVisible(chart)) return;
+    var agTheme = chart.querySelector('[class*="ag-theme"]');
+    if (!agTheme) return;
+    var api = findAgGridApi(agTheme);
+    if (!api) return;
+    if (!api.__psGastosMatColPersistInit) {
+      initGastosMatrizColPersist(chart, api);
+      return;
+    }
+    if (isFacturacionTotalClipped(chart)) {
+      applyGastosMatrizColumnLayout(api, chart);
+      blankGastosNA(chart);
+      labelAgGridTotalsRow(chart);
+    }
+  }
+
+  function placeGastosMatrizSearchInHeader() {
+    var charts = document.querySelectorAll('[data-test-chart-name="Gastos"]');
+    Array.prototype.forEach.call(charts, function (chart) {
+      if (!isGastosMatrixChart(chart)) return;
+      var header = chart.querySelector('[data-test="slice-header"]');
+      var realInput = chart.querySelector(
+        ".dropdown-controls-container #filter-text-box"
+      );
+      var originalRow = chart.querySelector(".dropdown-controls-container");
+      if (!header || !realInput || !originalRow) return;
+
+      originalRow.style.setProperty("display", "none", "important");
+      if (originalRow.parentElement) {
+        originalRow.parentElement.style.setProperty("height", "100%", "important");
+      }
+
+      var proxy = header.querySelector(".ps-gastos-matriz-search-proxy");
+      if (proxy) {
+        proxy.placeholder = realInput.placeholder || "Buscar";
+        return;
+      }
+
+      proxy = document.createElement("input");
+      proxy.type = "text";
+      proxy.placeholder = realInput.placeholder || "Buscar";
+      proxy.className = "ps-gastos-matriz-search-proxy";
+      proxy.setAttribute("aria-label", "Buscar proyectos");
+      proxy.style.cssText = [
+        "border:1px solid #d9d9d9",
+        "border-radius:4px",
+        "padding:3px 9px",
+        "font-size:14px",
+        "height:28px",
+        "width:175px",
+        "outline:none",
+        "background:#fff",
+        "color:#333",
+        "flex:0 0 175px",
+        "margin-right:8px",
+      ].join(";");
+
+      proxy.addEventListener("input", function () {
+        var currentInput = chart.querySelector(
+          ".dropdown-controls-container #filter-text-box"
+        );
+        if (!currentInput) return;
+        var descriptor = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype,
+          "value"
+        );
+        descriptor.set.call(currentInput, proxy.value);
+        currentInput.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      proxy.addEventListener("focus", function () {
+        proxy.style.borderColor = "#007c89";
+      });
+      proxy.addEventListener("blur", function () {
+        proxy.style.borderColor = "#d9d9d9";
+      });
+
+      var headerControls = header.querySelector(".header-controls");
+      header.insertBefore(proxy, headerControls || header.lastChild);
+    });
+  }
+
   /**
    * Resumen mensual no tiene buscador, pero AG Grid deja una fila de controles
    * vacía que añade ~7–11px entre título y tabla (Proyectos la oculta).
@@ -2256,6 +2432,7 @@
     placeProyectosSearchInHeader();
     hideResumenDropdownControls();
     placeGastosSearchInHeader();
+    placeGastosMatrizSearchInHeader();
     placeFacturacionSearchInHeader();
     // Inicializar persistencia de anchos en el chart Proyectos (idempotente)
     var proyCharts = document.querySelectorAll('[data-test-chart-name*="Proyectos"]');
@@ -2270,8 +2447,8 @@
       if (api && !api.__psColPersistInit) initProyectosColPersist(chart, api);
     });
     var heavyNa = typeof getMatrixNaMode === "function" && getMatrixNaMode() === "heavy";
-    var gastosCharts = document.querySelectorAll('[data-test-chart-name*="Gastos"]');
-    Array.prototype.forEach.call(gastosCharts, function (chart) {
+    var unidadCharts = document.querySelectorAll('[data-test-chart-name="Unidad"]');
+    Array.prototype.forEach.call(unidadCharts, function (chart) {
       if (!isGastosChart(chart)) return;
       ensureMatrixNullBlank(chart);
       ensureGastosColumnsFit(chart);
@@ -2283,6 +2460,20 @@
       var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
       if (!rows.length) return;
       if (api && !api.__psGastosColPersistInit) initGastosColPersist(chart, api);
+      else if (api && heavyNa) blankGastosNA(chart);
+    });
+    var gastosMatCharts = document.querySelectorAll('[data-test-chart-name="Gastos"]');
+    Array.prototype.forEach.call(gastosMatCharts, function (chart) {
+      if (!isGastosMatrixChart(chart)) return;
+      ensureMatrixNullBlank(chart);
+      ensureGastosMatrizColumnsFit(chart);
+      var agTheme = chart.querySelector('[class*="ag-theme"]');
+      if (!agTheme) return;
+      var api = findAgGridApi(agTheme);
+      if (api) patchAgGridNullAsBlank(api);
+      var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
+      if (!rows.length) return;
+      if (api && !api.__psGastosMatColPersistInit) initGastosMatrizColPersist(chart, api);
       else if (api && heavyNa) blankGastosNA(chart);
     });
     var factCharts = document.querySelectorAll('[data-test-chart-name="Facturación"]');
@@ -2309,7 +2500,7 @@
     var light =
       typeof getMatrixNaMode === "function" && getMatrixNaMode() === "light";
     var charts = document.querySelectorAll(
-      '[data-test-chart-name*="Gastos"],[data-test-chart-name="Facturación"]'
+      '[data-test-chart-name="Unidad"],[data-test-chart-name="Gastos"],[data-test-chart-name="Facturación"]'
     );
     Array.prototype.forEach.call(charts, function (chart) {
       if (!isMatrixNaChart(chart)) return;

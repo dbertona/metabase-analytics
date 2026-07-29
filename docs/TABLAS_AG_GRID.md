@@ -90,8 +90,9 @@ docker restart superset   # o el nombre del contenedor en el compose de este rep
 |-------|-----------|---------|----------|:--------:|-------|
 | Resumen mensual | 17 | Resumen | `ano_mes` + 3 métricas | No | Encaja casi siempre; orden cronológico vía SQL/JS |
 | Proyectos | 21 | Resumen | `proyecto` + 3 métricas | Sí | **Patrón canónico** de UX |
-| Gastos | 22 | Unidad | concepto + 12 meses + Total | Sí | Muchas columnas → **scroll horizontal real** si no caben |
-| Facturación | 23 | Facturación | Encabezado + 12 meses + Total | Sí | Misma matriz que Gastos; filtros Operational + estados |
+| Gastos | 22→nuevo | Gastos | Encabezado + 12 meses + Total | Sí | Coste Operational; filtros estado ≠ Lost + total>0 |
+| Unidad | nuevo | Unidad | concepto + 12 meses + Total | Sí | Antes llamado «Gastos»; Structure |
+| Facturación | 23 | Facturación | Encabezado + 12 meses + Total | Sí | Misma matriz que Gastos; métrica facturado |
 
 Si el usuario pide “otra tabla como Proyectos”, clonar el patrón Proyectos.  
 Si pide “matriz mes a mes” o “otra pestaña como Gastos/Facturación”, **§12** (no reinventar).
@@ -493,6 +494,7 @@ CREATE VIEW bi_v_<slug> AS SELECT * FROM bi_mv_<slug>;
 | Existente | Dimensión | Métrica | Filtros típicos |
 |-----------|-----------|---------|-----------------|
 | `bi_v_unidad` | `concepto_analitico` | `coste` | Structure (ver SQL) |
+| `bi_v_gastos` | `proyecto` (encabezado) | `coste` | Operational + Completed/Open/Planning; total>0 |
 | `bi_v_facturacion` | `proyecto` (encabezado) | `facturado` | Operational + Completed/Open/Planning |
 
 Tras crear la MV: añadirla al **REFRESH** del workflow **004** y aplicar con `./scripts/apply-bi-views.sh` (+ `--refresh` si solo refrescas).
@@ -620,8 +622,8 @@ Si hace falta sensación “casi instantánea” con cientos/miles de filas: **p
 | Función / símbolo | Rol |
 |-------------------|-----|
 | `_month_pivot_params` | Params Python canónicos meses |
-| `gastos_unidad_params` / `facturacion_matriz_params` | Wrappers Gastos / Facturación |
-| `isGastosChart` / `isFacturacionMatrixChart` | Detectores |
+| `gastos_unidad_params` / `gastos_matriz_params` / `facturacion_matriz_params` | Wrappers Unidad / Gastos / Facturación |
+| `isGastosChart` / `isGastosMatrixChart` / `isFacturacionMatrixChart` | Detectores (Unidad / Gastos / Facturación) |
 | `isMatrixNaChart` / `ensureMatrixNullBlank` | Anti-N/A compartido |
 | `getMatrixNaMode` / `attachMatrixNaScrollGuards` | light vs heavy |
 | `tuneAgGridScrollPerf` | rowBuffer / debounce / animateRows |

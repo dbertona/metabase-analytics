@@ -61,18 +61,19 @@ Debajo: separación ~12px · Resumen mensual + Proyectos.
 | 8 tarjetas KPI (Obj/Plan) | `bi_v_planificacion_kpi` | Plan por `tipo_label`; Obj solo filas P. Filtro Planificado/Real → tarjetas **Plan** |
 | Resumen / Evolución / Margen | `bi_v_evolucion_mensual` | Fuente de **valores** del filtro Planificado/Real (`tipo_label`); dims también en Resumen |
 | Facturación por Probabilidad | `bi_v_facturacion_probabilidad` | Al lado de KPIs (7+5); fuera del scope de filtros Año/Empresa/Dept; etiquetas `N%` e importes en `K€` (params + `tail_js`); sí entra en filtro **Proyectos** |
-| Gastos (pestaña Unidad) | `bi_v_unidad` | Pivot coste por concepto×mes; Structure fijo en la vista |
+| Gastos (pestaña Unidad) → **Unidad** | `bi_v_unidad` | Pivot coste por concepto×mes; Structure fijo en la vista |
+| Gastos (pestaña Gastos) | `bi_v_gastos` | Pivot coste Encabezado×mes; Operational + Completed/Open/Planning; total>0 |
 | Facturación (pestaña) | `bi_v_facturacion` | Pivot facturado Encabezado×mes; Operational + Completed/Open/Planning; total>0 |
 
 ### Filtros configurados
 
 | ID (obligatorio) | Nombre | Columna | Dataset | Scope |
 |------------------|--------|---------|---------|-------|
-| `NATIVE_FILTER-YEAR` | Año | `year` | KPI (ds planificacion) | Resumen + Unidad + Facturación + Gráficos |
-| `NATIVE_FILTER-EMPRESA` | Empresas | `empresa` | KPI | Resumen + Unidad + Facturación + Gráficos |
-| `NATIVE_FILTER-DEPT` | Departamentos | `department_code` | KPI | Resumen + Unidad + Facturación + Gráficos |
-| `NATIVE_FILTER-TIPO` | Planificado/Real | `tipo_label` | Evolución mensual | Resumen / Evolución / Margen / Proyectos / Gastos / Facturación / **Plan KPI** |
-| `NATIVE_FILTER-PROYECTO` | Proyectos | `proyecto` | Resumen proyectos | Resumen mensual / Proyectos / Evolución / Margen / Probabilidad / Facturación (**no** KPIs ni Gastos) |
+| `NATIVE_FILTER-YEAR` | Año | `year` | KPI (ds planificacion) | Resumen + Unidad + Gastos + Facturación + Gráficos |
+| `NATIVE_FILTER-EMPRESA` | Empresas | `empresa` | KPI | Resumen + Unidad + Gastos + Facturación + Gráficos |
+| `NATIVE_FILTER-DEPT` | Departamentos | `department_code` | KPI | Resumen + Unidad + Gastos + Facturación + Gráficos |
+| `NATIVE_FILTER-TIPO` | Planificado/Real | `tipo_label` | Evolución mensual | Resumen / Evolución / Margen / Proyectos / Unidad / Gastos / Facturación / **Plan KPI** |
+| `NATIVE_FILTER-PROYECTO` | Proyectos | `proyecto` | Resumen proyectos | Resumen mensual / Proyectos / Evolución / Margen / Probabilidad / Gastos / Facturación (**no** KPIs ni Unidad) |
 
 Valores del filtro Planificado/Real = `tipo_label` (Planificado|Real). Los charts
 en scope deben exponer `tipo_label` en `adhoc_filters` (IS NOT NULL); si solo
