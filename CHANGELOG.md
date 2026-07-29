@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2026-07-29c] — Fix altura AG Grid pestaña Unidad (Gastos)
+
+### Fixed
+- Selectores CSS `[Gastos],[Facturación] .hijo` solo aplicaban altura a Facturación
+  (coma CSS). Gastos quedaba ~560 px con card vacío. Ahora `:is(Gastos, Facturación)`.
+
 ## [2026-07-29b] — Pestaña Facturación (matriz Encabezado × mes)
 
 ### Added
