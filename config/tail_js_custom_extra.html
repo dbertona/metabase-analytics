@@ -1428,30 +1428,65 @@
     return !!api.__psNullBlankPatched;
   }
 
+  /**
+   * Modo anti-N/A (Facturación/Gastos) — reversible sin redeploy:
+   *   light (default) → solo valueFormatter + re-parche al cargar datos
+   *   heavy           → comportamiento anterior (scroll + MutationObserver + barrido DOM)
+   *
+   * Volver al modo pesado (si reaparece flash N/A al scroll):
+   *   ?_psna=heavy   en la URL del dashboard
+   *   o en consola:  window.__PS_MATRIX_NA_MODE = 'heavy'; location.reload()
+   * Forzar light: ?_psna=light
+   */
+  function getMatrixNaMode() {
+    try {
+      var q = new URLSearchParams(window.location.search || "");
+      var fromUrl = (q.get("_psna") || "").toLowerCase();
+      if (fromUrl === "heavy" || fromUrl === "light") return fromUrl;
+    } catch (eQ) { /* ignore */ }
+    var w = window.__PS_MATRIX_NA_MODE;
+    if (w === "heavy" || w === "light") return w;
+    return "light";
+  }
+
   function attachMatrixNaScrollGuards(api, chart) {
     if (!api || !chart || api.__psNaScrollGuards) return;
     api.__psNaScrollGuards = true;
 
-    function onVirt() {
+    var mode = getMatrixNaMode();
+    window.__psMatrixNaModeActive = mode;
+
+    function onVirtLight() {
+      // Solo reaplicar formatter si Superset reseteó colDefs (carga / refresh).
+      patchAgGridNullAsBlank(api);
+    }
+
+    function onVirtHeavy() {
       patchAgGridNullAsBlank(api);
       scheduleBlankGastosNA(chart);
     }
 
     try {
-      [
+      var lightEvents = ["firstDataRendered", "rowDataUpdated", "modelUpdated"];
+      var heavyEvents = [
         "bodyScroll",
         "modelUpdated",
         "viewportChanged",
         "virtualColumnsChanged",
         "firstDataRendered",
         "rowDataUpdated",
-      ].forEach(function (evName) {
+      ];
+      var events = mode === "heavy" ? heavyEvents : lightEvents;
+      var handler = mode === "heavy" ? onVirtHeavy : onVirtLight;
+      events.forEach(function (evName) {
         try {
-          api.addEventListener(evName, onVirt);
+          api.addEventListener(evName, handler);
         } catch (eEv) { /* ignore */ }
       });
     } catch (eAdd) { /* ignore */ }
 
+    // MutationObserver + barrido DOM: solo modo heavy (caro en scroll Retina).
+    if (mode !== "heavy") return;
     if (chart.__psNaDomObserver) return;
     var root =
       chart.querySelector(".ag-center-cols-viewport") ||
@@ -1505,7 +1540,10 @@
     }
     patchAgGridNullAsBlank(api);
     attachMatrixNaScrollGuards(api, chart);
-    blankGastosNA(chart);
+    // Barrido DOM inicial solo en heavy; en light basta el valueFormatter.
+    if (getMatrixNaMode() === "heavy") {
+      blankGastosNA(chart);
+    }
     if (api.__psNullBlankPatched) {
       if (chart.__psNaFailSafe) {
         clearTimeout(chart.__psNaFailSafe);

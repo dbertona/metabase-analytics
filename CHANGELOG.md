@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-07-29i] — Perf: anti-N/A Facturación/Gastos en modo light (reversible)
+
+- Default `light`: solo `valueFormatter` + re-parche en carga de datos (sin
+  `bodyScroll` / `MutationObserver` / barrido DOM en cada scroll).
+- Rollback sin redeploy: `?_psna=heavy` o `window.__PS_MATRIX_NA_MODE='heavy'` + reload.
+- Modo activo: `window.__psMatrixNaModeActive`.
+
 ## [2026-07-29h] — Perf: carga progresiva charts en Resumen (tail_js)
 
 - Experimento en `config/tail_js_custom_extra.html`: prioriza KPIs (slices 9–16) y
