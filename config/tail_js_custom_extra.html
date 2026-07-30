@@ -2220,6 +2220,21 @@
     return leaves;
   }
 
+  function moDisplayProyecto(row, expandedMap) {
+    if (!row) return "";
+    if (row.__psMoNivel === -1) return "Total";
+    if (row.__psMoNivel === 1) {
+      var name = row.recurso != null && row.recurso !== "" ? row.recurso : "";
+      return "\u00A0\u00A0\u00A0\u00A0" + name;
+    }
+    if (row.__psMoNivel === 0) {
+      var proy = row.__psMoProyecto || row.proyecto || "";
+      var exp = expandedMap[proy] !== false;
+      return (exp ? "−  " : "+  ") + proy;
+    }
+    return row.proyecto == null ? "" : String(row.proyecto);
+  }
+
   function moBuildTreeRows(leaves, expandedMap) {
     var byProy = {};
     var order = [];
@@ -2257,6 +2272,7 @@
         var mk = PS_MO_METRIC_COLS[mi];
         parent[mk] = moSumField(kids, mk);
       }
+      parent.proyecto = moDisplayProyecto(parent, expandedMap);
       tree.push(parent);
 
       var isExp = expandedMap[proy] !== false; // por defecto expandido (como PBI)
@@ -2270,7 +2286,7 @@
         child.__psMoTree = true;
         child.__psMoNivel = 1;
         child.__psMoProyecto = proy;
-        child.proyecto = proy; // el renderer muestra recurso indentado
+        child.proyecto = moDisplayProyecto(child, expandedMap);
         tree.push(child);
       }
     }
@@ -2291,50 +2307,6 @@
     return row;
   }
 
-  function moProyectoCellRenderer(params) {
-    var d = params && params.data;
-    var root = document.createElement("span");
-    if (!d) {
-      root.textContent = params.value == null ? "" : String(params.value);
-      return root;
-    }
-    if (d.__psMoNivel === -1) {
-      var strong = document.createElement("strong");
-      strong.textContent = "Total";
-      root.appendChild(strong);
-      return root;
-    }
-    if (d.__psMoNivel === 1) {
-      var name = d.recurso != null && d.recurso !== "" ? d.recurso : params.value;
-      root.className = "ps-mo-child";
-      root.style.paddingLeft = "22px";
-      root.style.display = "inline-block";
-      root.textContent = name == null ? "" : String(name);
-      return root;
-    }
-    if (d.__psMoNivel === 0) {
-      var proy = d.__psMoProyecto || d.proyecto || "";
-      var api = params.api;
-      var exp =
-        api && api.__psMoExpanded ? api.__psMoExpanded[proy] !== false : true;
-      var toggle = document.createElement("span");
-      toggle.className = "ps-mo-toggle";
-      toggle.setAttribute("data-ps-mo-proy", proy);
-      toggle.textContent = exp ? "−" : "+";
-      toggle.style.cssText =
-        "cursor:pointer;user-select:none;display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-right:6px;border:1px solid #8c8c8c;border-radius:2px;font-size:11px;line-height:1;color:#333;background:#fff;flex-shrink:0";
-      var label = document.createElement("span");
-      label.textContent = proy;
-      root.style.display = "inline-flex";
-      root.style.alignItems = "center";
-      root.appendChild(toggle);
-      root.appendChild(label);
-      return root;
-    }
-    root.textContent = params.value == null ? "" : String(params.value);
-    return root;
-  }
-
   function moApplyTreeColumnDefs(api) {
     if (!api || typeof api.getColumnDefs !== "function") return;
     var defs = api.getColumnDefs();
@@ -2346,8 +2318,7 @@
         changed = true;
         return Object.assign({}, d, {
           headerName: "Proyectos",
-          cellRenderer: moProyectoCellRenderer,
-          autoHeight: false,
+          // Sin cellRenderer React/DOM: el texto ya lleva −/+ e indentación.
         });
       }
       if (id === "recurso") {
@@ -2360,6 +2331,15 @@
     try {
       if (typeof api.setGridOption === "function") {
         api.setGridOption("columnDefs", next);
+      }
+      if (typeof api.setGridOption === "function") {
+        api.setGridOption("getRowClass", function (p) {
+          var n = p && p.data && p.data.__psMoNivel;
+          if (n === 0) return "ps-mo-row-parent";
+          if (n === 1) return "ps-mo-row-child";
+          if (n === -1) return "ps-mo-row-total";
+          return "";
+        });
       }
     } catch (e) { /* ignore */ }
   }
@@ -2467,7 +2447,7 @@
           var id = String(d.colId || d.field || "");
           if (id === "proyecto" || id.indexOf("proyecto") === 0) {
             d.headerName = "Proyectos";
-            d.cellRenderer = moProyectoCellRenderer;
+            if (d.cellRenderer) delete d.cellRenderer;
           }
           if (id === "recurso") {
             d.hide = true;
@@ -2481,11 +2461,8 @@
         var col = api.getColumn("proyecto");
         if (col && col.getColDef) {
           col.getColDef().headerName = "Proyectos";
-          col.getColDef().cellRenderer = moProyectoCellRenderer;
+          if (col.getColDef().cellRenderer) delete col.getColDef().cellRenderer;
           if (typeof api.refreshHeader === "function") api.refreshHeader();
-          if (typeof api.refreshCells === "function") {
-            api.refreshCells({ columns: ["proyecto"], force: true });
-          }
         }
       }
     } catch (err) { /* grid aún montando */ }
@@ -3542,6 +3519,26 @@
       '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-cell[col-id="year"],',
       '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-header-cell[col-id="month"],',
       '.chart-slice[data-test-chart-name*="Resumen mensual"] .ag-cell[col-id="month"] {',
+      "  display: none !important;",
+      "  width: 0 !important;",
+      "  max-width: 0 !important;",
+      "  padding: 0 !important;",
+      "  border: none !important;",
+      "}",
+      /* Mano de Obra: jerarquía proyecto → recurso */
+      '[data-test-chart-name="Mano de Obra"] .ps-mo-row-parent .ag-cell[col-id="proyecto"] {',
+      "  font-weight: 600 !important;",
+      "  cursor: pointer !important;",
+      "}",
+      '[data-test-chart-name="Mano de Obra"] .ps-mo-row-parent .ag-cell {',
+      "  background: rgba(180, 220, 230, 0.28) !important;",
+      "}",
+      '[data-test-chart-name="Mano de Obra"] .ps-mo-row-child .ag-cell[col-id="proyecto"] {',
+      "  font-weight: 400 !important;",
+      "  color: #333 !important;",
+      "}",
+      '[data-test-chart-name="Mano de Obra"] .ag-header-cell[col-id="recurso"],',
+      '[data-test-chart-name="Mano de Obra"] .ag-cell[col-id="recurso"] {',
       "  display: none !important;",
       "  width: 0 !important;",
       "  max-width: 0 !important;",
