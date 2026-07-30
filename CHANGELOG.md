@@ -6,12 +6,18 @@
 
 ### Added
 - Workflow n8n **021** (`src/workflows/021_health_check_analytics_bc.json`):
-  comparación diaria BC OData ↔ Analytics (R, plan, meses cerrados, budget=0, freshness).
+  reconciliación diaria BC ↔ Analytics.
 - Tabla `analytics_health_log` (`sql/tables/analytics_health_log.sql`).
 - Email alerta vía Outlook noreply → `dbertona@powersolution.es` si hay diff.
 - Schedule L–V 07:00 + webhook `POST /webhook/analytics-health-check`.
 - Deploy: `./scripts/deploy-n8n-workflow-021.sh`
 - Doc: `docs/HEALTH_CHECK_021.md`
+
+### Fixed
+- No comparar bruto `planificacionMes` vs `bc_job_planning_line` (falsos fail):
+  PBI/Superset usan **Planificación Actual = P+R** (`v_se_facturacion`).
+  Checks: `tipo_r_sum`, meses cerrados (tolerancia), budget=0, freshness;
+  `planificacion_actual_p_plus_r` solo como contexto.
 
 ## [2026-07-30b] — Fix paginación Transform MesesCerrados (workflow 004)
 
