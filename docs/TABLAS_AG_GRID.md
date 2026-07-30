@@ -90,7 +90,8 @@ docker restart superset   # o el nombre del contenedor en el compose de este rep
 |-------|-----------|---------|----------|:--------:|-------|
 | Resumen mensual | 17 | Resumen | `ano_mes` + 3 métricas | No | Encaja casi siempre; orden cronológico vía SQL/JS |
 | Proyectos | 21 | Resumen | `proyecto` + 3 métricas | Sí | **Patrón canónico** de UX |
-| Gastos | 22→nuevo | Gastos | Encabezado + 12 meses + Total | Sí | Coste Operational; filtros estado ≠ Lost + total>0 |
+| Gastos | 22→nuevo | Gastos | Encabezado + 12 meses + Total | Sí | Coste Operational; excl. Resource; filtros estado ≠ Lost + total>0 |
+| Mano de Obra | nuevo | Mano de Obra | Proyectos + 12 meses + Total | Sí | Coste Operational; solo `type_line=Resource`; mismos estados |
 | Unidad | nuevo | Unidad | concepto + 12 meses + Total | Sí | Antes llamado «Gastos»; Structure |
 | Facturación | 23 | Facturación | Encabezado + 12 meses + Total | Sí | Misma matriz que Gastos; métrica facturado |
 

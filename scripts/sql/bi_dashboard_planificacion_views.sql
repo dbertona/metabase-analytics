@@ -37,6 +37,8 @@ DROP VIEW IF EXISTS bi_v_unidad CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS bi_mv_unidad CASCADE;
 DROP VIEW IF EXISTS bi_v_gastos CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS bi_mv_gastos CASCADE;
+DROP VIEW IF EXISTS bi_v_mano_obra CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS bi_mv_mano_obra CASCADE;
 DROP VIEW IF EXISTS bi_v_facturacion CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS bi_mv_facturacion CASCADE;
 
@@ -484,6 +486,72 @@ COMMENT ON VIEW bi_v_gastos IS
   'Gastos PBI: Operational + Completed/Open/Planning; excl. type_line Resource; pivot coste×mes Encabezado; total>0. (materializada: bi_mv_gastos; REFRESH tras sync 004).';
 COMMENT ON MATERIALIZED VIEW bi_mv_gastos IS
   'Snapshot de bi_v_gastos; refrescar tras sync BC→Analytics.';
+
+-- -----------------------------------------------------------------------------
+-- bi_v_mano_obra  ←  wrapper sobre bi_mv_mano_obra
+-- Pestaña Mano de Obra PBI: Encabezado × meses (coste Resource); complementario de Gastos.
+-- -----------------------------------------------------------------------------
+CREATE MATERIALIZED VIEW bi_mv_mano_obra AS
+SELECT
+    c.empresa,
+    c.year,
+    c.departamento AS department_code,
+    d.department_name,
+    c.tipo,
+    CASE c.tipo
+        WHEN 'P' THEN 'Planificado'
+        WHEN 'R' THEN 'Real'
+        ELSE COALESCE(c.tipo::text, '')
+    END AS tipo_label,
+    c.tipo_proyecto,
+    c.estado,
+    c.job,
+    (c.job::text || ' --- '::text) || "left"(COALESCE(c.descripcion, ''::character varying)::text, 36) AS proyecto,
+    SUM(c.coste) FILTER (WHERE c.month = 1) AS m01,
+    SUM(c.coste) FILTER (WHERE c.month = 2) AS m02,
+    SUM(c.coste) FILTER (WHERE c.month = 3) AS m03,
+    SUM(c.coste) FILTER (WHERE c.month = 4) AS m04,
+    SUM(c.coste) FILTER (WHERE c.month = 5) AS m05,
+    SUM(c.coste) FILTER (WHERE c.month = 6) AS m06,
+    SUM(c.coste) FILTER (WHERE c.month = 7) AS m07,
+    SUM(c.coste) FILTER (WHERE c.month = 8) AS m08,
+    SUM(c.coste) FILTER (WHERE c.month = 9) AS m09,
+    SUM(c.coste) FILTER (WHERE c.month = 10) AS m10,
+    SUM(c.coste) FILTER (WHERE c.month = 11) AS m11,
+    SUM(c.coste) FILTER (WHERE c.month = 12) AS m12,
+    SUM(c.coste) AS total
+FROM v_se_coste c
+LEFT JOIN mb_v_dim_departamento d
+    ON d.company_name = c.empresa
+   AND d.department_code = c.departamento
+WHERE c.tipo IN ('P', 'R')
+  AND c.tipo_proyecto = 'Operational'
+  AND COALESCE(c.estado, '') IN ('Completed', 'Open', 'Planning')
+  -- PBI Coste de Mano de Obra: solo type_line Resource
+  AND COALESCE(c.type_line, '') = 'Resource'
+GROUP BY
+    c.empresa,
+    c.year,
+    c.departamento,
+    d.department_name,
+    c.tipo,
+    c.tipo_proyecto,
+    c.estado,
+    c.job,
+    c.descripcion
+HAVING ABS(SUM(c.coste)) > 0.0001;
+
+CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx0 ON bi_mv_mano_obra (empresa, year);
+CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx1 ON bi_mv_mano_obra (department_code);
+CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx2 ON bi_mv_mano_obra (tipo_label);
+CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx3 ON bi_mv_mano_obra (proyecto);
+
+CREATE VIEW bi_v_mano_obra AS SELECT * FROM bi_mv_mano_obra;
+
+COMMENT ON VIEW bi_v_mano_obra IS
+  'Mano de Obra PBI: Operational + Completed/Open/Planning; solo type_line Resource; pivot coste×mes Encabezado; total>0. (materializada: bi_mv_mano_obra; REFRESH tras sync 004).';
+COMMENT ON MATERIALIZED VIEW bi_mv_mano_obra IS
+  'Snapshot de bi_v_mano_obra; refrescar tras sync BC→Analytics.';
 
 -- KPI agregados por empresa/año (referencia / legacy; tarjetas usan bi_v_planificacion_kpi)
 CREATE OR REPLACE VIEW bi_v_kpi_anual_empresa AS

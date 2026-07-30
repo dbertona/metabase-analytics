@@ -117,6 +117,7 @@
       if (sid != null && otherTabIds[sid]) return otherTabIds[sid];
       if (name === "Unidad") return "Unidad";
       if (name === "Gastos") return "Gastos";
+      if (name === "Mano de Obra") return "Mano de Obra";
       if (name === "Facturación") return "Facturación";
       if (name === "Evolución mensual" || name === "Margen acumulado")
         return "Gráficos";
@@ -181,7 +182,7 @@
       }
       var active = activeTabLabel();
       // Pestañas laterales
-      if (bucket === "Unidad" || bucket === "Gastos" || bucket === "Facturación" || bucket === "Gráficos") {
+      if (bucket === "Unidad" || bucket === "Gastos" || bucket === "Mano de Obra" || bucket === "Facturación" || bucket === "Gráficos") {
         if (active === bucket || warmed[bucket]) {
           stats.allowed += 1;
           return sendFn();
@@ -376,10 +377,12 @@
     }
     var unidad = document.querySelector('[data-test-chart-name="Unidad"]');
     var gastos = document.querySelector('[data-test-chart-name="Gastos"]');
+    var manoObra = document.querySelector('[data-test-chart-name="Mano de Obra"]');
     var facturacion = document.querySelector('[data-test-chart-name="Facturación"]');
     var matrix = null;
     if (unidad && unidad.offsetParent !== null) matrix = unidad;
     else if (gastos && gastos.offsetParent !== null) matrix = gastos;
+    else if (manoObra && manoObra.offsetParent !== null) matrix = manoObra;
     else if (facturacion && facturacion.offsetParent !== null) matrix = facturacion;
     if (matrix) {
       /* Igual que Resumen: top del chart-slice (no del holder) → ~8–9px de aire abajo */
@@ -463,6 +466,7 @@
     var sels = [
       '[data-test-chart-name="Unidad"]',
       '[data-test-chart-name="Gastos"]',
+      '[data-test-chart-name="Mano de Obra"]',
       '[data-test-chart-name="Facturación"]',
       '[data-test-chart-name*="Proyectos"]',
       '[data-test-chart-name*="Resumen mensual"]',
@@ -1407,6 +1411,8 @@
       '[data-test-chart-name="Unidad"].ps-na-pending .ag-floating-bottom,' +
       '[data-test-chart-name="Gastos"].ps-na-pending .ag-center-cols-container,' +
       '[data-test-chart-name="Gastos"].ps-na-pending .ag-floating-bottom,' +
+      '[data-test-chart-name="Mano de Obra"].ps-na-pending .ag-center-cols-container,' +
+      '[data-test-chart-name="Mano de Obra"].ps-na-pending .ag-floating-bottom,' +
       '[data-test-chart-name="Facturación"].ps-na-pending .ag-center-cols-container,' +
       '[data-test-chart-name="Facturación"].ps-na-pending .ag-floating-bottom' +
       "{opacity:0 !important;}" +
@@ -1414,6 +1420,8 @@
       '[data-test-chart-name="Unidad"].ps-na-ready .ag-floating-bottom,' +
       '[data-test-chart-name="Gastos"].ps-na-ready .ag-center-cols-container,' +
       '[data-test-chart-name="Gastos"].ps-na-ready .ag-floating-bottom,' +
+      '[data-test-chart-name="Mano de Obra"].ps-na-ready .ag-center-cols-container,' +
+      '[data-test-chart-name="Mano de Obra"].ps-na-ready .ag-floating-bottom,' +
       '[data-test-chart-name="Facturación"].ps-na-ready .ag-center-cols-container,' +
       '[data-test-chart-name="Facturación"].ps-na-ready .ag-floating-bottom' +
       "{opacity:1 !important;}";
@@ -1599,7 +1607,7 @@
   }
 
   function isMatrixNaChart(chart) {
-    return isGastosChart(chart) || isGastosMatrixChart(chart) || isFacturacionMatrixChart(chart);
+    return isGastosChart(chart) || isGastosMatrixChart(chart) || isManoDeObraMatrixChart(chart) || isFacturacionMatrixChart(chart);
   }
 
   function markMatrixNaPending(chart) {
@@ -2114,6 +2122,231 @@
   }
 
 
+  // ─── Persistencia / layout — chart Mano de Obra (pestaña Mano de Obra) ─────
+  var PS_MANO_OBRA_COL_STORAGE_KEY = "ps-mano-obra-col-widths-v1";
+
+  function isManoDeObraMatrixChart(chart) {
+    var name = chart.getAttribute("data-test-chart-name") || "";
+    if (name === "Mano de Obra") return true;
+    var title = chart.querySelector(
+      '[data-test="slice-header"] .header-title, [data-test="slice-header"] .editable-title'
+    );
+    var t = title ? (title.textContent || "").replace(/\s+/g, " ").trim() : "";
+    return t === "Mano de Obra";
+  }
+
+  function getDefaultManoDeObraWidths(chart) {
+    return getDefaultFacturacionWidths(chart);
+  }
+
+  function applyManoDeObraColumnLayout(api, chart) {
+    if (!api || !chart) return;
+    var map = getDefaultManoDeObraWidths(chart);
+    var state = Object.keys(map).map(function (id) {
+      var row = { colId: id, width: map[id] };
+      if (id === "Total") row.pinned = "right";
+      else row.pinned = null;
+      return row;
+    });
+    try {
+      api.applyColumnState({ state: state, applyOrder: false });
+    } catch (e) { /* ignore */ }
+  }
+
+  function blankManoDeObraNA(chart) {
+    blankGastosNA(chart);
+  }
+
+  function fixManoDeObraProyectoColumn(api, chart) {
+    if (!api) return;
+    try {
+      var defs = typeof api.getColumnDefs === "function" ? api.getColumnDefs() : null;
+      if (defs && defs.length) {
+        var changed = false;
+        for (var i = 0; i < defs.length; i++) {
+          var d = defs[i] || {};
+          var id = String(d.colId || d.field || "");
+          if (id === "proyecto" || id.indexOf("proyecto") === 0) {
+            if (d.headerName !== "Proyectos") {
+              d.headerName = "Proyectos";
+              changed = true;
+            }
+          }
+        }
+        if (changed && typeof api.setColumnDefs === "function") {
+          api.setColumnDefs(defs);
+        }
+      }
+      if (typeof api.getColumn === "function") {
+        var col = api.getColumn("proyecto");
+        if (col && col.getColDef) {
+          col.getColDef().headerName = "Proyectos";
+          if (typeof api.refreshHeader === "function") api.refreshHeader();
+        }
+      }
+    } catch (err) { /* grid aún montando */ }
+
+    if (chart) {
+      var headers = chart.querySelectorAll(".ag-header-cell");
+      Array.prototype.forEach.call(headers, function (h) {
+        var colId = h.getAttribute("col-id") || "";
+        if (colId !== "proyecto") return;
+        var label = h.querySelector(".ag-header-cell-text, .ag-header-cell-label");
+        if (label && !/^Proyectos$/i.test((label.textContent || "").trim())) {
+          label.textContent = "Proyectos";
+        }
+      });
+    }
+  }
+
+  function clearManoDeObraClientSortOnce(api) {
+    if (!api || api.__psManoObraSortCleared) return;
+    api.__psManoObraSortCleared = true;
+    try {
+      if (typeof api.applyColumnState === "function") {
+        api.applyColumnState({
+          state: [{ colId: "proyecto", sort: null }],
+          defaultState: { sort: null },
+        });
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function saveManoDeObraWidthsLocal(map) {
+    try {
+      localStorage.setItem(PS_MANO_OBRA_COL_STORAGE_KEY, JSON.stringify(map));
+    } catch (e) { /* ignore */ }
+  }
+
+  function initManoDeObraColPersist(chart, api) {
+    if (api.__psManoObraColPersistInit) return;
+    api.__psManoObraColPersistInit = true;
+    chart.__psManoObraColPersistInit = true;
+
+    patchAgGridNullAsBlank(api);
+    ensureMatrixNullBlank(chart);
+    if (typeof tuneAgGridScrollPerf === "function") tuneAgGridScrollPerf(api);
+
+    function applyFit() {
+      applyManoDeObraColumnLayout(api, chart);
+      clearManoDeObraClientSortOnce(api);
+      fixManoDeObraProyectoColumn(api, chart);
+      blankManoDeObraNA(chart);
+      labelAgGridTotalsRow(chart);
+      markMatrixNaReady(chart);
+    }
+
+    api.sizeColumnsToFit = function () {
+      applyFit();
+    };
+
+    applyFit();
+    setTimeout(applyFit, 300);
+    setTimeout(applyFit, 900);
+    setTimeout(applyFit, 1800);
+
+    try {
+      api.addEventListener("columnResized", function (e) {
+        if (!e || !e.finished || e.source !== "uiColumnResized") return;
+        var map = getColWidthMap(api);
+        if (!map) return;
+        saveManoDeObraWidthsLocal(map);
+      });
+      api.addEventListener("modelUpdated", function () {
+        patchAgGridNullAsBlank(api);
+        fixManoDeObraProyectoColumn(api, chart);
+        blankManoDeObraNA(chart);
+      });
+      api.addEventListener("firstDataRendered", function () {
+        patchAgGridNullAsBlank(api);
+        applyFit();
+      });
+    } catch (err) { /* grid aún montando */ }
+  }
+
+  function ensureManoDeObraColumnsFit(chart) {
+    if (!isManoDeObraMatrixChart(chart) || !isGastosChartVisible(chart)) return;
+    var agTheme = chart.querySelector('[class*="ag-theme"]');
+    if (!agTheme) return;
+    var api = findAgGridApi(agTheme);
+    if (!api) return;
+    if (!api.__psManoObraColPersistInit) {
+      initManoDeObraColPersist(chart, api);
+      return;
+    }
+    if (isFacturacionTotalClipped(chart)) {
+      applyManoDeObraColumnLayout(api, chart);
+      blankManoDeObraNA(chart);
+      labelAgGridTotalsRow(chart);
+    }
+  }
+
+  function placeManoDeObraSearchInHeader() {
+    var charts = document.querySelectorAll('[data-test-chart-name="Mano de Obra"]');
+    Array.prototype.forEach.call(charts, function (chart) {
+      if (!isManoDeObraMatrixChart(chart)) return;
+      var header = chart.querySelector('[data-test="slice-header"]');
+      var realInput = chart.querySelector(
+        ".dropdown-controls-container #filter-text-box"
+      );
+      var originalRow = chart.querySelector(".dropdown-controls-container");
+      if (!header || !realInput || !originalRow) return;
+
+      originalRow.style.setProperty("display", "none", "important");
+      if (originalRow.parentElement) {
+        originalRow.parentElement.style.setProperty("height", "100%", "important");
+      }
+
+      var proxy = header.querySelector(".ps-mano-obra-search-proxy");
+      if (proxy) {
+        proxy.placeholder = realInput.placeholder || "Buscar";
+        return;
+      }
+
+      proxy = document.createElement("input");
+      proxy.type = "text";
+      proxy.placeholder = realInput.placeholder || "Buscar";
+      proxy.className = "ps-mano-obra-search-proxy";
+      proxy.setAttribute("aria-label", "Buscar proyectos");
+      proxy.style.cssText = [
+        "border:1px solid #d9d9d9",
+        "border-radius:4px",
+        "padding:3px 9px",
+        "font-size:14px",
+        "height:28px",
+        "width:175px",
+        "outline:none",
+        "background:#fff",
+        "color:#333",
+        "flex:0 0 175px",
+        "margin-right:8px",
+      ].join(";");
+
+      proxy.addEventListener("input", function () {
+        var currentInput = chart.querySelector(
+          ".dropdown-controls-container #filter-text-box"
+        );
+        if (!currentInput) return;
+        var descriptor = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype,
+          "value"
+        );
+        descriptor.set.call(currentInput, proxy.value);
+        currentInput.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      proxy.addEventListener("focus", function () {
+        proxy.style.borderColor = "#007c89";
+      });
+      proxy.addEventListener("blur", function () {
+        proxy.style.borderColor = "#d9d9d9";
+      });
+
+      var headerControls = header.querySelector(".header-controls");
+      header.insertBefore(proxy, headerControls || header.lastChild);
+    });
+  }
+
+
   // ─── Persistencia / layout — chart Gastos (Encabezado × mes, pestaña Gastos) ─
   var PS_GASTOS_MATRIZ_COL_STORAGE_KEY = "ps-gastos-matriz-col-widths-v1";
 
@@ -2436,6 +2669,7 @@
     hideResumenDropdownControls();
     placeGastosSearchInHeader();
     placeGastosMatrizSearchInHeader();
+    placeManoDeObraSearchInHeader();
     placeFacturacionSearchInHeader();
     // Inicializar persistencia de anchos en el chart Proyectos (idempotente)
     var proyCharts = document.querySelectorAll('[data-test-chart-name*="Proyectos"]');
@@ -2478,6 +2712,20 @@
       if (!rows.length) return;
       if (api && !api.__psGastosMatColPersistInit) initGastosMatrizColPersist(chart, api);
       else if (api && heavyNa) blankGastosNA(chart);
+    });
+    var manoObraCharts = document.querySelectorAll('[data-test-chart-name="Mano de Obra"]');
+    Array.prototype.forEach.call(manoObraCharts, function (chart) {
+      if (!isManoDeObraMatrixChart(chart)) return;
+      ensureMatrixNullBlank(chart);
+      ensureManoDeObraColumnsFit(chart);
+      var agTheme = chart.querySelector('[class*="ag-theme"]');
+      if (!agTheme) return;
+      var api = findAgGridApi(agTheme);
+      if (api) patchAgGridNullAsBlank(api);
+      var rows = chart.querySelectorAll(".ag-center-cols-container .ag-row");
+      if (!rows.length) return;
+      if (api && !api.__psManoObraColPersistInit) initManoDeObraColPersist(chart, api);
+      else if (api && heavyNa) blankManoDeObraNA(chart);
     });
     var factCharts = document.querySelectorAll('[data-test-chart-name="Facturación"]');
     Array.prototype.forEach.call(factCharts, function (chart) {
