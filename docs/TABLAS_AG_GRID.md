@@ -91,7 +91,7 @@ docker restart superset   # o el nombre del contenedor en el compose de este rep
 | Resumen mensual | 17 | Resumen | `ano_mes` + 3 métricas | No | Encaja casi siempre; orden cronológico vía SQL/JS |
 | Proyectos | 21 | Resumen | `proyecto` + 3 métricas | Sí | **Patrón canónico** de UX |
 | Gastos | 22→nuevo | Gastos | Encabezado + 12 meses + Total | Sí | Coste Operational; excl. Resource; filtros estado ≠ Lost + total>0 |
-| Mano de Obra | nuevo | Mano de Obra | Proyectos + 12 meses + Total | Sí | Coste Operational; Resource; CA `Mano de Obra%` o vacío |
+| Mano de Obra | nuevo | Mano de Obra | Proyectos (árbol) + recursos indentados + 12 meses + Total | Sí | Coste Operational; Resource; CA `Mano de Obra%` o vacío; grano `proyecto×recurso`; expand/collapse en `tail_js` |
 | Unidad | nuevo | Unidad | concepto + 12 meses + Total | Sí | Antes llamado «Gastos»; Structure |
 | Facturación | 23 | Facturación | Encabezado + 12 meses + Total | Sí | Misma matriz que Gastos; métrica facturado |
 
@@ -496,7 +496,7 @@ CREATE VIEW bi_v_<slug> AS SELECT * FROM bi_mv_<slug>;
 |-----------|-----------|---------|-----------------|
 | `bi_v_unidad` | `concepto_analitico` | `coste` | Structure (ver SQL) |
 | `bi_v_gastos` | `proyecto` (encabezado) | `coste` | Operational + Completed/Open/Planning; excl. Resource; total>0 |
-| `bi_v_mano_obra` | `proyecto` (Proyectos) | `coste` | Operational + Completed/Open/Planning; Resource; CA Mano de Obra% o vacío; total>0 |
+| `bi_v_mano_obra` | `proyecto` + `recurso` (árbol UI) | `coste` | Operational + Completed/Open/Planning; Resource; CA Mano de Obra% o vacío; total>0; expand/collapse en tail_js |
 | `bi_v_facturacion` | `proyecto` (encabezado) | `facturado` | Operational + Completed/Open/Planning |
 
 Tras crear la MV: añadirla al **REFRESH** del workflow **004** y aplicar con `./scripts/apply-bi-views.sh` (+ `--refresh` si solo refrescas).

@@ -489,7 +489,8 @@ COMMENT ON MATERIALIZED VIEW bi_mv_gastos IS
 
 -- -----------------------------------------------------------------------------
 -- bi_v_mano_obra  ←  wrapper sobre bi_mv_mano_obra
--- Pestaña Mano de Obra PBI: Encabezado × meses (coste Resource); complementario de Gastos.
+-- Pestaña Mano de Obra PBI: Proyecto × Recurso × meses (coste Resource).
+-- Grano recurso: la UI AG Grid arma árbol expandible Proyecto → Recurso (JS).
 -- -----------------------------------------------------------------------------
 CREATE MATERIALIZED VIEW bi_mv_mano_obra AS
 SELECT
@@ -507,6 +508,12 @@ SELECT
     c.estado,
     c.job,
     (c.job::text || ' --- '::text) || "left"(COALESCE(c.descripcion, ''::character varying)::text, 36) AS proyecto,
+    COALESCE(NULLIF(TRIM(c.nr), ''), '') AS recurso_code,
+    COALESCE(
+        NULLIF(TRIM(r.name), ''),
+        NULLIF(TRIM(c.nr), ''),
+        '(sin recurso)'
+    ) AS recurso,
     SUM(c.coste) FILTER (WHERE c.month = 1) AS m01,
     SUM(c.coste) FILTER (WHERE c.month = 2) AS m02,
     SUM(c.coste) FILTER (WHERE c.month = 3) AS m03,
@@ -524,6 +531,9 @@ FROM v_se_coste c
 LEFT JOIN mb_v_dim_departamento d
     ON d.company_name = c.empresa
    AND d.department_code = c.departamento
+LEFT JOIN bc_resource r
+    ON r.code = c.nr
+   AND r.company_name = c.empresa
 WHERE c.tipo IN ('P', 'R')
   AND c.tipo_proyecto = 'Operational'
   AND COALESCE(c.estado, '') IN ('Completed', 'Open', 'Planning')
@@ -543,20 +553,23 @@ GROUP BY
     c.tipo_proyecto,
     c.estado,
     c.job,
-    c.descripcion
+    c.descripcion,
+    c.nr,
+    r.name
 HAVING ABS(SUM(c.coste)) > 0.0001;
 
 CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx0 ON bi_mv_mano_obra (empresa, year);
 CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx1 ON bi_mv_mano_obra (department_code);
 CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx2 ON bi_mv_mano_obra (tipo_label);
 CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx3 ON bi_mv_mano_obra (proyecto);
+CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx4 ON bi_mv_mano_obra (recurso);
 
 CREATE VIEW bi_v_mano_obra AS SELECT * FROM bi_mv_mano_obra;
 
 COMMENT ON VIEW bi_v_mano_obra IS
-  'Mano de Obra PBI: Operational + Completed/Open/Planning; type_line Resource; CA Mano de Obra* o vacío; pivot coste×mes; total>0. (materializada: bi_mv_mano_obra; REFRESH tras sync 004).';
+  'Mano de Obra PBI: Operational + Completed/Open/Planning; Resource; CA Mano de Obra* o vacío; grano proyecto×recurso; pivot coste×mes; total>0. (MV: bi_mv_mano_obra; árbol UI en tail_js).';
 COMMENT ON MATERIALIZED VIEW bi_mv_mano_obra IS
-  'Snapshot de bi_v_mano_obra; refrescar tras sync BC→Analytics.';
+  'Snapshot de bi_v_mano_obra (proyecto×recurso); refrescar tras sync BC→Analytics.';
 
 -- KPI agregados por empresa/año (referencia / legacy; tarjetas usan bi_v_planificacion_kpi)
 CREATE OR REPLACE VIEW bi_v_kpi_anual_empresa AS

@@ -2124,6 +2124,10 @@
 
   // ─── Persistencia / layout — chart Mano de Obra (pestaña Mano de Obra) ─────
   var PS_MANO_OBRA_COL_STORAGE_KEY = "ps-mano-obra-col-widths-v1";
+  var PS_MO_METRIC_COLS = [
+    "01", "02", "03", "04", "05", "06",
+    "07", "08", "09", "10", "11", "12", "Total",
+  ];
 
   function isManoDeObraMatrixChart(chart) {
     var name = chart.getAttribute("data-test-chart-name") || "";
@@ -2148,6 +2152,8 @@
       else row.pinned = null;
       return row;
     });
+    // Recurso solo alimenta el árbol; no ocupa columna.
+    state.push({ colId: "recurso", hide: true, width: 0 });
     try {
       api.applyColumnState({ state: state, applyOrder: false });
     } catch (e) { /* ignore */ }
@@ -2157,31 +2163,319 @@
     blankGastosNA(chart);
   }
 
+  function moEscapeHtml(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function moParseNum(v) {
+    if (v == null || v === "") return null;
+    if (typeof v === "number") return isFinite(v) ? v : null;
+    var n = Number(String(v).replace(/\s/g, "").replace(",", "."));
+    return isFinite(n) ? n : null;
+  }
+
+  function moSumField(rows, field) {
+    var s = 0;
+    var any = false;
+    for (var i = 0; i < rows.length; i++) {
+      var n = moParseNum(rows[i][field]);
+      if (n == null) continue;
+      s += n;
+      any = true;
+    }
+    return any ? s : null;
+  }
+
+  function moLeafFingerprint(leaves) {
+    var n = leaves.length;
+    if (!n) return "0";
+    var a = leaves[0];
+    var b = leaves[n - 1];
+    return [
+      n,
+      a && a.proyecto,
+      a && a.recurso,
+      b && b.proyecto,
+      b && b.recurso,
+      moSumField(leaves, "Total"),
+    ].join("|");
+  }
+
+  function moCollectLeaves(api) {
+    var leaves = [];
+    if (!api || typeof api.forEachNode !== "function") return leaves;
+    api.forEachNode(function (node) {
+      if (!node || !node.data) return;
+      var d = node.data;
+      if (d.__psMoTree) return;
+      if (d.proyecto == null || d.proyecto === "") return;
+      // Sin columna recurso = datos viejos (solo proyecto); no armar árbol.
+      if (!Object.prototype.hasOwnProperty.call(d, "recurso")) return;
+      leaves.push(d);
+    });
+    return leaves;
+  }
+
+  function moBuildTreeRows(leaves, expandedMap) {
+    var byProy = {};
+    var order = [];
+    for (var i = 0; i < leaves.length; i++) {
+      var d = leaves[i];
+      var p = String(d.proyecto);
+      if (!byProy[p]) {
+        byProy[p] = [];
+        order.push(p);
+      }
+      byProy[p].push(d);
+    }
+    order.sort(function (a, b) {
+      return a.localeCompare(b, "es", { sensitivity: "base" });
+    });
+
+    var tree = [];
+    for (var oi = 0; oi < order.length; oi++) {
+      var proy = order[oi];
+      var kids = byProy[proy].slice().sort(function (a, b) {
+        return String(a.recurso || "").localeCompare(
+          String(b.recurso || ""),
+          "es",
+          { sensitivity: "base" }
+        );
+      });
+      var parent = {
+        __psMoTree: true,
+        __psMoNivel: 0,
+        __psMoProyecto: proy,
+        proyecto: proy,
+        recurso: null,
+      };
+      for (var mi = 0; mi < PS_MO_METRIC_COLS.length; mi++) {
+        var mk = PS_MO_METRIC_COLS[mi];
+        parent[mk] = moSumField(kids, mk);
+      }
+      tree.push(parent);
+
+      var isExp = expandedMap[proy] !== false; // por defecto expandido (como PBI)
+      if (!isExp) continue;
+      for (var ki = 0; ki < kids.length; ki++) {
+        var src = kids[ki];
+        var child = {};
+        for (var key in src) {
+          if (Object.prototype.hasOwnProperty.call(src, key)) child[key] = src[key];
+        }
+        child.__psMoTree = true;
+        child.__psMoNivel = 1;
+        child.__psMoProyecto = proy;
+        child.proyecto = proy; // el renderer muestra recurso indentado
+        tree.push(child);
+      }
+    }
+    return tree;
+  }
+
+  function moGrandTotalRow(parents) {
+    var row = {
+      __psMoTree: true,
+      __psMoNivel: -1,
+      proyecto: "Total",
+      recurso: null,
+    };
+    for (var i = 0; i < PS_MO_METRIC_COLS.length; i++) {
+      var k = PS_MO_METRIC_COLS[i];
+      row[k] = moSumField(parents, k);
+    }
+    return row;
+  }
+
+  function moProyectoCellRenderer(params) {
+    var d = params && params.data;
+    if (!d) return params.value == null ? "" : String(params.value);
+    if (d.__psMoNivel === -1) {
+      return '<strong>Total</strong>';
+    }
+    if (d.__psMoNivel === 1) {
+      var name = d.recurso != null && d.recurso !== "" ? d.recurso : params.value;
+      return (
+        '<span class="ps-mo-child" style="padding-left:22px;display:inline-block">' +
+        moEscapeHtml(name) +
+        "</span>"
+      );
+    }
+    if (d.__psMoNivel === 0) {
+      var proy = d.__psMoProyecto || d.proyecto || "";
+      var api = params.api;
+      var exp =
+        api && api.__psMoExpanded ? api.__psMoExpanded[proy] !== false : true;
+      var icon = exp ? "−" : "+";
+      return (
+        '<span class="ps-mo-toggle" data-ps-mo-proy="' +
+        moEscapeHtml(proy) +
+        '" style="cursor:pointer;user-select:none;display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-right:6px;border:1px solid #8c8c8c;border-radius:2px;font-size:11px;line-height:1;color:#333;background:#fff">' +
+        icon +
+        "</span>" +
+        "<span>" +
+        moEscapeHtml(proy) +
+        "</span>"
+      );
+    }
+    return params.value == null ? "" : moEscapeHtml(params.value);
+  }
+
+  function moApplyTreeColumnDefs(api) {
+    if (!api || typeof api.getColumnDefs !== "function") return;
+    var defs = api.getColumnDefs();
+    if (!defs || !defs.length) return;
+    var changed = false;
+    var next = defs.map(function (d) {
+      var id = String((d && (d.colId || d.field)) || "");
+      if (id === "proyecto" || id.indexOf("proyecto") === 0) {
+        changed = true;
+        return Object.assign({}, d, {
+          headerName: "Proyectos",
+          cellRenderer: moProyectoCellRenderer,
+          autoHeight: false,
+        });
+      }
+      if (id === "recurso") {
+        changed = true;
+        return Object.assign({}, d, { hide: true, width: 0, suppressColumnsToolPanel: true });
+      }
+      return d;
+    });
+    if (!changed) return;
+    try {
+      if (typeof api.setGridOption === "function") {
+        api.setGridOption("columnDefs", next);
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function ensureManoObraTree(api, chart) {
+    if (!api || !chart) return;
+    var leaves = moCollectLeaves(api);
+    if (!leaves.length) {
+      // Ya treeificado: refrescar renderer/layout si hace falta
+      if (api.__psMoTreeFp) {
+        moApplyTreeColumnDefs(api);
+        applyManoDeObraColumnLayout(api, chart);
+      }
+      return;
+    }
+    var fp = moLeafFingerprint(leaves);
+    if (api.__psMoTreeFp === fp && api.__psMoTreeBuilt) return;
+
+    if (!api.__psMoExpanded) api.__psMoExpanded = {};
+
+    var tree = moBuildTreeRows(leaves, api.__psMoExpanded);
+    var parents = tree.filter(function (r) {
+      return r.__psMoNivel === 0;
+    });
+    var totalRow = moGrandTotalRow(parents);
+
+    api.__psMoTreeBuilding = true;
+    try {
+      moApplyTreeColumnDefs(api);
+      if (typeof api.setGridOption === "function") {
+        api.setGridOption("rowData", tree);
+        api.setGridOption("pinnedBottomRowData", [totalRow]);
+        api.setGridOption("getRowId", function (p) {
+          var d = p && p.data;
+          if (!d) return undefined;
+          if (d.__psMoNivel === -1) return "ps-mo-total";
+          if (d.__psMoNivel === 0) return "p|" + d.__psMoProyecto;
+          return (
+            "c|" +
+            d.__psMoProyecto +
+            "|" +
+            (d.recurso_code || d.recurso || "")
+          );
+        });
+      }
+      api.__psMoTreeFp = fp;
+      api.__psMoTreeBuilt = true;
+    } catch (err) {
+      api.__psMoTreeBuilt = false;
+    }
+    api.__psMoTreeBuilding = false;
+
+    applyManoDeObraColumnLayout(api, chart);
+    blankManoDeObraNA(chart);
+  }
+
+  function initManoObraTreeToggle(api, chart) {
+    if (!api || api.__psMoToggleInit) return;
+    api.__psMoToggleInit = true;
+    if (!api.__psMoExpanded) api.__psMoExpanded = {};
+
+    try {
+      api.addEventListener("cellClicked", function (e) {
+        if (!e || !e.data || e.data.__psMoNivel !== 0) return;
+        var colId = e.column && e.column.getColId ? e.column.getColId() : "";
+        if (colId !== "proyecto") return;
+        var proy = e.data.__psMoProyecto || e.data.proyecto;
+        if (!proy) return;
+        var leaves = api.__psMoLeavesCache;
+        if (!leaves || !leaves.length) return;
+        var cur = api.__psMoExpanded[proy] !== false;
+        api.__psMoExpanded[proy] = !cur;
+
+        var tree = moBuildTreeRows(leaves, api.__psMoExpanded);
+        var parents = tree.filter(function (r) {
+          return r.__psMoNivel === 0;
+        });
+        api.__psMoTreeBuilding = true;
+        try {
+          if (typeof api.setGridOption === "function") {
+            api.setGridOption("rowData", tree);
+            api.setGridOption("pinnedBottomRowData", [moGrandTotalRow(parents)]);
+          }
+          api.__psMoTreeBuilt = true;
+        } catch (err) { /* ignore */ }
+        api.__psMoTreeBuilding = false;
+        applyManoDeObraColumnLayout(api, chart);
+        blankManoDeObraNA(chart);
+        if (typeof api.refreshCells === "function") {
+          try {
+            api.refreshCells({ columns: ["proyecto"], force: true });
+          } catch (e2) { /* ignore */ }
+        }
+      });
+    } catch (err) { /* ignore */ }
+  }
+
   function fixManoDeObraProyectoColumn(api, chart) {
     if (!api) return;
     try {
       var defs = typeof api.getColumnDefs === "function" ? api.getColumnDefs() : null;
       if (defs && defs.length) {
-        var changed = false;
         for (var i = 0; i < defs.length; i++) {
           var d = defs[i] || {};
           var id = String(d.colId || d.field || "");
           if (id === "proyecto" || id.indexOf("proyecto") === 0) {
-            if (d.headerName !== "Proyectos") {
-              d.headerName = "Proyectos";
-              changed = true;
-            }
+            d.headerName = "Proyectos";
+            d.cellRenderer = moProyectoCellRenderer;
+          }
+          if (id === "recurso") {
+            d.hide = true;
           }
         }
-        if (changed && typeof api.setColumnDefs === "function") {
-          api.setColumnDefs(defs);
+        if (typeof api.setGridOption === "function") {
+          api.setGridOption("columnDefs", defs);
         }
       }
       if (typeof api.getColumn === "function") {
         var col = api.getColumn("proyecto");
         if (col && col.getColDef) {
           col.getColDef().headerName = "Proyectos";
+          col.getColDef().cellRenderer = moProyectoCellRenderer;
           if (typeof api.refreshHeader === "function") api.refreshHeader();
+          if (typeof api.refreshCells === "function") {
+            api.refreshCells({ columns: ["proyecto"], force: true });
+          }
         }
       }
     } catch (err) { /* grid aún montando */ }
@@ -2205,7 +2499,10 @@
     try {
       if (typeof api.applyColumnState === "function") {
         api.applyColumnState({
-          state: [{ colId: "proyecto", sort: null }],
+          state: [
+            { colId: "proyecto", sort: null },
+            { colId: "recurso", sort: null, hide: true },
+          ],
           defaultState: { sort: null },
         });
       }
@@ -2226,8 +2523,19 @@
     patchAgGridNullAsBlank(api);
     ensureMatrixNullBlank(chart);
     if (typeof tuneAgGridScrollPerf === "function") tuneAgGridScrollPerf(api);
+    initManoObraTreeToggle(api, chart);
 
     function applyFit() {
+      if (api.__psMoTreeBuilding) return;
+      var leaves = moCollectLeaves(api);
+      if (leaves.length) {
+        api.__psMoLeavesCache = leaves;
+        api.__psMoTreeFp = null;
+        api.__psMoTreeBuilt = false;
+        ensureManoObraTree(api, chart);
+      } else if (api.__psMoLeavesCache && api.__psMoLeavesCache.length && !api.__psMoTreeBuilt) {
+        ensureManoObraTree(api, chart);
+      }
       applyManoDeObraColumnLayout(api, chart);
       clearManoDeObraClientSortOnce(api);
       fixManoDeObraProyectoColumn(api, chart);
@@ -2253,12 +2561,24 @@
         saveManoDeObraWidthsLocal(map);
       });
       api.addEventListener("modelUpdated", function () {
+        if (api.__psMoTreeBuilding) return;
         patchAgGridNullAsBlank(api);
+        var leaves = moCollectLeaves(api);
+        if (leaves.length) {
+          api.__psMoLeavesCache = leaves;
+          api.__psMoTreeFp = null;
+          api.__psMoTreeBuilt = false;
+          ensureManoObraTree(api, chart);
+        }
         fixManoDeObraProyectoColumn(api, chart);
         blankManoDeObraNA(chart);
       });
       api.addEventListener("firstDataRendered", function () {
         patchAgGridNullAsBlank(api);
+        applyFit();
+      });
+      api.addEventListener("rowDataUpdated", function () {
+        if (api.__psMoTreeBuilding) return;
         applyFit();
       });
     } catch (err) { /* grid aún montando */ }
