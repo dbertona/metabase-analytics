@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [2026-07-30b] — Fix paginación Transform MesesCerrados (workflow 004)
+
+### Fixed
+- **`Transform MesesCerrados`** en workflow n8n 004: solo procesaba la primera página
+  OData de `mesesCerrados`, dejando `bc_meses_cerrados` incompleta tras re-sync.
+  Causa: líneas `PP*`/`PY*` en la primera página provocaban que el resultado fuera
+  vacío aunque existían más páginas con datos válidos.
+- Corregido siguiendo el patrón de `Transform HistoricoPlanificacionMes`:
+  acumula **todas** las páginas con `$input.all()` antes de filtrar.
+- Efecto: `bc_meses_cerrados` ahora se carga completa para todas las empresas
+  (Lab incluido), eliminando la discrepancia Tipo P Analytics vs PBI causada por
+  líneas de plan en meses cerrados que no eran excluidas correctamente.
+
+### Context
+- Investigación reveló que la discrepancia Planificado Lab (Analytics 857 k€ vs
+  PBI 1.231 k€) no era datos malos en BC, sino planificación válida sin versionar
+  (`budgetDateYear=0`) en meses ya cerrados con ingresos reales.
+- El usuario corrigió BC (eliminó líneas ene-jun, versionó Jul-Dic con `budgetDateYear=2026`).
+- Analytics resincronizado: paridad exacta `v_se_facturacion` Tipo P = plan bruto BC.
+
 ## [2026-07-30] — Pestaña Gastos (Encabezado × mes) + paridad PBI
 
 ### Added
