@@ -2157,10 +2157,25 @@
       row.pinned = id === "Total" ? "right" : null;
       return row;
     });
-    // sort_key es auxiliar — ancho mínimo; CSS lo oculta visualmente
-    state.push({ colId: "sort_key", width: 1, pinned: null });
+    // sort_key es auxiliar de orden — ocultar con hide:true (AG Grid no la renderiza)
+    state.push({ colId: "sort_key", hide: true, pinned: null });
     try { api.applyColumnState({ state: state, applyOrder: false }); }
     catch (e) { /* ignore */ }
+  }
+
+  /** Una sola vez: eliminar sort cliente que AG Grid puede aplicar por defecto sobre "nombre",
+   *  rompiendo el orden de sort_key que crea la jerarquía Proyecto → Recurso. */
+  function clearManoObraClientSortOnce(api) {
+    if (!api || api.__psMoSortCleared) return;
+    api.__psMoSortCleared = true;
+    try {
+      if (typeof api.applyColumnState === "function") {
+        api.applyColumnState({
+          state: [{ colId: "nombre", sort: null }, { colId: "sort_key", sort: null }],
+          defaultState: { sort: null },
+        });
+      }
+    } catch (e) { /* ignore */ }
   }
 
   function blankManoDeObraNA(chart) { blankGastosNA(chart); }
@@ -2180,15 +2195,20 @@
     return { nivel: -1, proyecto: "" };
   }
 
-  // ── DOM: aplica clases CSS a los elementos .ag-row ────────────────────────
+  // ── DOM: aplica clases CSS a los elementos .ag-row (recorrido DOM-first: sólo filas visibles) ──
   function moApplyRowClasses(api, chart) {
-    if (!api || !chart || typeof api.forEachNode !== "function") return;
-    api.forEachNode(function (node) {
-      if (!node || !node.data || node.rowPinned) return;
+    if (!api || !chart || typeof api.getRowNode !== "function") return;
+    // Recorremos sólo las filas renderizadas en la página actual (más rápido que forEachNode)
+    var rowEls = chart.querySelectorAll(
+      ".ag-center-cols-container .ag-row:not([row-pinned])"
+    );
+    Array.prototype.forEach.call(rowEls, function (rowEl) {
+      var rowId = rowEl.getAttribute("row-id");
+      if (rowId === null) return;
+      var node = api.getRowNode(rowId);
+      if (!node || !node.data) return;
       var info = moParseRowInfo(node.data.sort_key);
       if (info.nivel < 0) return;
-      var rowEl = chart.querySelector('.ag-row[row-id="' + String(node.id) + '"]');
-      if (!rowEl) return;
       rowEl.classList.remove("ps-mo-row-parent", "ps-mo-row-child");
       if (info.nivel === 0) rowEl.classList.add("ps-mo-row-parent");
       else                  rowEl.classList.add("ps-mo-row-child");
@@ -2197,14 +2217,18 @@
 
   // ── DOM: pone indicador ▼/▶ en la celda nombre de cada fila padre ─────────
   function moApplyIndicators(api, chart) {
-    if (!api || !chart || typeof api.forEachNode !== "function") return;
-    api.forEachNode(function (node) {
-      if (!node || !node.data || node.rowPinned) return;
+    if (!api || !chart || typeof api.getRowNode !== "function") return;
+    var rowEls = chart.querySelectorAll(
+      ".ag-center-cols-container .ag-row:not([row-pinned])"
+    );
+    Array.prototype.forEach.call(rowEls, function (rowEl) {
+      var rowId = rowEl.getAttribute("row-id");
+      if (rowId === null) return;
+      var node = api.getRowNode(rowId);
+      if (!node || !node.data) return;
       var info = moParseRowInfo(node.data.sort_key);
       if (info.nivel !== 0) return;
       var exp = !api.__psMoExpanded || api.__psMoExpanded[info.proyecto] !== false;
-      var rowEl = chart.querySelector('.ag-row[row-id="' + String(node.id) + '"]');
-      if (!rowEl) return;
       var cellEl = rowEl.querySelector('[col-id="nombre"] .ag-cell-value');
       if (!cellEl) return;
       var wanted = (exp ? "\u25bc  " : "\u25ba  ") + (node.data.nombre || "");
@@ -2218,15 +2242,21 @@
     var wasExpanded = api.__psMoExpanded[proyecto] !== false;
     api.__psMoExpanded[proyecto] = !wasExpanded;
 
-    api.forEachNode(function (node) {
-      if (!node || !node.data || node.rowPinned) return;
-      var info = moParseRowInfo(node.data.sort_key);
-      if (info.nivel !== 1 || info.proyecto !== proyecto) return;
-      node.setRowHeight(wasExpanded ? 0 : null);
-    });
+    if (typeof api.forEachNode === "function") {
+      api.forEachNode(function (node) {
+        if (!node || !node.data || node.rowPinned) return;
+        var info = moParseRowInfo(node.data.sort_key);
+        if (info.nivel !== 1 || info.proyecto !== proyecto) return;
+        node.setRowHeight(wasExpanded ? 0 : null);
+      });
+    }
 
     try { api.onRowHeightChanged(); } catch (e) { /* ignore */ }
-    setTimeout(function () { moApplyIndicators(api, chart); }, 20);
+    // Re-aplicar clases e indicadores tras reposicionamiento AG Grid
+    setTimeout(function () {
+      moApplyRowClasses(api, chart);
+      moApplyIndicators(api, chart);
+    }, 30);
   }
 
   function initManoDeObraColPersist(chart, api) {
@@ -2241,6 +2271,7 @@
 
     function applyFit() {
       applyManoDeObraColumnLayout(api, chart);
+      clearManoObraClientSortOnce(api);   // Elimina sort cliente que rompe el orden sort_key
       blankManoDeObraNA(chart);
       moApplyRowClasses(api, chart);
       moApplyIndicators(api, chart);
@@ -2273,8 +2304,18 @@
         applyFit();
       });
 
+      // Re-aplicar clases e indicadores al cambiar de página (paginación AG Grid)
+      api.addEventListener("paginationChanged", function () {
+        setTimeout(function () {
+          moApplyRowClasses(api, chart);
+          moApplyIndicators(api, chart);
+        }, 50);
+      });
+
+      // Re-aplicar clases e indicadores si Superset actualiza datos (cambio de filtro)
       api.addEventListener("rowDataUpdated", function () {
         setTimeout(function () {
+          clearManoObraClientSortOnce(api);
           moApplyRowClasses(api, chart);
           moApplyIndicators(api, chart);
         }, 100);
