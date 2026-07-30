@@ -22,6 +22,7 @@ REFRESH MATERIALIZED VIEW bi_mv_facturacion_probabilidad;
 REFRESH MATERIALIZED VIEW bi_mv_resumen_proyectos;
 REFRESH MATERIALIZED VIEW bi_mv_unidad;
 REFRESH MATERIALIZED VIEW bi_mv_facturacion;
+REFRESH MATERIALIZED VIEW bi_mv_gastos;
 SELECT 'bi_mvs_refreshed' AS status;
 SQL
 )
