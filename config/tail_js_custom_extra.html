@@ -2122,14 +2122,19 @@
   }
 
 
-  // ─── Mano de Obra: árbol expand/collapse vía External Filter (AG Grid Community) ───
+  // ─── Mano de Obra: árbol expand/collapse (Community, CERO setGridOption) ──────
   //
-  // ARQUITECTURA (sin setRowData → sin bucle modelUpdated):
-  //   SQL genera nivel=0 (proyecto padre) + nivel=1 (recurso hijo), ordenados por sort_key.
-  //   JS solo filtra qué filas son visibles usando doesExternalFilterPass.
-  //   Toggle  →  update __psMoExpanded  →  api.onFilterChanged()  →  re-eval por fila
-  //   NO modifica rowData en ningún momento → velocidad nativa de AG Grid.
+  // BUG ANTERIOR: setGridOption("isExternalFilterPresent", fn) en Superset 6.1/React
+  //   causaba re-mount del componente → nueva API → init otra vez → bucle colgante.
+  //   Además groupby=["nombre"] no incluía sort_key → nivel/proyecto no llegaban al JS.
   //
+  // ARQUITECTURA CORRECTA (sin setGridOption de comportamiento):
+  //   groupby = ["nombre","sort_key"] → sort_key llega al JS codificando nivel+proyecto.
+  //   DOM directo → aplica clases CSS ps-mo-row-parent/child en elementos .ag-row.
+  //   Toggle → node.setRowHeight(0|null) + api.onRowHeightChanged() → sin setGridOption.
+  //   Indicador ▶/▼ → textContent directo en .ag-cell-value → sin refreshCells.
+  //   NINGUNA operación usa setGridOption con callbacks → React no re-monta → cero bucle.
+
   var PS_MANO_OBRA_COL_STORAGE_KEY = "ps-mano-obra-col-widths-v1";
 
   function isManoDeObraMatrixChart(chart) {
@@ -2142,9 +2147,7 @@
     return t === "Mano de Obra";
   }
 
-  function getDefaultManoDeObraWidths(chart) {
-    return getDefaultFacturacionWidths(chart);
-  }
+  function getDefaultManoDeObraWidths(chart) { return getDefaultFacturacionWidths(chart); }
 
   function applyManoDeObraColumnLayout(api, chart) {
     if (!api || !chart) return;
@@ -2154,6 +2157,8 @@
       row.pinned = id === "Total" ? "right" : null;
       return row;
     });
+    // sort_key es auxiliar — ancho mínimo; CSS lo oculta visualmente
+    state.push({ colId: "sort_key", width: 1, pinned: null });
     try { api.applyColumnState({ state: state, applyOrder: false }); }
     catch (e) { /* ignore */ }
   }
@@ -2165,118 +2170,80 @@
     catch (e) { /* ignore */ }
   }
 
-  // ── External filter: ocultar hijos cuyo proyecto está colapsado ────────────
-  function moInstallExternalFilter(api) {
-    if (!api || api.__psMoFilterInstalled) return;
-    api.__psMoFilterInstalled = true;
+  // ── Decodifica nivel y proyecto desde sort_key ("proyecto|0|" o "proyecto|1|recurso") ──
+  function moParseRowInfo(sortKey) {
+    var sk = String(sortKey || "");
+    var idx0 = sk.lastIndexOf("|0|");
+    var idx1 = sk.lastIndexOf("|1|");
+    if (idx0 > idx1) return { nivel: 0, proyecto: sk.substring(0, idx0) };
+    if (idx1 >= 0)   return { nivel: 1, proyecto: sk.substring(0, idx1) };
+    return { nivel: -1, proyecto: "" };
+  }
+
+  // ── DOM: aplica clases CSS a los elementos .ag-row ────────────────────────
+  function moApplyRowClasses(api, chart) {
+    if (!api || !chart || typeof api.forEachNode !== "function") return;
+    api.forEachNode(function (node) {
+      if (!node || !node.data || node.rowPinned) return;
+      var info = moParseRowInfo(node.data.sort_key);
+      if (info.nivel < 0) return;
+      var rowEl = chart.querySelector('.ag-row[row-id="' + String(node.id) + '"]');
+      if (!rowEl) return;
+      rowEl.classList.remove("ps-mo-row-parent", "ps-mo-row-child");
+      if (info.nivel === 0) rowEl.classList.add("ps-mo-row-parent");
+      else                  rowEl.classList.add("ps-mo-row-child");
+    });
+  }
+
+  // ── DOM: pone indicador ▼/▶ en la celda nombre de cada fila padre ─────────
+  function moApplyIndicators(api, chart) {
+    if (!api || !chart || typeof api.forEachNode !== "function") return;
+    api.forEachNode(function (node) {
+      if (!node || !node.data || node.rowPinned) return;
+      var info = moParseRowInfo(node.data.sort_key);
+      if (info.nivel !== 0) return;
+      var exp = !api.__psMoExpanded || api.__psMoExpanded[info.proyecto] !== false;
+      var rowEl = chart.querySelector('.ag-row[row-id="' + String(node.id) + '"]');
+      if (!rowEl) return;
+      var cellEl = rowEl.querySelector('[col-id="nombre"] .ag-cell-value');
+      if (!cellEl) return;
+      var wanted = (exp ? "\u25bc  " : "\u25ba  ") + (node.data.nombre || "");
+      if (cellEl.textContent !== wanted) cellEl.textContent = wanted;
+    });
+  }
+
+  // ── Toggle: node.setRowHeight + onRowHeightChanged (sin setGridOption) ─────
+  function moToggle(api, chart, proyecto) {
     if (!api.__psMoExpanded) api.__psMoExpanded = {};
+    var wasExpanded = api.__psMoExpanded[proyecto] !== false;
+    api.__psMoExpanded[proyecto] = !wasExpanded;
 
-    try {
-      api.setGridOption("isExternalFilterPresent", function () { return true; });
-      api.setGridOption("doesExternalFilterPass", function (node) {
-        var d = node && node.data;
-        if (!d) return true;
-        var n = Number(d.nivel);
-        if (n !== 1) return true; // padres + cualquier otro siempre visibles
-        // Hijo visible solo si su proyecto está expandido (default: sí)
-        return api.__psMoExpanded[d.proyecto] !== false;
-      });
-    } catch (e) { /* ignore */ }
-  }
+    api.forEachNode(function (node) {
+      if (!node || !node.data || node.rowPinned) return;
+      var info = moParseRowInfo(node.data.sort_key);
+      if (info.nivel !== 1 || info.proyecto !== proyecto) return;
+      node.setRowHeight(wasExpanded ? 0 : null);
+    });
 
-  // ── valueFormatter para columna `nombre`: añade ▶/▼ en filas padre ────────
-  function moNombreFormatter(params) {
-    var d = params && params.data;
-    if (!d) return params ? params.value : "";
-    var n = Number(d.nivel);
-    if (n === 0) {
-      var api = params.api || params.context && params.context.api;
-      var exp = !api || (api.__psMoExpanded && api.__psMoExpanded[d.proyecto] !== false);
-      return (exp ? "▼  " : "▶  ") + (d.proyecto || params.value || "");
-    }
-    return params.value || "";
-  }
-
-  function moInstallNombreFormatter(api) {
-    if (!api || api.__psMoFormatterInstalled) return;
-    api.__psMoFormatterInstalled = true;
-    try {
-      var defs = typeof api.getColumnDefs === "function" ? api.getColumnDefs() : null;
-      if (!defs || !defs.length) return;
-      var changed = false;
-      var next = defs.map(function (d) {
-        var id = String((d && (d.colId || d.field)) || "");
-        if (id === "nombre") {
-          changed = true;
-          return Object.assign({}, d, {
-            headerName: "Proyecto / Recurso",
-            valueFormatter: moNombreFormatter,
-          });
-        }
-        return d;
-      });
-      if (changed && typeof api.setGridOption === "function") {
-        api.setGridOption("columnDefs", next);
-      }
-    } catch (e) { /* ignore */ }
-  }
-
-  // ── getRowClass basado en nivel (CSS aplica fondo padre / sangría hijo) ────
-  function moInstallRowClasses(api) {
-    if (!api || api.__psMoRowClassInstalled) return;
-    api.__psMoRowClassInstalled = true;
-    try {
-      api.setGridOption("getRowClass", function (p) {
-        var n = p && p.data && Number(p.data.nivel);
-        if (n === 0) return "ps-mo-row-parent";
-        if (n === 1) return "ps-mo-row-child";
-        return "";
-      });
-    } catch (e) { /* ignore */ }
-  }
-
-  // ── Click en fila padre → toggle expand/collapse ───────────────────────────
-  function moInstallToggleClick(api, chart) {
-    if (!api || api.__psMoClickInstalled) return;
-    api.__psMoClickInstalled = true;
-    try {
-      api.addEventListener("cellClicked", function (e) {
-        var d = e && e.data;
-        if (!d || Number(d.nivel) !== 0) return;
-        var proy = d.proyecto;
-        if (!proy) return;
-        // Toggle: default = expandido
-        var cur = api.__psMoExpanded[proy] !== false;
-        api.__psMoExpanded[proy] = !cur;
-        // Actualizar indicador ▶/▼ en la celda padre + re-evaluar filtro
-        try { api.onFilterChanged(); } catch (ex) { /* ignore */ }
-        try { api.refreshCells({ columns: ["nombre"], force: true }); } catch (ex) { /* ignore */ }
-        // Mantener layout de columnas
-        applyManoDeObraColumnLayout(api, chart);
-        blankManoDeObraNA(chart);
-      });
-    } catch (err) { /* grid aún montando */ }
+    try { api.onRowHeightChanged(); } catch (e) { /* ignore */ }
+    setTimeout(function () { moApplyIndicators(api, chart); }, 20);
   }
 
   function initManoDeObraColPersist(chart, api) {
     if (api.__psManoObraColPersistInit) return;
     api.__psManoObraColPersistInit = true;
     chart.__psManoObraColPersistInit = true;
+    if (!api.__psMoExpanded) api.__psMoExpanded = {};
 
     patchAgGridNullAsBlank(api);
     ensureMatrixNullBlank(chart);
     if (typeof tuneAgGridScrollPerf === "function") tuneAgGridScrollPerf(api);
 
-    moInstallExternalFilter(api);
-    moInstallRowClasses(api);
-    moInstallToggleClick(api, chart);
-    moInstallNombreFormatter(api);
-
     function applyFit() {
       applyManoDeObraColumnLayout(api, chart);
-      moInstallNombreFormatter(api);
       blankManoDeObraNA(chart);
-      labelAgGridTotalsRow(chart);
+      moApplyRowClasses(api, chart);
+      moApplyIndicators(api, chart);
       markMatrixNaReady(chart);
     }
 
@@ -2286,18 +2253,31 @@
     setTimeout(applyFit, 900);
 
     try {
+      api.addEventListener("cellClicked", function (e) {
+        var d = e && e.data;
+        if (!d) return;
+        var info = moParseRowInfo(d.sort_key);
+        if (info.nivel !== 0) return;
+        moToggle(api, chart, info.proyecto);
+        applyManoDeObraColumnLayout(api, chart);
+      });
+
       api.addEventListener("columnResized", function (e) {
         if (!e || !e.finished || e.source !== "uiColumnResized") return;
         var map = getColWidthMap(api);
         if (map) saveManoDeObraWidthsLocal(map);
       });
+
       api.addEventListener("firstDataRendered", function () {
         patchAgGridNullAsBlank(api);
-        moInstallExternalFilter(api);
-        moInstallRowClasses(api);
-        moInstallToggleClick(api, chart);
-        moInstallNombreFormatter(api);
         applyFit();
+      });
+
+      api.addEventListener("rowDataUpdated", function () {
+        setTimeout(function () {
+          moApplyRowClasses(api, chart);
+          moApplyIndicators(api, chart);
+        }, 100);
       });
     } catch (err) { /* grid aún montando */ }
   }
@@ -2315,9 +2295,9 @@
     if (isFacturacionTotalClipped(chart)) {
       applyManoDeObraColumnLayout(api, chart);
       blankManoDeObraNA(chart);
-      labelAgGridTotalsRow(chart);
     }
   }
+
 
   function placeManoDeObraSearchInHeader() {
     var charts = document.querySelectorAll('[data-test-chart-name="Mano de Obra"]');
@@ -3256,7 +3236,15 @@
       "  padding: 0 !important;",
       "  border: none !important;",
       "}",
-      /* Mano de Obra: jerarquía proyecto → recurso (nivel viene del SQL) */
+      /* Mano de Obra: jerarquía proyecto → recurso */
+      /* sort_key es columna auxiliar — oculta completamente */
+      '[data-test-chart-name="Mano de Obra"] .ag-header-cell[col-id="sort_key"],',
+      '[data-test-chart-name="Mano de Obra"] .ag-cell[col-id="sort_key"] {',
+      "  display: none !important;",
+      "  width: 0 !important; max-width: 0 !important;",
+      "  padding: 0 !important; border: none !important;",
+      "}",
+      /* Fila padre (proyecto): fondo azul suave, negrita, cursor pointer */
       '[data-test-chart-name="Mano de Obra"] .ps-mo-row-parent {',
       "  cursor: pointer !important;",
       "}",
@@ -3267,13 +3255,14 @@
       '[data-test-chart-name="Mano de Obra"] .ps-mo-row-parent .ag-cell {',
       "  background: rgba(0, 120, 170, 0.07) !important;",
       "}",
+      '[data-test-chart-name="Mano de Obra"] .ps-mo-row-parent:hover .ag-cell {',
+      "  background: rgba(0, 120, 170, 0.13) !important;",
+      "}",
+      /* Fila hijo (recurso): sangría visual en la celda nombre */
       '[data-test-chart-name="Mano de Obra"] .ps-mo-row-child .ag-cell[col-id="nombre"] {',
       "  font-weight: 400 !important;",
       "  color: #444 !important;",
       "  padding-left: 32px !important;",
-      "}",
-      '[data-test-chart-name="Mano de Obra"] .ps-mo-row-parent:hover .ag-cell {',
-      "  background: rgba(0, 120, 170, 0.13) !important;",
       "}",
     ].join("\n");
     if (!style) {

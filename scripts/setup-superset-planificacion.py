@@ -695,14 +695,24 @@ def gastos_matriz_params() -> dict[str, Any]:
 
 
 def mano_obra_matriz_params() -> dict[str, Any]:
-    """Tabla PBI Mano de Obra: nivel 0=proyecto (padre), 1=recurso (hijo sangrado por CSS)."""
+    """Tabla PBI Mano de Obra: nivel 0=proyecto (padre), 1=recurso (hijo).
+    groupby incluye sort_key para que el JS pueda leer nivel+proyecto.
+    CSS oculta la columna sort_key; tail_js aplica clases CSS vía DOM directo
+    (sin setGridOption → sin bucle React) y toggle via node.setRowHeight(0).
+    """
     params = _month_pivot_params(
         dim_col="nombre",
         dim_label="Proyecto / Recurso",
         dim_width=330,
         order_label="sort_key",
     )
-    params["groupby"] = ["nombre"]
+    params["groupby"] = ["nombre", "sort_key"]
+    params["show_totals"] = False   # nivel 0+1 están ambos → sin show_totals evita doble suma
+    params["column_config"]["sort_key"] = {
+        "customColumnName": "sort_key",
+        "columnWidth": 1,           # CSS lo oculta completamente
+        "truncateLongCells": True,
+    }
     params["order_by_cols"] = [
         json.dumps(
             [{"expressionType": "SQL", "sqlExpression": "sort_key", "label": "sort_key"}, True],
