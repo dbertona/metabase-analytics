@@ -2293,36 +2293,46 @@
 
   function moProyectoCellRenderer(params) {
     var d = params && params.data;
-    if (!d) return params.value == null ? "" : String(params.value);
+    var root = document.createElement("span");
+    if (!d) {
+      root.textContent = params.value == null ? "" : String(params.value);
+      return root;
+    }
     if (d.__psMoNivel === -1) {
-      return '<strong>Total</strong>';
+      var strong = document.createElement("strong");
+      strong.textContent = "Total";
+      root.appendChild(strong);
+      return root;
     }
     if (d.__psMoNivel === 1) {
       var name = d.recurso != null && d.recurso !== "" ? d.recurso : params.value;
-      return (
-        '<span class="ps-mo-child" style="padding-left:22px;display:inline-block">' +
-        moEscapeHtml(name) +
-        "</span>"
-      );
+      root.className = "ps-mo-child";
+      root.style.paddingLeft = "22px";
+      root.style.display = "inline-block";
+      root.textContent = name == null ? "" : String(name);
+      return root;
     }
     if (d.__psMoNivel === 0) {
       var proy = d.__psMoProyecto || d.proyecto || "";
       var api = params.api;
       var exp =
         api && api.__psMoExpanded ? api.__psMoExpanded[proy] !== false : true;
-      var icon = exp ? "−" : "+";
-      return (
-        '<span class="ps-mo-toggle" data-ps-mo-proy="' +
-        moEscapeHtml(proy) +
-        '" style="cursor:pointer;user-select:none;display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-right:6px;border:1px solid #8c8c8c;border-radius:2px;font-size:11px;line-height:1;color:#333;background:#fff">' +
-        icon +
-        "</span>" +
-        "<span>" +
-        moEscapeHtml(proy) +
-        "</span>"
-      );
+      var toggle = document.createElement("span");
+      toggle.className = "ps-mo-toggle";
+      toggle.setAttribute("data-ps-mo-proy", proy);
+      toggle.textContent = exp ? "−" : "+";
+      toggle.style.cssText =
+        "cursor:pointer;user-select:none;display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-right:6px;border:1px solid #8c8c8c;border-radius:2px;font-size:11px;line-height:1;color:#333;background:#fff;flex-shrink:0";
+      var label = document.createElement("span");
+      label.textContent = proy;
+      root.style.display = "inline-flex";
+      root.style.alignItems = "center";
+      root.appendChild(toggle);
+      root.appendChild(label);
+      return root;
     }
-    return params.value == null ? "" : moEscapeHtml(params.value);
+    root.textContent = params.value == null ? "" : String(params.value);
+    return root;
   }
 
   function moApplyTreeColumnDefs(api) {
