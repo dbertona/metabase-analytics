@@ -527,8 +527,13 @@ LEFT JOIN mb_v_dim_departamento d
 WHERE c.tipo IN ('P', 'R')
   AND c.tipo_proyecto = 'Operational'
   AND COALESCE(c.estado, '') IN ('Completed', 'Open', 'Planning')
-  -- PBI Coste de Mano de Obra: solo type_line Resource
+  -- PBI Coste de Mano de Obra: Resource + CA Mano de Obra* (o vacío).
+  -- Excluye p.ej. «Trabajos relacionados» (+26.751 € PSI 2026 P vs PBI).
   AND COALESCE(c.type_line, '') = 'Resource'
+  AND (
+    COALESCE(TRIM(c.descripcion_ca), '') = ''
+    OR c.descripcion_ca LIKE 'Mano de Obra%'
+  )
 GROUP BY
     c.empresa,
     c.year,
@@ -549,7 +554,7 @@ CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx3 ON bi_mv_mano_obra (proyecto);
 CREATE VIEW bi_v_mano_obra AS SELECT * FROM bi_mv_mano_obra;
 
 COMMENT ON VIEW bi_v_mano_obra IS
-  'Mano de Obra PBI: Operational + Completed/Open/Planning; solo type_line Resource; pivot coste×mes Encabezado; total>0. (materializada: bi_mv_mano_obra; REFRESH tras sync 004).';
+  'Mano de Obra PBI: Operational + Completed/Open/Planning; type_line Resource; CA Mano de Obra* o vacío; pivot coste×mes; total>0. (materializada: bi_mv_mano_obra; REFRESH tras sync 004).';
 COMMENT ON MATERIALIZED VIEW bi_mv_mano_obra IS
   'Snapshot de bi_v_mano_obra; refrescar tras sync BC→Analytics.';
 
