@@ -1,0 +1,600 @@
+[
+  {
+    "id": "e005a1b2c3d4e5f6",
+    "name": "005 - Health Check Analytics vs BC",
+    "active": false,
+    "nodes": [
+      {
+        "id": "sched-005",
+        "name": "Schedule diario",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "position": [
+          0,
+          300
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 7 * * 1-5"
+              }
+            ]
+          }
+        },
+        "typeVersion": 1.2
+      },
+      {
+        "id": "wh-005",
+        "name": "Webhook manual",
+        "type": "n8n-nodes-base.webhook",
+        "position": [
+          0,
+          520
+        ],
+        "parameters": {
+          "path": "analytics-health-check",
+          "httpMethod": "POST",
+          "responseMode": "onReceived",
+          "options": {}
+        },
+        "typeVersion": 2,
+        "webhookId": "analytics-health-check-005"
+      },
+      {
+        "id": "emit-005",
+        "name": "Emit Companies",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          240,
+          400
+        ],
+        "parameters": {
+          "jsCode": "const year = new Date().getUTCFullYear();\nconst emailTo = 'dbertona@powersolution.es';\nconst companies = [\n  { slug: 'psi', companyName: 'Power Solution Iberia SL', companyId: 'ca9dc1bf-54ee-ed11-884a-000d3a455d5b' },\n  { slug: 'pslab', companyName: 'PS LAB CONSULTING SL', companyId: '656f8f0e-2bf4-ed11-8848-000d3a4baf18' },\n];\nreturn companies.map(c => ({ json: { ...c, year, emailTo } }));\n"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "batch-005",
+        "name": "Loop Companies",
+        "type": "n8n-nodes-base.splitInBatches",
+        "position": [
+          480,
+          400
+        ],
+        "parameters": {
+          "batchSize": 1,
+          "options": {}
+        },
+        "typeVersion": 3
+      },
+      {
+        "id": "urls-005",
+        "name": "Build BC URLs",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          720,
+          400
+        ],
+        "parameters": {
+          "jsCode": "const year = Number($json.year);\nconst companyName = $json.companyName;\nconst companyId = $json.companyId;\nconst env = (($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || 'Production');\nconst base = 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/'\n  + env + '/api/Power_Solution/PS_API/v2.0/companies(' + companyId + ')';\n\nconst movUrl = base + \"/movimientosProyectosMes\"\n  + \"?$select=invoice,year,descripcionCA,job\"\n  + \"&$filter=year%20eq%20'\" + year + \"'%20and%20descripcionCA%20eq%20'Ingresos'\";\n\nconst planUrl = base + \"/planificacionMes\"\n  + \"?$select=job,year,month,invoice,status1\"\n  + \"&$filter=year%20eq%20\" + year;\n\nconst cerradosUrl = base + \"/mesesCerrados\"\n  + \"?$select=job,fecha\";\n\nreturn [{ json: {\n  year, companyName, companyId, slug: $json.slug,\n  movUrl, planUrl, cerradosUrl,\n  emailTo: $json.emailTo || 'dbertona@powersolution.es',\n}}];\n"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "http-mov-005",
+        "name": "BC Movimientos",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          960,
+          400
+        ],
+        "parameters": {
+          "url": "={{ $json.movUrl }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "options": {
+            "pagination": {
+              "pagination": {
+                "nextURL": "={{ $response.body['@odata.nextLink'] }}",
+                "paginationMode": "responseContainsNextURL",
+                "completeExpression": "={{ !$response.body['@odata.nextLink'] }}",
+                "paginationCompleteWhen": "other"
+              }
+            }
+          }
+        },
+        "typeVersion": 4.2,
+        "credentials": {
+          "oAuth2Api": {
+            "id": "5caHilW1m87Snw87",
+            "name": "Business Central"
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "id": "sum-mov-005",
+        "name": "Sum Movimientos BC",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          1200,
+          400
+        ],
+        "parameters": {
+          "jsCode": "const input = $input.all();\nconst meta = $('Build BC URLs').first().json;\nlet sum = 0;\nlet count = 0;\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  if (raw.error || raw.statusCode >= 400) continue;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const inv = Number(r.invoice ?? 0);\n    if (!Number.isFinite(inv)) continue;\n    sum += inv;\n    count += 1;\n  }\n}\nreturn [{ json: {\n  ...meta,\n  bc_r_sum: Math.abs(sum),\n  bc_r_count: count,\n}}];\n"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "http-plan-005",
+        "name": "BC Planificacion",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          1440,
+          400
+        ],
+        "parameters": {
+          "url": "={{ $json.planUrl }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "options": {
+            "pagination": {
+              "pagination": {
+                "nextURL": "={{ $response.body['@odata.nextLink'] }}",
+                "paginationMode": "responseContainsNextURL",
+                "completeExpression": "={{ !$response.body['@odata.nextLink'] }}",
+                "paginationCompleteWhen": "other"
+              }
+            }
+          }
+        },
+        "typeVersion": 4.2,
+        "credentials": {
+          "oAuth2Api": {
+            "id": "5caHilW1m87Snw87",
+            "name": "Business Central"
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "id": "sum-plan-005",
+        "name": "Sum Planificacion BC",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          1680,
+          400
+        ],
+        "parameters": {
+          "jsCode": "const input = $input.all();\nconst meta = $('Sum Movimientos BC').first().json;\nlet sum = 0;\nlet count = 0;\nconst skip = (j) => {\n  const s = String(j || '').trim();\n  return s.startsWith('PP') || s.startsWith('PY');\n};\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  if (raw.error || raw.statusCode >= 400) continue;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const job = String(r.job ?? '').trim();\n    if (!job || skip(job)) continue;\n    const st = String(r.status1 ?? r.estado ?? '').trim();\n    if (st !== 'Open' && st !== 'Planning') continue;\n    const inv = Number(r.invoice ?? 0);\n    if (!Number.isFinite(inv)) continue;\n    sum += inv;\n    count += 1;\n  }\n}\nreturn [{ json: {\n  ...meta,\n  bc_plan_sum: Math.abs(sum),\n  bc_plan_count: count,\n}}];\n"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "http-cer-005",
+        "name": "BC MesesCerrados",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          1920,
+          400
+        ],
+        "parameters": {
+          "url": "={{ $json.cerradosUrl }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "options": {
+            "pagination": {
+              "pagination": {
+                "nextURL": "={{ $response.body['@odata.nextLink'] }}",
+                "paginationMode": "responseContainsNextURL",
+                "completeExpression": "={{ !$response.body['@odata.nextLink'] }}",
+                "paginationCompleteWhen": "other"
+              }
+            }
+          }
+        },
+        "typeVersion": 4.2,
+        "credentials": {
+          "oAuth2Api": {
+            "id": "5caHilW1m87Snw87",
+            "name": "Business Central"
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "id": "sum-cer-005",
+        "name": "Sum MesesCerrados BC",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          2160,
+          400
+        ],
+        "parameters": {
+          "jsCode": "const input = $input.all();\nconst meta = $('Sum Planificacion BC').first().json;\nlet count = 0;\nconst skip = (j) => {\n  const s = String(j || '').trim();\n  return s.startsWith('PP') || s.startsWith('PY');\n};\nconst seen = new Set();\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  if (raw.error || raw.statusCode >= 400) continue;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const job = String(r.job ?? '').trim();\n    const fecha = String(r.fecha ?? '').trim();\n    if (!job || !fecha || skip(job) || fecha.startsWith('0001')) continue;\n    const key = job + '|' + fecha;\n    if (seen.has(key)) continue;\n    seen.add(key);\n    count += 1;\n  }\n}\nreturn [{ json: {\n  ...meta,\n  bc_cerrados_count: count,\n}}];\n"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "pg-an-005",
+        "name": "Query Analytics",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          2400,
+          400
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT\n  COALESCE((SELECT SUM(invoice) FROM bc_job_ledger_entry_month\n    WHERE company_name = $1 AND year = $2::int\n      AND concepto_analitico_descripcion = 'Ingresos'), 0) AS r_sum,\n  COALESCE((SELECT COUNT(*) FROM bc_job_planning_line\n    WHERE company_name = $1 AND year = $2::int\n      AND status IN ('Open','Planning')\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'), 0) AS plan_count,\n  COALESCE((SELECT SUM(invoice) FROM bc_job_planning_line\n    WHERE company_name = $1 AND year = $2::int\n      AND status IN ('Open','Planning')\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'), 0) AS plan_sum,\n  COALESCE((SELECT COUNT(*) FROM bc_meses_cerrados\n    WHERE company_name = $1\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'), 0) AS cerrados_count,\n  COALESCE((SELECT COUNT(*) FROM bc_job_planning_line\n    WHERE company_name = $1 AND year = $2::int\n      AND budget_date_year = 0 AND COALESCE(invoice,0) <> 0\n      AND status IN ('Open','Planning')\n      AND make_date(year, month, 1) < date_trunc('month', CURRENT_DATE)), 0) AS budget0_past_count,\n  (SELECT MAX(last_sync_at) FROM sync_state\n    WHERE company_name = $1\n      AND entity IN ('bc_job_planning_line','bc_job_ledger_entry_month','bc_meses_cerrados')) AS last_sync_at\n",
+          "options": {
+            "queryReplacement": "={{ $json.companyName }}\n={{ $json.year }}"
+          }
+        },
+        "typeVersion": 2.5,
+        "credentials": {
+          "postgres": {
+            "id": "TTHI6C7o3V8eVzzr",
+            "name": "Postgres PS_Analytics"
+          }
+        }
+      },
+      {
+        "id": "cmp-005",
+        "name": "Compare",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          2640,
+          400
+        ],
+        "parameters": {
+          "jsCode": "const meta = $('Sum MesesCerrados BC').first().json;\nconst rows = $input.all().map(i => i.json);\nconst a = rows[0] || {};\n\nconst num = (v) => {\n  const n = Number(v);\n  return Number.isFinite(n) ? n : 0;\n};\n\nconst an_r = Math.abs(num(a.r_sum));\nconst an_plan_count = num(a.plan_count);\nconst an_plan_sum = Math.abs(num(a.plan_sum));\nconst an_cerrados = num(a.cerrados_count);\nconst an_budget0 = num(a.budget0_past_count);\nconst lastSync = a.last_sync_at ? new Date(a.last_sync_at) : null;\nconst hoursSinceSync = lastSync ? (Date.now() - lastSync.getTime()) / 3600000 : 999;\n\nconst checks = [];\nconst push = (check_name, bc, an, tol, kind='abs') => {\n  const delta = Number((bc - an).toFixed(2));\n  let status = 'ok';\n  if (kind === 'count' && Math.abs(delta) > tol) status = 'fail';\n  if (kind === 'abs' && Math.abs(delta) > tol) status = 'fail';\n  if (kind === 'signal' && an > tol) status = 'fail';\n  if (kind === 'fresh' && an > tol) status = 'warn';\n  checks.push({\n    company_name: meta.companyName,\n    year: meta.year,\n    check_name,\n    bc_value: bc,\n    analytics_value: an,\n    delta,\n    status,\n    details: { slug: meta.slug },\n  });\n};\n\npush('tipo_r_sum', Number(meta.bc_r_sum.toFixed(2)), Number(an_r.toFixed(2)), 0.5, 'abs');\npush('plan_count', meta.bc_plan_count, an_plan_count, 0, 'count');\npush('plan_sum', Number(meta.bc_plan_sum.toFixed(2)), Number(an_plan_sum.toFixed(2)), 0.5, 'abs');\npush('meses_cerrados_count', meta.bc_cerrados_count, an_cerrados, 0, 'count');\npush('budget0_past_with_invoice', 0, an_budget0, 0, 'signal');\npush('sync_freshness_hours', 26, Number(hoursSinceSync.toFixed(1)), 26, 'fresh');\n\nconst hasFail = checks.some(c => c.status === 'fail');\nconst hasWarn = checks.some(c => c.status === 'warn');\nconst overall = hasFail ? 'fail' : (hasWarn ? 'warn' : 'ok');\n\nreturn [{ json: {\n  companyName: meta.companyName,\n  year: meta.year,\n  emailTo: meta.emailTo,\n  overall,\n  checks,\n  hasDiff: hasFail || hasWarn,\n}}];\n"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "exp-005",
+        "name": "Expand checks for insert",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          2880,
+          400
+        ],
+        "parameters": {
+          "jsCode": "const d = $json;\nconst alert = d.hasDiff ? 'true' : 'false';\nreturn (d.checks || []).map(c => ({\n  json: {\n    company_name: c.company_name,\n    year: c.year,\n    check_name: c.check_name,\n    bc_value: c.bc_value === null || c.bc_value === undefined ? '' : String(c.bc_value),\n    analytics_value: c.analytics_value === null || c.analytics_value === undefined ? '' : String(c.analytics_value),\n    delta: c.delta === null || c.delta === undefined ? '' : String(c.delta),\n    status: c.status,\n    details: JSON.stringify(c.details || {}),\n    alert_sent: alert,\n    // pass-through for later aggregate\n    _overall: d.overall,\n    _hasDiff: d.hasDiff,\n    _companyName: d.companyName,\n    _emailTo: d.emailTo,\n    _checks: d.checks,\n  }\n}));\n"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "pg-ins-005",
+        "name": "Insert health log",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          3120,
+          400
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO analytics_health_log\n(company_name, year, check_name, bc_value, analytics_value, delta, status, details, alert_sent)\nSELECT\n  $1, $2::int, $3, NULLIF($4,'')::numeric, NULLIF($5,'')::numeric, NULLIF($6,'')::numeric,\n  $7, COALESCE(NULLIF($8,'')::jsonb, '{}'::jsonb), ($9 = 'true')\n",
+          "options": {
+            "queryReplacement": "={{ $json.company_name }}\n={{ $json.year }}\n={{ $json.check_name }}\n={{ $json.bc_value }}\n={{ $json.analytics_value }}\n={{ $json.delta }}\n={{ $json.status }}\n={{ $json.details }}\n={{ $json.alert_sent }}"
+          }
+        },
+        "typeVersion": 2.5,
+        "credentials": {
+          "postgres": {
+            "id": "TTHI6C7o3V8eVzzr",
+            "name": "Postgres PS_Analytics"
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "id": "rest-005",
+        "name": "Restore company result",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          3360,
+          400
+        ],
+        "parameters": {
+          "jsCode": "const items = $input.all();\nif (!items.length) return [];\nconst first = items[0].json;\nreturn [{ json: {\n  companyName: first._companyName,\n  year: first.year,\n  emailTo: first._emailTo,\n  overall: first._overall,\n  hasDiff: first._hasDiff,\n  checks: first._checks,\n}}];\n"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "agg-005",
+        "name": "Collect results",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          720,
+          160
+        ],
+        "parameters": {
+          "jsCode": "return $input.all();"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "prep-mail-005",
+        "name": "Prepare Alert Email",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          1200,
+          80
+        ],
+        "parameters": {
+          "jsCode": "const items = $input.all().map(i => i.json).filter(Boolean);\nconst diffs = items.filter(i => i.hasDiff);\nif (!diffs.length) return [];\n\nconst esc = (s) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\nconst fmt = (n) => {\n  if (n === null || n === undefined) return '';\n  const x = Number(n);\n  return Number.isFinite(x) ? x.toLocaleString('es-ES', { maximumFractionDigits: 2 }) : String(n);\n};\n\nlet rows = '';\nfor (const d of diffs) {\n  for (const c of (d.checks || []).filter(x => x.status !== 'ok')) {\n    rows += `<tr>\n      <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.company_name)}</td>\n      <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.check_name)}</td>\n      <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.bc_value))}</td>\n      <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.analytics_value))}</td>\n      <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.delta))}</td>\n      <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.status)}</td>\n    </tr>`;\n  }\n}\n\nconst when = new Date().toISOString().slice(0,10);\nconst html = `<!DOCTYPE html><html><body style=\"font-family:Segoe UI,sans-serif;color:#333;\">\n<p style=\"margin:0 0 16px;font-size:13px;color:#c0392b;font-weight:600;\">Alerta Health Check Analytics vs BC (workflow 005)</p>\n<p>Se detectaron diferencias el <strong>${esc(when)}</strong>.</p>\n<table style=\"border-collapse:collapse;width:100%;max-width:900px;\">\n<thead><tr style=\"background:#f0f0f0;\">\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Empresa</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Check</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">BC</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">Analytics</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">Delta</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Status</th>\n</tr></thead>\n<tbody>${rows}</tbody></table>\n<p style=\"font-size:12px;color:#888;margin-top:16px;\">\nAcciones tipicas: disparar webhook 004 (company=psi|pslab), revisar bc_meses_cerrados / budget_date_year=0, ver analytics_health_log.\n</p>\n</body></html>`;\n\nreturn [{ json: {\n  to: diffs[0].emailTo || 'dbertona@powersolution.es',\n  subject: `[Analytics 005] Discrepancia BC vs Analytics — ${when}`,\n  html,\n}}];\n"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "send-mail-005",
+        "name": "Enviar Alerta Health",
+        "type": "n8n-nodes-base.microsoftOutlook",
+        "position": [
+          1440,
+          80
+        ],
+        "parameters": {
+          "subject": "={{ $json.subject }}",
+          "bodyContent": "={{ $json.html }}",
+          "toRecipients": "={{ $json.to }}",
+          "additionalFields": {
+            "bodyContentType": "html"
+          }
+        },
+        "typeVersion": 2,
+        "credentials": {
+          "microsoftOutlookOAuth2Api": {
+            "id": "aFr0chbt85ByNN6H",
+            "name": "Microsoft Outlook noreply"
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "id": "any-005",
+        "name": "Algun fail/warn?",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          960,
+          160
+        ],
+        "parameters": {
+          "jsCode": "const items = $input.all().map(i => i.json);\nconst diffs = items.filter(i => i && i.hasDiff);\nif (!diffs.length) return [];\n// Pass all items to Prepare Alert Email\nreturn items.map(j => ({ json: j }));\n"
+        },
+        "typeVersion": 2
+      }
+    ],
+    "connections": {
+      "Schedule diario": {
+        "main": [
+          [
+            {
+              "node": "Emit Companies",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Webhook manual": {
+        "main": [
+          [
+            {
+              "node": "Emit Companies",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Emit Companies": {
+        "main": [
+          [
+            {
+              "node": "Loop Companies",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Loop Companies": {
+        "main": [
+          [
+            {
+              "node": "Build BC URLs",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Collect results",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build BC URLs": {
+        "main": [
+          [
+            {
+              "node": "BC Movimientos",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BC Movimientos": {
+        "main": [
+          [
+            {
+              "node": "Sum Movimientos BC",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sum Movimientos BC": {
+        "main": [
+          [
+            {
+              "node": "BC Planificacion",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BC Planificacion": {
+        "main": [
+          [
+            {
+              "node": "Sum Planificacion BC",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sum Planificacion BC": {
+        "main": [
+          [
+            {
+              "node": "BC MesesCerrados",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BC MesesCerrados": {
+        "main": [
+          [
+            {
+              "node": "Sum MesesCerrados BC",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sum MesesCerrados BC": {
+        "main": [
+          [
+            {
+              "node": "Query Analytics",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Query Analytics": {
+        "main": [
+          [
+            {
+              "node": "Compare",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Compare": {
+        "main": [
+          [
+            {
+              "node": "Expand checks for insert",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Expand checks for insert": {
+        "main": [
+          [
+            {
+              "node": "Insert health log",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Insert health log": {
+        "main": [
+          [
+            {
+              "node": "Restore company result",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Restore company result": {
+        "main": [
+          [
+            {
+              "node": "Loop Companies",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Collect results": {
+        "main": [
+          [
+            {
+              "node": "Algun fail/warn?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Algun fail/warn?": {
+        "main": [
+          [
+            {
+              "node": "Prepare Alert Email",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prepare Alert Email": {
+        "main": [
+          [
+            {
+              "node": "Enviar Alerta Health",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "timezone": "Europe/Madrid"
+    },
+    "staticData": null,
+    "pinData": {},
+    "versionId": "00000000-0000-0000-0000-000000000001",
+    "meta": {
+      "templateCredsSetupCompleted": true
+    },
+    "tags": []
+  }
+]
