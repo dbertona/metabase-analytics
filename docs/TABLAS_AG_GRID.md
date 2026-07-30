@@ -496,6 +496,7 @@ CREATE VIEW bi_v_<slug> AS SELECT * FROM bi_mv_<slug>;
 |-----------|-----------|---------|-----------------|
 | `bi_v_unidad` | `concepto_analitico` | `coste` | Structure (ver SQL) |
 | `bi_v_gastos` | `proyecto` (encabezado) | `coste` | Operational + Completed/Open/Planning; excl. Resource; total>0 |
+| `bi_v_mano_obra` | `proyecto` (Proyectos) | `coste` | Operational + Completed/Open/Planning; solo Resource; total>0 |
 | `bi_v_facturacion` | `proyecto` (encabezado) | `facturado` | Operational + Completed/Open/Planning |
 
 Tras crear la MV: añadirla al **REFRESH** del workflow **004** y aplicar con `./scripts/apply-bi-views.sh` (+ `--refresh` si solo refrescas).
