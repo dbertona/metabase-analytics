@@ -821,12 +821,13 @@ def persist_dashboard_config(
         + evo_chart_ids
         + prob_chart_ids
     )
+    # Orden UI: Resumen → Facturación → Unidad → Gastos → Mano de Obra → Gráficos
     tabs_all = [
         "TAB-RESUMEN",
+        "TAB-FACTURACION",
         "TAB-UNIDAD",
         "TAB-GASTOS",
         "TAB-MANO-OBRA",
-        "TAB-FACTURACION",
         "TAB-GRAFICOS",
     ]
 
@@ -1796,10 +1797,10 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "id": "TABS-MAIN",
             "children": [
                 "TAB-RESUMEN",
+                "TAB-FACTURACION",
                 "TAB-UNIDAD",
                 "TAB-GASTOS",
                 "TAB-MANO-OBRA",
-                "TAB-FACTURACION",
                 "TAB-GRAFICOS",
             ],
             "parents": ["ROOT_ID", "GRID_ID"],
