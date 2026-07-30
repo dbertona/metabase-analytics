@@ -695,44 +695,19 @@ def gastos_matriz_params() -> dict[str, Any]:
 
 
 def mano_obra_matriz_params() -> dict[str, Any]:
-    """Tabla PBI Mano de Obra: Proyecto × Recurso × meses (árbol UI en tail_js)."""
+    """Tabla PBI Mano de Obra: nivel 0=proyecto (padre), 1=recurso (hijo sangrado por CSS)."""
     params = _month_pivot_params(
-        dim_col="proyecto",
-        dim_label="Proyectos",
-        dim_width=320,
-        order_label="orden_proyecto",
+        dim_col="nombre",
+        dim_label="Proyecto / Recurso",
+        dim_width=330,
+        order_label="sort_key",
     )
-    # Grano recurso: Superset devuelve filas planas; tail_js arma expand/collapse.
-    params["groupby"] = ["proyecto", "recurso"]
-    params["show_totals"] = False  # Total lo pinta JS (solo padres; evita ×2)
-    params["column_config"]["recurso"] = {
-        "customColumnName": "Recurso",
-        "truncateLongCells": True,
-        "columnWidth": 1,  # oculto vía JS tras armar el árbol
-    }
+    params["groupby"] = ["nombre"]
     params["order_by_cols"] = [
         json.dumps(
-            [
-                {
-                    "expressionType": "SQL",
-                    "sqlExpression": "proyecto",
-                    "label": "orden_proyecto",
-                },
-                True,
-            ],
+            [{"expressionType": "SQL", "sqlExpression": "sort_key", "label": "sort_key"}, True],
             ensure_ascii=False,
-        ),
-        json.dumps(
-            [
-                {
-                    "expressionType": "SQL",
-                    "sqlExpression": "recurso",
-                    "label": "orden_recurso",
-                },
-                True,
-            ],
-            ensure_ascii=False,
-        ),
+        )
     ]
     return params
 

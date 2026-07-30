@@ -2122,12 +2122,10 @@
   }
 
 
-  // ─── Persistencia / layout — chart Mano de Obra (pestaña Mano de Obra) ─────
+  // ─── Layout — chart Mano de Obra (nivel viene del SQL; CSS sangra hijos) ─────
+  // nivel=0 → proyecto padre (fondo azul claro) | nivel=1 → recurso hijo (sangría)
+  // Sin árbol en JS → sin bucle modelUpdated → sin lentitud.
   var PS_MANO_OBRA_COL_STORAGE_KEY = "ps-mano-obra-col-widths-v1";
-  var PS_MO_METRIC_COLS = [
-    "01", "02", "03", "04", "05", "06",
-    "07", "08", "09", "10", "11", "12", "Total",
-  ];
 
   function isManoDeObraMatrixChart(chart) {
     var name = chart.getAttribute("data-test-chart-name") || "";
@@ -2152,354 +2150,33 @@
       else row.pinned = null;
       return row;
     });
-    // Recurso solo alimenta el árbol; no ocupa columna.
-    state.push({ colId: "recurso", hide: true, width: 0 });
-    try {
-      api.applyColumnState({ state: state, applyOrder: false });
-    } catch (e) { /* ignore */ }
+    try { api.applyColumnState({ state: state, applyOrder: false }); }
+    catch (e) { /* ignore */ }
   }
 
   function blankManoDeObraNA(chart) {
     blankGastosNA(chart);
   }
 
-  function moEscapeHtml(s) {
-    return String(s == null ? "" : s)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
-
-  function moParseNum(v) {
-    if (v == null || v === "") return null;
-    if (typeof v === "number") return isFinite(v) ? v : null;
-    var n = Number(String(v).replace(/\s/g, "").replace(",", "."));
-    return isFinite(n) ? n : null;
-  }
-
-  function moSumField(rows, field) {
-    var s = 0;
-    var any = false;
-    for (var i = 0; i < rows.length; i++) {
-      var n = moParseNum(rows[i][field]);
-      if (n == null) continue;
-      s += n;
-      any = true;
-    }
-    return any ? s : null;
-  }
-
-  function moLeafFingerprint(leaves) {
-    var n = leaves.length;
-    if (!n) return "0";
-    var a = leaves[0];
-    var b = leaves[n - 1];
-    return [
-      n,
-      a && a.proyecto,
-      a && a.recurso,
-      b && b.proyecto,
-      b && b.recurso,
-      moSumField(leaves, "Total"),
-    ].join("|");
-  }
-
-  function moCollectLeaves(api) {
-    var leaves = [];
-    if (!api || typeof api.forEachNode !== "function") return leaves;
-    api.forEachNode(function (node) {
-      if (!node || !node.data) return;
-      var d = node.data;
-      if (d.__psMoTree) return;
-      if (d.proyecto == null || d.proyecto === "") return;
-      // Sin columna recurso = datos viejos (solo proyecto); no armar árbol.
-      if (!Object.prototype.hasOwnProperty.call(d, "recurso")) return;
-      leaves.push(d);
-    });
-    return leaves;
-  }
-
-  function moDisplayProyecto(row, expandedMap) {
-    if (!row) return "";
-    if (row.__psMoNivel === -1) return "Total";
-    if (row.__psMoNivel === 1) {
-      var name = row.recurso != null && row.recurso !== "" ? row.recurso : "";
-      return "\u00A0\u00A0\u00A0\u00A0" + name;
-    }
-    if (row.__psMoNivel === 0) {
-      var proy = row.__psMoProyecto || row.proyecto || "";
-      var exp = expandedMap[proy] !== false;
-      return (exp ? "−  " : "+  ") + proy;
-    }
-    return row.proyecto == null ? "" : String(row.proyecto);
-  }
-
-  function moBuildTreeRows(leaves, expandedMap) {
-    var byProy = {};
-    var order = [];
-    for (var i = 0; i < leaves.length; i++) {
-      var d = leaves[i];
-      var p = String(d.proyecto);
-      if (!byProy[p]) {
-        byProy[p] = [];
-        order.push(p);
-      }
-      byProy[p].push(d);
-    }
-    order.sort(function (a, b) {
-      return a.localeCompare(b, "es", { sensitivity: "base" });
-    });
-
-    var tree = [];
-    for (var oi = 0; oi < order.length; oi++) {
-      var proy = order[oi];
-      var kids = byProy[proy].slice().sort(function (a, b) {
-        return String(a.recurso || "").localeCompare(
-          String(b.recurso || ""),
-          "es",
-          { sensitivity: "base" }
-        );
+  function applyManoDeObraRowClasses(api) {
+    // Aplica getRowClass basado en la columna `nivel` que llega del SQL.
+    if (!api || typeof api.setGridOption !== "function") return;
+    if (api.__psMoRowClassApplied) return;
+    api.__psMoRowClassApplied = true;
+    try {
+      api.setGridOption("getRowClass", function (p) {
+        var n = p && p.data && p.data.nivel;
+        if (n === 0 || n === "0") return "ps-mo-row-parent";
+        if (n === 1 || n === "1") return "ps-mo-row-child";
+        return "";
       });
-      var parent = {
-        __psMoTree: true,
-        __psMoNivel: 0,
-        __psMoProyecto: proy,
-        proyecto: proy,
-        recurso: null,
-      };
-      for (var mi = 0; mi < PS_MO_METRIC_COLS.length; mi++) {
-        var mk = PS_MO_METRIC_COLS[mi];
-        parent[mk] = moSumField(kids, mk);
-      }
-      parent.proyecto = moDisplayProyecto(parent, expandedMap);
-      tree.push(parent);
-
-      var isExp = expandedMap[proy] !== false; // por defecto expandido (como PBI)
-      if (!isExp) continue;
-      for (var ki = 0; ki < kids.length; ki++) {
-        var src = kids[ki];
-        var child = {};
-        for (var key in src) {
-          if (Object.prototype.hasOwnProperty.call(src, key)) child[key] = src[key];
-        }
-        child.__psMoTree = true;
-        child.__psMoNivel = 1;
-        child.__psMoProyecto = proy;
-        child.proyecto = moDisplayProyecto(child, expandedMap);
-        tree.push(child);
-      }
-    }
-    return tree;
-  }
-
-  function moGrandTotalRow(parents) {
-    var row = {
-      __psMoTree: true,
-      __psMoNivel: -1,
-      proyecto: "Total",
-      recurso: null,
-    };
-    for (var i = 0; i < PS_MO_METRIC_COLS.length; i++) {
-      var k = PS_MO_METRIC_COLS[i];
-      row[k] = moSumField(parents, k);
-    }
-    return row;
-  }
-
-  function moApplyTreeColumnDefs(api) {
-    if (!api || typeof api.getColumnDefs !== "function") return;
-    var defs = api.getColumnDefs();
-    if (!defs || !defs.length) return;
-    var changed = false;
-    var next = defs.map(function (d) {
-      var id = String((d && (d.colId || d.field)) || "");
-      if (id === "proyecto" || id.indexOf("proyecto") === 0) {
-        changed = true;
-        return Object.assign({}, d, {
-          headerName: "Proyectos",
-          // Sin cellRenderer React/DOM: el texto ya lleva −/+ e indentación.
-        });
-      }
-      if (id === "recurso") {
-        changed = true;
-        return Object.assign({}, d, { hide: true, width: 0, suppressColumnsToolPanel: true });
-      }
-      return d;
-    });
-    if (!changed) return;
-    try {
-      if (typeof api.setGridOption === "function") {
-        api.setGridOption("columnDefs", next);
-      }
-      if (typeof api.setGridOption === "function") {
-        api.setGridOption("getRowClass", function (p) {
-          var n = p && p.data && p.data.__psMoNivel;
-          if (n === 0) return "ps-mo-row-parent";
-          if (n === 1) return "ps-mo-row-child";
-          if (n === -1) return "ps-mo-row-total";
-          return "";
-        });
-      }
-    } catch (e) { /* ignore */ }
-  }
-
-  function ensureManoObraTree(api, chart) {
-    if (!api || !chart) return;
-    var leaves = moCollectLeaves(api);
-    if (!leaves.length) {
-      // Ya treeificado: refrescar renderer/layout si hace falta
-      if (api.__psMoTreeFp) {
-        moApplyTreeColumnDefs(api);
-        applyManoDeObraColumnLayout(api, chart);
-      }
-      return;
-    }
-    var fp = moLeafFingerprint(leaves);
-    if (api.__psMoTreeFp === fp && api.__psMoTreeBuilt) return;
-
-    if (!api.__psMoExpanded) api.__psMoExpanded = {};
-
-    var tree = moBuildTreeRows(leaves, api.__psMoExpanded);
-    var parents = tree.filter(function (r) {
-      return r.__psMoNivel === 0;
-    });
-    var totalRow = moGrandTotalRow(parents);
-
-    api.__psMoTreeBuilding = true;
-    try {
-      moApplyTreeColumnDefs(api);
-      if (typeof api.setGridOption === "function") {
-        api.setGridOption("rowData", tree);
-        api.setGridOption("pinnedBottomRowData", [totalRow]);
-        api.setGridOption("getRowId", function (p) {
-          var d = p && p.data;
-          if (!d) return undefined;
-          if (d.__psMoNivel === -1) return "ps-mo-total";
-          if (d.__psMoNivel === 0) return "p|" + d.__psMoProyecto;
-          return (
-            "c|" +
-            d.__psMoProyecto +
-            "|" +
-            (d.recurso_code || d.recurso || "")
-          );
-        });
-      }
-      api.__psMoTreeFp = fp;
-      api.__psMoTreeBuilt = true;
-    } catch (err) {
-      api.__psMoTreeBuilt = false;
-    }
-    api.__psMoTreeBuilding = false;
-
-    applyManoDeObraColumnLayout(api, chart);
-    blankManoDeObraNA(chart);
-  }
-
-  function initManoObraTreeToggle(api, chart) {
-    if (!api || api.__psMoToggleInit) return;
-    api.__psMoToggleInit = true;
-    if (!api.__psMoExpanded) api.__psMoExpanded = {};
-
-    try {
-      api.addEventListener("cellClicked", function (e) {
-        if (!e || !e.data || e.data.__psMoNivel !== 0) return;
-        var colId = e.column && e.column.getColId ? e.column.getColId() : "";
-        if (colId !== "proyecto") return;
-        var proy = e.data.__psMoProyecto || e.data.proyecto;
-        if (!proy) return;
-        var leaves = api.__psMoLeavesCache;
-        if (!leaves || !leaves.length) return;
-        var cur = api.__psMoExpanded[proy] !== false;
-        api.__psMoExpanded[proy] = !cur;
-
-        var tree = moBuildTreeRows(leaves, api.__psMoExpanded);
-        var parents = tree.filter(function (r) {
-          return r.__psMoNivel === 0;
-        });
-        api.__psMoTreeBuilding = true;
-        try {
-          if (typeof api.setGridOption === "function") {
-            api.setGridOption("rowData", tree);
-            api.setGridOption("pinnedBottomRowData", [moGrandTotalRow(parents)]);
-          }
-          api.__psMoTreeBuilt = true;
-        } catch (err) { /* ignore */ }
-        api.__psMoTreeBuilding = false;
-        applyManoDeObraColumnLayout(api, chart);
-        blankManoDeObraNA(chart);
-        if (typeof api.refreshCells === "function") {
-          try {
-            api.refreshCells({ columns: ["proyecto"], force: true });
-          } catch (e2) { /* ignore */ }
-        }
-      });
-    } catch (err) { /* ignore */ }
-  }
-
-  function fixManoDeObraProyectoColumn(api, chart) {
-    if (!api) return;
-    try {
-      var defs = typeof api.getColumnDefs === "function" ? api.getColumnDefs() : null;
-      if (defs && defs.length) {
-        for (var i = 0; i < defs.length; i++) {
-          var d = defs[i] || {};
-          var id = String(d.colId || d.field || "");
-          if (id === "proyecto" || id.indexOf("proyecto") === 0) {
-            d.headerName = "Proyectos";
-            if (d.cellRenderer) delete d.cellRenderer;
-          }
-          if (id === "recurso") {
-            d.hide = true;
-          }
-        }
-        if (typeof api.setGridOption === "function") {
-          api.setGridOption("columnDefs", defs);
-        }
-      }
-      if (typeof api.getColumn === "function") {
-        var col = api.getColumn("proyecto");
-        if (col && col.getColDef) {
-          col.getColDef().headerName = "Proyectos";
-          if (col.getColDef().cellRenderer) delete col.getColDef().cellRenderer;
-          if (typeof api.refreshHeader === "function") api.refreshHeader();
-        }
-      }
-    } catch (err) { /* grid aún montando */ }
-
-    if (chart) {
-      var headers = chart.querySelectorAll(".ag-header-cell");
-      Array.prototype.forEach.call(headers, function (h) {
-        var colId = h.getAttribute("col-id") || "";
-        if (colId !== "proyecto") return;
-        var label = h.querySelector(".ag-header-cell-text, .ag-header-cell-label");
-        if (label && !/^Proyectos$/i.test((label.textContent || "").trim())) {
-          label.textContent = "Proyectos";
-        }
-      });
-    }
-  }
-
-  function clearManoDeObraClientSortOnce(api) {
-    if (!api || api.__psManoObraSortCleared) return;
-    api.__psManoObraSortCleared = true;
-    try {
-      if (typeof api.applyColumnState === "function") {
-        api.applyColumnState({
-          state: [
-            { colId: "proyecto", sort: null },
-            { colId: "recurso", sort: null, hide: true },
-          ],
-          defaultState: { sort: null },
-        });
-      }
+      if (typeof api.redrawRows === "function") api.redrawRows();
     } catch (e) { /* ignore */ }
   }
 
   function saveManoDeObraWidthsLocal(map) {
-    try {
-      localStorage.setItem(PS_MANO_OBRA_COL_STORAGE_KEY, JSON.stringify(map));
-    } catch (e) { /* ignore */ }
+    try { localStorage.setItem(PS_MANO_OBRA_COL_STORAGE_KEY, JSON.stringify(map)); }
+    catch (e) { /* ignore */ }
   }
 
   function initManoDeObraColPersist(chart, api) {
@@ -2510,62 +2187,29 @@
     patchAgGridNullAsBlank(api);
     ensureMatrixNullBlank(chart);
     if (typeof tuneAgGridScrollPerf === "function") tuneAgGridScrollPerf(api);
-    initManoObraTreeToggle(api, chart);
+    applyManoDeObraRowClasses(api);
 
     function applyFit() {
-      if (api.__psMoTreeBuilding) return;
-      var leaves = moCollectLeaves(api);
-      if (leaves.length) {
-        api.__psMoLeavesCache = leaves;
-        api.__psMoTreeFp = null;
-        api.__psMoTreeBuilt = false;
-        ensureManoObraTree(api, chart);
-      } else if (api.__psMoLeavesCache && api.__psMoLeavesCache.length && !api.__psMoTreeBuilt) {
-        ensureManoObraTree(api, chart);
-      }
       applyManoDeObraColumnLayout(api, chart);
-      clearManoDeObraClientSortOnce(api);
-      fixManoDeObraProyectoColumn(api, chart);
+      applyManoDeObraRowClasses(api);
       blankManoDeObraNA(chart);
       labelAgGridTotalsRow(chart);
       markMatrixNaReady(chart);
     }
 
-    api.sizeColumnsToFit = function () {
-      applyFit();
-    };
-
+    api.sizeColumnsToFit = function () { applyFit(); };
     applyFit();
     setTimeout(applyFit, 300);
     setTimeout(applyFit, 900);
-    setTimeout(applyFit, 1800);
 
     try {
       api.addEventListener("columnResized", function (e) {
         if (!e || !e.finished || e.source !== "uiColumnResized") return;
         var map = getColWidthMap(api);
-        if (!map) return;
-        saveManoDeObraWidthsLocal(map);
-      });
-      api.addEventListener("modelUpdated", function () {
-        if (api.__psMoTreeBuilding) return;
-        patchAgGridNullAsBlank(api);
-        var leaves = moCollectLeaves(api);
-        if (leaves.length) {
-          api.__psMoLeavesCache = leaves;
-          api.__psMoTreeFp = null;
-          api.__psMoTreeBuilt = false;
-          ensureManoObraTree(api, chart);
-        }
-        fixManoDeObraProyectoColumn(api, chart);
-        blankManoDeObraNA(chart);
+        if (map) saveManoDeObraWidthsLocal(map);
       });
       api.addEventListener("firstDataRendered", function () {
         patchAgGridNullAsBlank(api);
-        applyFit();
-      });
-      api.addEventListener("rowDataUpdated", function () {
-        if (api.__psMoTreeBuilding) return;
         applyFit();
       });
     } catch (err) { /* grid aún montando */ }
@@ -3525,25 +3169,17 @@
       "  padding: 0 !important;",
       "  border: none !important;",
       "}",
-      /* Mano de Obra: jerarquía proyecto → recurso */
-      '[data-test-chart-name="Mano de Obra"] .ps-mo-row-parent .ag-cell[col-id="proyecto"] {',
+      /* Mano de Obra: jerarquía proyecto → recurso (nivel viene del SQL) */
+      '[data-test-chart-name="Mano de Obra"] .ps-mo-row-parent .ag-cell[col-id="nombre"] {',
       "  font-weight: 600 !important;",
-      "  cursor: pointer !important;",
       "}",
       '[data-test-chart-name="Mano de Obra"] .ps-mo-row-parent .ag-cell {',
       "  background: rgba(180, 220, 230, 0.28) !important;",
       "}",
-      '[data-test-chart-name="Mano de Obra"] .ps-mo-row-child .ag-cell[col-id="proyecto"] {',
+      '[data-test-chart-name="Mano de Obra"] .ps-mo-row-child .ag-cell[col-id="nombre"] {',
       "  font-weight: 400 !important;",
       "  color: #333 !important;",
-      "}",
-      '[data-test-chart-name="Mano de Obra"] .ag-header-cell[col-id="recurso"],',
-      '[data-test-chart-name="Mano de Obra"] .ag-cell[col-id="recurso"] {',
-      "  display: none !important;",
-      "  width: 0 !important;",
-      "  max-width: 0 !important;",
-      "  padding: 0 !important;",
-      "  border: none !important;",
+      "  padding-left: 28px !important;",
       "}",
     ].join("\n");
     if (!style) {

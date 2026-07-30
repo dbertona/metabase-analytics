@@ -489,87 +489,93 @@ COMMENT ON MATERIALIZED VIEW bi_mv_gastos IS
 
 -- -----------------------------------------------------------------------------
 -- bi_v_mano_obra  ←  wrapper sobre bi_mv_mano_obra
--- Pestaña Mano de Obra PBI: Proyecto × Recurso × meses (coste Resource).
--- Grano recurso: la UI AG Grid arma árbol expandible Proyecto → Recurso (JS).
+-- Pestaña Mano de Obra PBI: jerarquía Proyecto → Recurso.
+-- nivel=0 → fila padre (proyecto agregado, sort_key = 'proyecto|0|')
+-- nivel=1 → fila hijo  (recurso individual,  sort_key = 'proyecto|1|recurso')
+-- AG Grid ordena por sort_key; JS aplica solo CSS (sin tocar rowData → rápido).
 -- -----------------------------------------------------------------------------
 CREATE MATERIALIZED VIEW bi_mv_mano_obra AS
+-- ── Filas HIJO (recurso individual) ──────────────────────────────────────────
+WITH base AS (
+  SELECT
+      c.empresa,
+      c.year,
+      c.departamento AS department_code,
+      d.department_name,
+      c.tipo,
+      CASE c.tipo WHEN 'P' THEN 'Planificado' WHEN 'R' THEN 'Real'
+                  ELSE COALESCE(c.tipo::text, '') END AS tipo_label,
+      c.tipo_proyecto,
+      c.estado,
+      c.job,
+      (c.job::text || ' --- ') || left(COALESCE(c.descripcion,''), 36) AS proyecto,
+      COALESCE(NULLIF(TRIM(r.name),''), NULLIF(TRIM(c.nr),''), '(sin recurso)') AS recurso,
+      SUM(c.coste) FILTER (WHERE c.month =  1) AS m01,
+      SUM(c.coste) FILTER (WHERE c.month =  2) AS m02,
+      SUM(c.coste) FILTER (WHERE c.month =  3) AS m03,
+      SUM(c.coste) FILTER (WHERE c.month =  4) AS m04,
+      SUM(c.coste) FILTER (WHERE c.month =  5) AS m05,
+      SUM(c.coste) FILTER (WHERE c.month =  6) AS m06,
+      SUM(c.coste) FILTER (WHERE c.month =  7) AS m07,
+      SUM(c.coste) FILTER (WHERE c.month =  8) AS m08,
+      SUM(c.coste) FILTER (WHERE c.month =  9) AS m09,
+      SUM(c.coste) FILTER (WHERE c.month = 10) AS m10,
+      SUM(c.coste) FILTER (WHERE c.month = 11) AS m11,
+      SUM(c.coste) FILTER (WHERE c.month = 12) AS m12,
+      SUM(c.coste) AS total
+  FROM v_se_coste c
+  LEFT JOIN mb_v_dim_departamento d
+      ON d.company_name = c.empresa AND d.department_code = c.departamento
+  LEFT JOIN bc_resource r
+      ON r.code = c.nr AND r.company_name = c.empresa
+  WHERE c.tipo IN ('P','R')
+    AND c.tipo_proyecto = 'Operational'
+    AND COALESCE(c.estado,'') IN ('Completed','Open','Planning')
+    AND COALESCE(c.type_line,'') = 'Resource'
+    AND (COALESCE(TRIM(c.descripcion_ca),'') = '' OR c.descripcion_ca LIKE 'Mano de Obra%')
+  GROUP BY c.empresa, c.year, c.departamento, d.department_name,
+           c.tipo, c.tipo_proyecto, c.estado, c.job, c.descripcion, c.nr, r.name
+  HAVING ABS(SUM(c.coste)) > 0.0001
+)
+-- Filas hijo (nivel=1): nombre = recurso indentado por CSS
 SELECT
-    c.empresa,
-    c.year,
-    c.departamento AS department_code,
-    d.department_name,
-    c.tipo,
-    CASE c.tipo
-        WHEN 'P' THEN 'Planificado'
-        WHEN 'R' THEN 'Real'
-        ELSE COALESCE(c.tipo::text, '')
-    END AS tipo_label,
-    c.tipo_proyecto,
-    c.estado,
-    c.job,
-    (c.job::text || ' --- '::text) || "left"(COALESCE(c.descripcion, ''::character varying)::text, 36) AS proyecto,
-    COALESCE(NULLIF(TRIM(c.nr), ''), '') AS recurso_code,
-    COALESCE(
-        NULLIF(TRIM(r.name), ''),
-        NULLIF(TRIM(c.nr), ''),
-        '(sin recurso)'
-    ) AS recurso,
-    SUM(c.coste) FILTER (WHERE c.month = 1) AS m01,
-    SUM(c.coste) FILTER (WHERE c.month = 2) AS m02,
-    SUM(c.coste) FILTER (WHERE c.month = 3) AS m03,
-    SUM(c.coste) FILTER (WHERE c.month = 4) AS m04,
-    SUM(c.coste) FILTER (WHERE c.month = 5) AS m05,
-    SUM(c.coste) FILTER (WHERE c.month = 6) AS m06,
-    SUM(c.coste) FILTER (WHERE c.month = 7) AS m07,
-    SUM(c.coste) FILTER (WHERE c.month = 8) AS m08,
-    SUM(c.coste) FILTER (WHERE c.month = 9) AS m09,
-    SUM(c.coste) FILTER (WHERE c.month = 10) AS m10,
-    SUM(c.coste) FILTER (WHERE c.month = 11) AS m11,
-    SUM(c.coste) FILTER (WHERE c.month = 12) AS m12,
-    SUM(c.coste) AS total
-FROM v_se_coste c
-LEFT JOIN mb_v_dim_departamento d
-    ON d.company_name = c.empresa
-   AND d.department_code = c.departamento
-LEFT JOIN bc_resource r
-    ON r.code = c.nr
-   AND r.company_name = c.empresa
-WHERE c.tipo IN ('P', 'R')
-  AND c.tipo_proyecto = 'Operational'
-  AND COALESCE(c.estado, '') IN ('Completed', 'Open', 'Planning')
-  -- PBI Coste de Mano de Obra: Resource + CA Mano de Obra* (o vacío).
-  -- Excluye p.ej. «Trabajos relacionados» (+26.751 € PSI 2026 P vs PBI).
-  AND COALESCE(c.type_line, '') = 'Resource'
-  AND (
-    COALESCE(TRIM(c.descripcion_ca), '') = ''
-    OR c.descripcion_ca LIKE 'Mano de Obra%'
-  )
-GROUP BY
-    c.empresa,
-    c.year,
-    c.departamento,
-    d.department_name,
-    c.tipo,
-    c.tipo_proyecto,
-    c.estado,
-    c.job,
-    c.descripcion,
-    c.nr,
-    r.name
-HAVING ABS(SUM(c.coste)) > 0.0001;
+    empresa, year, department_code, department_name,
+    tipo, tipo_label, tipo_proyecto, estado,
+    1                        AS nivel,
+    proyecto                 AS proyecto,
+    recurso                  AS nombre,
+    proyecto || '|1|' || recurso AS sort_key,
+    m01, m02, m03, m04, m05, m06, m07, m08, m09, m10, m11, m12, total
+FROM base
+
+UNION ALL
+
+-- Filas padre (nivel=0): nombre = proyecto; métricas = SUM de hijos
+SELECT
+    empresa, year, department_code, department_name,
+    tipo, tipo_label, tipo_proyecto, estado,
+    0                        AS nivel,
+    proyecto                 AS proyecto,
+    proyecto                 AS nombre,
+    proyecto || '|0|'        AS sort_key,
+    SUM(m01), SUM(m02), SUM(m03), SUM(m04), SUM(m05), SUM(m06),
+    SUM(m07), SUM(m08), SUM(m09), SUM(m10), SUM(m11), SUM(m12),
+    SUM(total)
+FROM base
+GROUP BY empresa, year, department_code, department_name,
+         tipo, tipo_label, tipo_proyecto, estado, proyecto;
 
 CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx0 ON bi_mv_mano_obra (empresa, year);
 CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx1 ON bi_mv_mano_obra (department_code);
 CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx2 ON bi_mv_mano_obra (tipo_label);
-CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx3 ON bi_mv_mano_obra (proyecto);
-CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx4 ON bi_mv_mano_obra (recurso);
+CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx3 ON bi_mv_mano_obra (sort_key);
 
 CREATE VIEW bi_v_mano_obra AS SELECT * FROM bi_mv_mano_obra;
 
 COMMENT ON VIEW bi_v_mano_obra IS
-  'Mano de Obra PBI: Operational + Completed/Open/Planning; Resource; CA Mano de Obra* o vacío; grano proyecto×recurso; pivot coste×mes; total>0. (MV: bi_mv_mano_obra; árbol UI en tail_js).';
+  'Mano de Obra: nivel 0=proyecto (padre), 1=recurso (hijo). Ordenar por sort_key. CSS en tail_js aplica sangrado; sin manipulación de rowData → sin bucles.';
 COMMENT ON MATERIALIZED VIEW bi_mv_mano_obra IS
-  'Snapshot de bi_v_mano_obra (proyecto×recurso); refrescar tras sync BC→Analytics.';
+  'Snapshot bi_v_mano_obra (nivel 0+1); refrescar tras sync BC→Analytics.';
 
 -- KPI agregados por empresa/año (referencia / legacy; tarjetas usan bi_v_planificacion_kpi)
 CREATE OR REPLACE VIEW bi_v_kpi_anual_empresa AS
