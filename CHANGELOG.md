@@ -2,16 +2,16 @@
 
 ## [Unreleased]
 
-## [2026-07-30c] — Health Check 005 Analytics vs BC
+## [2026-07-30c] — Health Check 021 Analytics vs BC
 
 ### Added
-- Workflow n8n **005** (`src/workflows/005_health_check_analytics_bc.json`):
+- Workflow n8n **021** (`src/workflows/021_health_check_analytics_bc.json`):
   comparación diaria BC OData ↔ Analytics (R, plan, meses cerrados, budget=0, freshness).
 - Tabla `analytics_health_log` (`sql/tables/analytics_health_log.sql`).
 - Email alerta vía Outlook noreply → `dbertona@powersolution.es` si hay diff.
 - Schedule L–V 07:00 + webhook `POST /webhook/analytics-health-check`.
-- Deploy: `./scripts/deploy-n8n-workflow-005.sh`
-- Doc: `docs/HEALTH_CHECK_005.md`
+- Deploy: `./scripts/deploy-n8n-workflow-021.sh`
+- Doc: `docs/HEALTH_CHECK_021.md`
 
 ## [2026-07-30b] — Fix paginación Transform MesesCerrados (workflow 004)
 

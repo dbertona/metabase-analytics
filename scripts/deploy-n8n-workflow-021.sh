@@ -1,13 +1,13 @@
 #!/bin/bash
-# Crea o actualiza el workflow 005 (Health Check Analytics vs BC) en n8n prod (VM 101).
+# Crea o actualiza el workflow 021 (Health Check Analytics vs BC) en n8n prod (VM 101).
 # Usa PostgreSQL de n8n (mismo método que 004).
 #
-# Uso: ./scripts/deploy-n8n-workflow-005.sh
+# Uso: ./scripts/deploy-n8n-workflow-021.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-WF_FILE="$ROOT/src/workflows/005_health_check_analytics_bc.json"
-WF_ID="e005a1b2c3d4e5f6"
+WF_FILE="$ROOT/src/workflows/021_health_check_analytics_bc.json"
+WF_ID="a021healthcheck0001"
 HOST="${N8N_HOST:-192.168.36.101}"
 USER="${N8N_SSH_USER:-ps_admin}"
 PASS="${N8N_SSH_PASS:-PsAdmin2025}"
@@ -24,7 +24,7 @@ echo "✅ JSON válido"
 
 sshpass -p "$PASS" scp -o StrictHostKeyChecking=no \
   "$WF_FILE" \
-  "$USER@$HOST:/tmp/005_health_check_analytics_bc.json"
+  "$USER@$HOST:/tmp/021_health_check_analytics_bc.json"
 
 sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no "$USER@$HOST" bash <<REMOTE
 set -euo pipefail
@@ -36,7 +36,7 @@ from datetime import datetime, timezone
 WF_ID = "$WF_ID"
 PROJECT_ID = "$PROJECT_ID"
 PG_PASSWORD = os.environ["N8N_DB_PASSWORD"]
-path = "/tmp/005_health_check_analytics_bc.json"
+path = "/tmp/021_health_check_analytics_bc.json"
 
 def psql(sql: str, input_sql: str | None = None) -> str:
     cmd = [
@@ -62,7 +62,7 @@ wf = data[0] if isinstance(data, list) else data
 nodes = wf.get("nodes", [])
 connections = wf.get("connections", {})
 settings = wf.get("settings") or {}
-name = wf.get("name") or "005 - Health Check Analytics vs BC"
+name = wf.get("name") or "021 - Health Check Analytics vs BC"
 now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 hist_now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
 new_version = str(uuid.uuid4())
@@ -76,7 +76,7 @@ INSERT INTO workflow_history (
   "versionId", "workflowId", authors, "createdAt", "updatedAt",
   nodes, connections, name, autosaved, description, "nodeGroups"
 ) VALUES (
-  '{new_version}', '{WF_ID}', 'deploy-n8n-workflow-005.sh',
+  '{new_version}', '{WF_ID}', 'deploy-n8n-workflow-021.sh',
   '{hist_now}', '{hist_now}',
   '{sql_json(nodes)}'::json, '{sql_json(connections)}'::json,
   'Version {new_version[:8]}', false, NULL, '[]'::json
@@ -123,7 +123,7 @@ INSERT INTO workflow_history (
   "versionId", "workflowId", authors, "createdAt", "updatedAt",
   nodes, connections, name, autosaved, description, "nodeGroups"
 ) VALUES (
-  '{new_version}', '{WF_ID}', 'deploy-n8n-workflow-005.sh',
+  '{new_version}', '{WF_ID}', 'deploy-n8n-workflow-021.sh',
   '{hist_now}', '{hist_now}',
   '{sql_json(nodes)}'::json, '{sql_json(connections)}'::json,
   'Version {new_version[:8]}', false, NULL, '[]'::json
@@ -146,7 +146,7 @@ PY
 REMOTE
 
 echo ""
-echo "✅ Workflow 005 desplegado en n8n prod"
+echo "✅ Workflow 021 desplegado en n8n prod"
 echo "   UI: https://apps.powersolution.es/n8n/workflow/${WF_ID}"
 echo "   Manual: POST https://apps.powersolution.es/n8n/webhook/analytics-health-check"
 echo "   Schedule: L-V 07:00 Europe/Madrid"

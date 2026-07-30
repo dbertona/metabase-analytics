@@ -1,4 +1,4 @@
-# Workflow 005 — Health Check Analytics vs BC
+# Workflow 021 — Health Check Analytics vs BC
 
 Reconciliación diaria entre **Business Central (OData)** y **PostgreSQL Analytics**.
 Si hay diferencias, envía email desde `noreply@powersolution.es` a `dbertona@powersolution.es`.
@@ -20,16 +20,16 @@ Empresas: **PSI** + **PS Lab**. Año: calendario UTC actual.
 
 | Pieza | Ruta |
 |-------|------|
-| Workflow canónico | `src/workflows/005_health_check_analytics_bc.json` |
+| Workflow canónico | `src/workflows/021_health_check_analytics_bc.json` |
 | Tabla log | `sql/tables/analytics_health_log.sql` → `public.analytics_health_log` |
-| Deploy | `./scripts/deploy-n8n-workflow-005.sh` |
-| ID n8n prod | `e005a1b2c3d4e5f6` |
+| Deploy | `./scripts/deploy-n8n-workflow-021.sh` |
+| ID n8n prod | `a021healthcheck0001` |
 
 ## Operación
 
 ```bash
 # Desplegar / actualizar en n8n VM 101
-./scripts/deploy-n8n-workflow-005.sh
+./scripts/deploy-n8n-workflow-021.sh
 
 # Ejecutar a mano (webhook)
 curl -sS -X POST 'https://apps.powersolution.es/n8n/webhook/analytics-health-check'
