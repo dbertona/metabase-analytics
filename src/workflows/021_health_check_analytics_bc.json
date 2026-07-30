@@ -311,7 +311,7 @@
           160
         ],
         "parameters": {
-          "jsCode": "return $input.all();"
+          "jsCode": "return [{ json: { phase: 'done' } }];"
         },
         "typeVersion": 2
       },
@@ -324,7 +324,7 @@
           80
         ],
         "parameters": {
-          "jsCode": "const items = $input.all().map(i => i.json).filter(Boolean);\nconst diffs = items.filter(i => i.hasDiff);\nif (!diffs.length) return [];\n\nconst esc = (s) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\nconst fmt = (n) => {\n  if (n === null || n === undefined) return '';\n  const x = Number(n);\n  return Number.isFinite(x) ? x.toLocaleString('es-ES', { maximumFractionDigits: 2 }) : String(n);\n};\n\nlet rows = '';\nfor (const d of diffs) {\n  for (const c of (d.checks || []).filter(x => x.status !== 'ok')) {\n    rows += `<tr>\n      <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.company_name)}</td>\n      <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.check_name)}</td>\n      <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.bc_value))}</td>\n      <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.analytics_value))}</td>\n      <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.delta))}</td>\n      <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.status)}</td>\n    </tr>`;\n  }\n}\n\nconst when = new Date().toISOString().slice(0,10);\nconst html = `<!DOCTYPE html><html><body style=\"font-family:Segoe UI,sans-serif;color:#333;\">\n<p style=\"margin:0 0 16px;font-size:13px;color:#c0392b;font-weight:600;\">Alerta Health Check Analytics vs BC (workflow 021)</p>\n<p>Se detectaron diferencias el <strong>${esc(when)}</strong>.</p>\n<table style=\"border-collapse:collapse;width:100%;max-width:900px;\">\n<thead><tr style=\"background:#f0f0f0;\">\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Empresa</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Check</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">BC</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">Analytics</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">Delta</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Status</th>\n</tr></thead>\n<tbody>${rows}</tbody></table>\n<p style=\"font-size:12px;color:#888;margin-top:16px;\">\nAcciones tipicas: disparar webhook 004 (company=psi|pslab), revisar bc_meses_cerrados / budget_date_year=0, ver analytics_health_log.\n</p>\n</body></html>`;\n\nreturn [{ json: {\n  to: diffs[0].emailTo || 'dbertona@powersolution.es',\n  subject: `[Analytics 021] Discrepancia BC vs Analytics — ${when}`,\n  html,\n}}];\n"
+          "jsCode": "const rows = $input.all().map(i => i.json).filter(r => r && r.check_name);\nif (!rows.length) return [];\n\nconst esc = (s) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\nconst fmt = (n) => {\n  if (n === null || n === undefined || n === '') return '';\n  const x = Number(n);\n  return Number.isFinite(x) ? x.toLocaleString('es-ES', { maximumFractionDigits: 2 }) : String(n);\n};\n\nlet body = '';\nfor (const c of rows) {\n  body += `<tr>\n    <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.company_name)}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.check_name)}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.bc_value))}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.analytics_value))}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.delta))}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.status)}</td>\n  </tr>`;\n}\n\nconst when = new Date().toISOString().slice(0,10);\nconst html = `<!DOCTYPE html><html><body style=\"font-family:Segoe UI,sans-serif;color:#333;\">\n<p style=\"margin:0 0 16px;font-size:13px;color:#c0392b;font-weight:600;\">Alerta Health Check Analytics vs BC (workflow 021)</p>\n<p>Se detectaron diferencias el <strong>${esc(when)}</strong> (${rows.length} checks).</p>\n<table style=\"border-collapse:collapse;width:100%;max-width:900px;\">\n<thead><tr style=\"background:#f0f0f0;\">\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Empresa</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Check</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">BC</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">Analytics</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">Delta</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Status</th>\n</tr></thead>\n<tbody>${body}</tbody></table>\n<p style=\"font-size:12px;color:#888;margin-top:16px;\">\nDetalle en <code>analytics_health_log</code>. Acciones tipicas: webhook 004 (psi|pslab), revisar meses cerrados / budget_date_year.\n</p>\n</body></html>`;\n\nreturn [{ json: {\n  to: 'dbertona@powersolution.es',\n  subject: `[Analytics 021] Discrepancia BC vs Analytics — ${when}`,\n  html,\n}}];\n"
         },
         "typeVersion": 2
       },
@@ -354,17 +354,25 @@
         "continueOnFail": true
       },
       {
-        "id": "any-005",
-        "name": "Algun fail/warn?",
-        "type": "n8n-nodes-base.code",
+        "id": "pg-fails-021",
+        "name": "Query recent fails",
+        "type": "n8n-nodes-base.postgres",
         "position": [
           960,
           160
         ],
         "parameters": {
-          "jsCode": "const items = $input.all().map(i => i.json);\nconst diffs = items.filter(i => i && i.hasDiff);\nif (!diffs.length) return [];\n// Pass all items to Prepare Alert Email\nreturn items.map(j => ({ json: j }));\n"
+          "operation": "executeQuery",
+          "query": "SELECT company_name, check_name, bc_value, analytics_value, delta, status\nFROM analytics_health_log\nWHERE checked_at >= NOW() - INTERVAL '15 minutes'\n  AND status <> 'ok'\nORDER BY company_name, check_name",
+          "options": {}
         },
-        "typeVersion": 2
+        "typeVersion": 2.5,
+        "credentials": {
+          "postgres": {
+            "id": "TTHI6C7o3V8eVzzr",
+            "name": "Postgres PS_Analytics"
+          }
+        }
       }
     ],
     "connections": {
@@ -555,18 +563,7 @@
         "main": [
           [
             {
-              "node": "Algun fail/warn?",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Algun fail/warn?": {
-        "main": [
-          [
-            {
-              "node": "Prepare Alert Email",
+              "node": "Query recent fails",
               "type": "main",
               "index": 0
             }
@@ -578,6 +575,17 @@
           [
             {
               "node": "Enviar Alerta Health",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Query recent fails": {
+        "main": [
+          [
+            {
+              "node": "Prepare Alert Email",
               "type": "main",
               "index": 0
             }
