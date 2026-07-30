@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [2026-07-30d] — Pestaña Mano de Obra (matriz coste Resource)
+
+### Added
+- Vista `bi_v_mano_obra` / MV `bi_mv_mano_obra`: coste `Operational` +
+  `type_line = Resource` (mano de obra), `Completed`/`Open`/`Planning`,
+  total>0 (`scripts/sql/bi_dashboard_planificacion_views.sql`).
+- Pestaña **Mano de Obra** en el dashboard Resumen (después de Gastos):
+  chart AG Grid matriz mes×proyecto (`scripts/setup-superset-planificacion.py`).
+- JS propio en `config/tail_js_custom_extra.html` (anti-N/A, scroll,
+  persistencia) siguiendo el patrón de Gastos/Facturación.
+- REFRESH de `bi_mv_mano_obra` añadido al workflow n8n **004**
+  (`src/workflows/004_sync_bc_to_ps_analytics.json`) y a
+  `scripts/apply-bi-views.sh`.
+- Doc: `docs/TABLAS_AG_GRID.md` — fila `bi_v_mano_obra` en la tabla de
+  vistas matriz mes×dim.
+
 ## [2026-07-30c] — Health Check 021 Analytics vs BC
 
 ### Added
