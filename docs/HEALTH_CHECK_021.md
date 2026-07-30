@@ -21,6 +21,19 @@ Por eso el 021 **no** alerta por bruto de plan BC vs `bc_job_planning_line`.
 
 Empresas: **PSI** + **PS Lab**. Año: calendario UTC actual.
 
+## Email vs log: solo se alerta lo crítico
+
+Para evitar fatiga de alarma por diferencias menores (p. ej. desajustes de
+1-2 % en `meses_cerrados_count` por timing entre dos llamadas OData):
+
+- **Siempre se loguea** cada check (ok/warn/fail) en `analytics_health_log`.
+- **Solo se envía email si algún check quedó en `status = 'fail'`** en esa
+  ejecución. Los `warn` (diferencias menores) quedan solo en la tabla para
+  revisión periódica, sin interrumpir por email.
+- Único check con tolerancia cero real: `tipo_r_sum` (dinero) y
+  `budget0_past_with_invoice` (señal binaria de plan sin versionar en mes
+  cerrado — el bug de PS Lab de julio 2026).
+
 ## Artefactos
 
 | Pieza | Ruta |
