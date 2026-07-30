@@ -2122,9 +2122,14 @@
   }
 
 
-  // ─── Layout — chart Mano de Obra (nivel viene del SQL; CSS sangra hijos) ─────
-  // nivel=0 → proyecto padre (fondo azul claro) | nivel=1 → recurso hijo (sangría)
-  // Sin árbol en JS → sin bucle modelUpdated → sin lentitud.
+  // ─── Mano de Obra: árbol expand/collapse vía External Filter (AG Grid Community) ───
+  //
+  // ARQUITECTURA (sin setRowData → sin bucle modelUpdated):
+  //   SQL genera nivel=0 (proyecto padre) + nivel=1 (recurso hijo), ordenados por sort_key.
+  //   JS solo filtra qué filas son visibles usando doesExternalFilterPass.
+  //   Toggle  →  update __psMoExpanded  →  api.onFilterChanged()  →  re-eval por fila
+  //   NO modifica rowData en ningún momento → velocidad nativa de AG Grid.
+  //
   var PS_MANO_OBRA_COL_STORAGE_KEY = "ps-mano-obra-col-widths-v1";
 
   function isManoDeObraMatrixChart(chart) {
@@ -2146,37 +2151,111 @@
     var map = getDefaultManoDeObraWidths(chart);
     var state = Object.keys(map).map(function (id) {
       var row = { colId: id, width: map[id] };
-      if (id === "Total") row.pinned = "right";
-      else row.pinned = null;
+      row.pinned = id === "Total" ? "right" : null;
       return row;
     });
     try { api.applyColumnState({ state: state, applyOrder: false }); }
     catch (e) { /* ignore */ }
   }
 
-  function blankManoDeObraNA(chart) {
-    blankGastosNA(chart);
-  }
-
-  function applyManoDeObraRowClasses(api) {
-    // Aplica getRowClass basado en la columna `nivel` que llega del SQL.
-    if (!api || typeof api.setGridOption !== "function") return;
-    if (api.__psMoRowClassApplied) return;
-    api.__psMoRowClassApplied = true;
-    try {
-      api.setGridOption("getRowClass", function (p) {
-        var n = p && p.data && p.data.nivel;
-        if (n === 0 || n === "0") return "ps-mo-row-parent";
-        if (n === 1 || n === "1") return "ps-mo-row-child";
-        return "";
-      });
-      if (typeof api.redrawRows === "function") api.redrawRows();
-    } catch (e) { /* ignore */ }
-  }
+  function blankManoDeObraNA(chart) { blankGastosNA(chart); }
 
   function saveManoDeObraWidthsLocal(map) {
     try { localStorage.setItem(PS_MANO_OBRA_COL_STORAGE_KEY, JSON.stringify(map)); }
     catch (e) { /* ignore */ }
+  }
+
+  // ── External filter: ocultar hijos cuyo proyecto está colapsado ────────────
+  function moInstallExternalFilter(api) {
+    if (!api || api.__psMoFilterInstalled) return;
+    api.__psMoFilterInstalled = true;
+    if (!api.__psMoExpanded) api.__psMoExpanded = {};
+
+    try {
+      api.setGridOption("isExternalFilterPresent", function () { return true; });
+      api.setGridOption("doesExternalFilterPass", function (node) {
+        var d = node && node.data;
+        if (!d) return true;
+        var n = Number(d.nivel);
+        if (n !== 1) return true; // padres + cualquier otro siempre visibles
+        // Hijo visible solo si su proyecto está expandido (default: sí)
+        return api.__psMoExpanded[d.proyecto] !== false;
+      });
+    } catch (e) { /* ignore */ }
+  }
+
+  // ── valueFormatter para columna `nombre`: añade ▶/▼ en filas padre ────────
+  function moNombreFormatter(params) {
+    var d = params && params.data;
+    if (!d) return params ? params.value : "";
+    var n = Number(d.nivel);
+    if (n === 0) {
+      var api = params.api || params.context && params.context.api;
+      var exp = !api || (api.__psMoExpanded && api.__psMoExpanded[d.proyecto] !== false);
+      return (exp ? "▼  " : "▶  ") + (d.proyecto || params.value || "");
+    }
+    return params.value || "";
+  }
+
+  function moInstallNombreFormatter(api) {
+    if (!api || api.__psMoFormatterInstalled) return;
+    api.__psMoFormatterInstalled = true;
+    try {
+      var defs = typeof api.getColumnDefs === "function" ? api.getColumnDefs() : null;
+      if (!defs || !defs.length) return;
+      var changed = false;
+      var next = defs.map(function (d) {
+        var id = String((d && (d.colId || d.field)) || "");
+        if (id === "nombre") {
+          changed = true;
+          return Object.assign({}, d, {
+            headerName: "Proyecto / Recurso",
+            valueFormatter: moNombreFormatter,
+          });
+        }
+        return d;
+      });
+      if (changed && typeof api.setGridOption === "function") {
+        api.setGridOption("columnDefs", next);
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  // ── getRowClass basado en nivel (CSS aplica fondo padre / sangría hijo) ────
+  function moInstallRowClasses(api) {
+    if (!api || api.__psMoRowClassInstalled) return;
+    api.__psMoRowClassInstalled = true;
+    try {
+      api.setGridOption("getRowClass", function (p) {
+        var n = p && p.data && Number(p.data.nivel);
+        if (n === 0) return "ps-mo-row-parent";
+        if (n === 1) return "ps-mo-row-child";
+        return "";
+      });
+    } catch (e) { /* ignore */ }
+  }
+
+  // ── Click en fila padre → toggle expand/collapse ───────────────────────────
+  function moInstallToggleClick(api, chart) {
+    if (!api || api.__psMoClickInstalled) return;
+    api.__psMoClickInstalled = true;
+    try {
+      api.addEventListener("cellClicked", function (e) {
+        var d = e && e.data;
+        if (!d || Number(d.nivel) !== 0) return;
+        var proy = d.proyecto;
+        if (!proy) return;
+        // Toggle: default = expandido
+        var cur = api.__psMoExpanded[proy] !== false;
+        api.__psMoExpanded[proy] = !cur;
+        // Actualizar indicador ▶/▼ en la celda padre + re-evaluar filtro
+        try { api.onFilterChanged(); } catch (ex) { /* ignore */ }
+        try { api.refreshCells({ columns: ["nombre"], force: true }); } catch (ex) { /* ignore */ }
+        // Mantener layout de columnas
+        applyManoDeObraColumnLayout(api, chart);
+        blankManoDeObraNA(chart);
+      });
+    } catch (err) { /* grid aún montando */ }
   }
 
   function initManoDeObraColPersist(chart, api) {
@@ -2187,11 +2266,15 @@
     patchAgGridNullAsBlank(api);
     ensureMatrixNullBlank(chart);
     if (typeof tuneAgGridScrollPerf === "function") tuneAgGridScrollPerf(api);
-    applyManoDeObraRowClasses(api);
+
+    moInstallExternalFilter(api);
+    moInstallRowClasses(api);
+    moInstallToggleClick(api, chart);
+    moInstallNombreFormatter(api);
 
     function applyFit() {
       applyManoDeObraColumnLayout(api, chart);
-      applyManoDeObraRowClasses(api);
+      moInstallNombreFormatter(api);
       blankManoDeObraNA(chart);
       labelAgGridTotalsRow(chart);
       markMatrixNaReady(chart);
@@ -2210,6 +2293,10 @@
       });
       api.addEventListener("firstDataRendered", function () {
         patchAgGridNullAsBlank(api);
+        moInstallExternalFilter(api);
+        moInstallRowClasses(api);
+        moInstallToggleClick(api, chart);
+        moInstallNombreFormatter(api);
         applyFit();
       });
     } catch (err) { /* grid aún montando */ }
@@ -3170,16 +3257,23 @@
       "  border: none !important;",
       "}",
       /* Mano de Obra: jerarquía proyecto → recurso (nivel viene del SQL) */
+      '[data-test-chart-name="Mano de Obra"] .ps-mo-row-parent {',
+      "  cursor: pointer !important;",
+      "}",
       '[data-test-chart-name="Mano de Obra"] .ps-mo-row-parent .ag-cell[col-id="nombre"] {',
       "  font-weight: 600 !important;",
+      "  color: #1a4a6b !important;",
       "}",
       '[data-test-chart-name="Mano de Obra"] .ps-mo-row-parent .ag-cell {',
-      "  background: rgba(180, 220, 230, 0.28) !important;",
+      "  background: rgba(0, 120, 170, 0.07) !important;",
       "}",
       '[data-test-chart-name="Mano de Obra"] .ps-mo-row-child .ag-cell[col-id="nombre"] {',
       "  font-weight: 400 !important;",
-      "  color: #333 !important;",
-      "  padding-left: 28px !important;",
+      "  color: #444 !important;",
+      "  padding-left: 32px !important;",
+      "}",
+      '[data-test-chart-name="Mano de Obra"] .ps-mo-row-parent:hover .ag-cell {',
+      "  background: rgba(0, 120, 170, 0.13) !important;",
       "}",
     ].join("\n");
     if (!style) {
