@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [2026-07-30] — Pestaña Gastos (Encabezado × mes) + paridad PBI
+
+### Added
+- Pestaña **Gastos** en dashboard `planificacion-ps-analytics`: matriz AG Grid
+  Encabezado × meses 01–12 + Total (coste), dataset `bi_v_gastos` / `bi_mv_gastos`.
+- Chart **Unidad** (antes «Gastos» en pestaña Unidad): concepto analítico × mes.
+- REFRESH `bi_mv_gastos` en workflow **004**.
+
+### Fixed
+- Filtros PBI en SQL: Operational + Completed/Open/Planning + coste > 0 +
+  **excl. `type_line = Resource`** (evitaba inflar ~2,4 M€ vs PBI ~1,98 M€ PSI 2026).
+- Lazy-load JS: chart id 22 mapeado a pestaña Gastos (no Unidad).
+
+### Docs
+- `docs/TABLAS_AG_GRID.md`, `FILTROS_DASHBOARD_PLANIFICACION.md`,
+  `seguimiento-economico/README.md`.
+
 ## [2026-07-29m] — Docs: receta matriz mes×dim (Gastos/Facturación)
 
 - `docs/TABLAS_AG_GRID.md` **§12**: SQL MV, `_month_pivot_params`, CSS `:is`, JS
