@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [2026-07-31c] — Fix: historico_planificacion_mes Invalid string length
+
+### Fixed
+- `Prepare HistoricoPlanificacion BC Requests`: reducido `fields` de 3 a 1
+  (`["lastModifiedDateTime"]` en vez de los 3 campos `lastModifiedDateTime /
+  jobLastModifiedDateTime / monthClosingLastModifiedDateTime`). Los 3 campos
+  generaban 3 requests HTTP con el mismo dataset → `Transform` acumulaba 3× las filas
+  → la string V8 excedía el límite → `Invalid string length` en producción.
+  Mismo fix que Bug 1/Bug 5 aplicados previamente a `PlanificacionMes` y
+  `MovimientosProyectos`. Desplegado en n8n prod (d1f7647e114a486e, 2026-07-31 14:05).
+
 ## [2026-07-31b] — Mano de Obra: flags mes cerrado en la vista
 
 ### Added
