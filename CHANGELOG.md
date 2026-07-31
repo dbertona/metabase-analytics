@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+## [2026-07-31] — Mano de Obra: filtro CA + orden pestañas + tabla plana (árbol AG Grid descartado)
+
+### Fixed
+- `bi_v_mano_obra`: excluir "Trabajos relacionados" (solo CA vacío o `Mano de Obra%`) —
+  paridad con PBI (antes 1.310.025 € vs 1.283.273,995 € PBI).
+- Orden de pestañas del dashboard Resumen: Resumen → Facturación → Unidad → Gastos →
+  Mano de Obra → Gráficos.
+
+### Changed
+- Se descartó la jerarquía Proyecto→Recurso vía AG Grid Community tras varios intentos
+  (DOM renderer, SQL nivel/sort_key, external filter API, `setRowHeight`) por resultar
+  inestable en producción (cuelgues, sin expand/collapse funcional).
+- `bi_v_mano_obra` / `bi_mv_mano_obra` vuelve a filas planas (proyecto + recurso).
+- Chart Superset "Mano de Obra": tabla plana Proyecto/Recurso × meses (sin árbol).
+- `tail_js_custom_extra.html`: eliminada la lógica de árbol (`moToggle`,
+  `moApplyRowClasses`, CSS de sangrado); mantiene solo persistencia de columnas.
+
+### Next
+- La jerarquía Proyecto→Recurso se construirá en un módulo React dedicado en
+  `power-solution-apps` (TanStack Table, expand/collapse nativo) consumiendo
+  `bi_v_mano_obra` vía un endpoint propio del backend (decisión de arquitectura
+  2026-07-31: Superset se mantiene para el resto del dashboard).
+
 ## [2026-07-30d] — Pestaña Mano de Obra (matriz coste Resource)
 
 ### Added

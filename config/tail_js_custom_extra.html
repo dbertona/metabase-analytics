@@ -2122,7 +2122,15 @@
   }
 
 
-  // ─── Persistencia / layout — chart Mano de Obra (pestaña Mano de Obra) ─────
+  // ─── Mano de Obra: tabla interina plana (Proyecto + Recurso) ──────────────────
+  //
+  // HISTORIAL: se intentó un árbol expand/collapse con AG Grid Community vía
+  // hacks de DOM/setGridOption sobre nivel/sort_key — inestable (bucles, colgados).
+  // ARQUITECTURA (2026-07-31): jerarquía Proyecto→Recurso se abandona aquí;
+  // bi_v_mano_obra vuelve a ser plana (proyecto+recurso). Esta tabla queda como
+  // vista interina de solo columnas mientras se construye el módulo definitivo
+  // en React (power-solution-apps, TanStack Table) con expand/collapse nativo.
+
   var PS_MANO_OBRA_COL_STORAGE_KEY = "ps-mano-obra-col-widths-v1";
 
   function isManoDeObraMatrixChart(chart) {
@@ -2136,7 +2144,34 @@
   }
 
   function getDefaultManoDeObraWidths(chart) {
-    return getDefaultFacturacionWidths(chart);
+    var holder =
+      chart.closest('[data-test="dashboard-component-chart-holder"]') || chart;
+    var available = Math.max(
+      560,
+      Math.floor(holder.getBoundingClientRect().width || chart.clientWidth || 1200) - 24
+    );
+    var totalW = 118;
+    var recursoW = 180;
+    var proyectoMin = 220;
+    var monthMin = 64;
+    var centerAvail = Math.max(400, available - totalW - recursoW);
+    var monthW = Math.floor((centerAvail - proyectoMin) / 12);
+    if (monthW < monthMin) {
+      monthW = monthMin;
+      proyectoMin = Math.max(160, centerAvail - monthW * 12);
+    }
+    var proyecto = centerAvail - monthW * 12;
+    if (proyecto < 160) {
+      proyecto = 160;
+      monthW = Math.max(56, Math.floor((centerAvail - proyecto) / 12));
+    }
+    var map = { proyecto: proyecto, recurso: recursoW, Total: totalW };
+    var months = [
+      "01", "02", "03", "04", "05", "06",
+      "07", "08", "09", "10", "11", "12",
+    ];
+    for (var i = 0; i < months.length; i++) map[months[i]] = monthW;
+    return map;
   }
 
   function applyManoDeObraColumnLayout(api, chart) {
@@ -2144,78 +2179,32 @@
     var map = getDefaultManoDeObraWidths(chart);
     var state = Object.keys(map).map(function (id) {
       var row = { colId: id, width: map[id] };
-      if (id === "Total") row.pinned = "right";
-      else row.pinned = null;
+      row.pinned = id === "Total" ? "right" : null;
       return row;
     });
-    try {
-      api.applyColumnState({ state: state, applyOrder: false });
-    } catch (e) { /* ignore */ }
+    try { api.applyColumnState({ state: state, applyOrder: false }); }
+    catch (e) { /* ignore */ }
   }
 
-  function blankManoDeObraNA(chart) {
-    blankGastosNA(chart);
-  }
-
-  function fixManoDeObraProyectoColumn(api, chart) {
-    if (!api) return;
-    try {
-      var defs = typeof api.getColumnDefs === "function" ? api.getColumnDefs() : null;
-      if (defs && defs.length) {
-        var changed = false;
-        for (var i = 0; i < defs.length; i++) {
-          var d = defs[i] || {};
-          var id = String(d.colId || d.field || "");
-          if (id === "proyecto" || id.indexOf("proyecto") === 0) {
-            if (d.headerName !== "Proyectos") {
-              d.headerName = "Proyectos";
-              changed = true;
-            }
-          }
-        }
-        if (changed && typeof api.setColumnDefs === "function") {
-          api.setColumnDefs(defs);
-        }
-      }
-      if (typeof api.getColumn === "function") {
-        var col = api.getColumn("proyecto");
-        if (col && col.getColDef) {
-          col.getColDef().headerName = "Proyectos";
-          if (typeof api.refreshHeader === "function") api.refreshHeader();
-        }
-      }
-    } catch (err) { /* grid aún montando */ }
-
-    if (chart) {
-      var headers = chart.querySelectorAll(".ag-header-cell");
-      Array.prototype.forEach.call(headers, function (h) {
-        var colId = h.getAttribute("col-id") || "";
-        if (colId !== "proyecto") return;
-        var label = h.querySelector(".ag-header-cell-text, .ag-header-cell-label");
-        if (label && !/^Proyectos$/i.test((label.textContent || "").trim())) {
-          label.textContent = "Proyectos";
-        }
-      });
-    }
-  }
-
-  function clearManoDeObraClientSortOnce(api) {
-    if (!api || api.__psManoObraSortCleared) return;
-    api.__psManoObraSortCleared = true;
+  /** Una sola vez: eliminar sort cliente que AG Grid aplica por defecto sobre "proyecto". */
+  function clearManoObraClientSortOnce(api) {
+    if (!api || api.__psMoSortCleared) return;
+    api.__psMoSortCleared = true;
     try {
       if (typeof api.applyColumnState === "function") {
         api.applyColumnState({
-          state: [{ colId: "proyecto", sort: null }],
+          state: [{ colId: "proyecto", sort: null }, { colId: "recurso", sort: null }],
           defaultState: { sort: null },
         });
       }
     } catch (e) { /* ignore */ }
   }
 
+  function blankManoDeObraNA(chart) { blankGastosNA(chart); }
+
   function saveManoDeObraWidthsLocal(map) {
-    try {
-      localStorage.setItem(PS_MANO_OBRA_COL_STORAGE_KEY, JSON.stringify(map));
-    } catch (e) { /* ignore */ }
+    try { localStorage.setItem(PS_MANO_OBRA_COL_STORAGE_KEY, JSON.stringify(map)); }
+    catch (e) { /* ignore */ }
   }
 
   function initManoDeObraColPersist(chart, api) {
@@ -2229,37 +2218,33 @@
 
     function applyFit() {
       applyManoDeObraColumnLayout(api, chart);
-      clearManoDeObraClientSortOnce(api);
-      fixManoDeObraProyectoColumn(api, chart);
+      clearManoObraClientSortOnce(api);
       blankManoDeObraNA(chart);
-      labelAgGridTotalsRow(chart);
       markMatrixNaReady(chart);
     }
 
-    api.sizeColumnsToFit = function () {
-      applyFit();
-    };
-
+    api.sizeColumnsToFit = function () { applyFit(); };
     applyFit();
     setTimeout(applyFit, 300);
     setTimeout(applyFit, 900);
-    setTimeout(applyFit, 1800);
 
     try {
       api.addEventListener("columnResized", function (e) {
         if (!e || !e.finished || e.source !== "uiColumnResized") return;
         var map = getColWidthMap(api);
-        if (!map) return;
-        saveManoDeObraWidthsLocal(map);
+        if (map) saveManoDeObraWidthsLocal(map);
       });
-      api.addEventListener("modelUpdated", function () {
-        patchAgGridNullAsBlank(api);
-        fixManoDeObraProyectoColumn(api, chart);
-        blankManoDeObraNA(chart);
-      });
+
       api.addEventListener("firstDataRendered", function () {
         patchAgGridNullAsBlank(api);
         applyFit();
+      });
+
+      api.addEventListener("rowDataUpdated", function () {
+        setTimeout(function () {
+          clearManoObraClientSortOnce(api);
+          blankManoDeObraNA(chart);
+        }, 100);
       });
     } catch (err) { /* grid aún montando */ }
   }
@@ -2277,9 +2262,9 @@
     if (isFacturacionTotalClipped(chart)) {
       applyManoDeObraColumnLayout(api, chart);
       blankManoDeObraNA(chart);
-      labelAgGridTotalsRow(chart);
     }
   }
+
 
   function placeManoDeObraSearchInHeader() {
     var charts = document.querySelectorAll('[data-test-chart-name="Mano de Obra"]');

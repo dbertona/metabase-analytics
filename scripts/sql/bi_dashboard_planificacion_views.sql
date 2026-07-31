@@ -489,7 +489,9 @@ COMMENT ON MATERIALIZED VIEW bi_mv_gastos IS
 
 -- -----------------------------------------------------------------------------
 -- bi_v_mano_obra  ←  wrapper sobre bi_mv_mano_obra
--- Pestaña Mano de Obra PBI: Encabezado × meses (coste Resource); complementario de Gastos.
+-- Mano de Obra PBI: filas planas proyecto+recurso (una fila por combinación).
+-- Sin nivel/sort_key: la jerarquía Proyecto→Recurso se construye en el consumidor
+-- (agrupación cliente/API), no en SQL. Ver docs/GUIA_COMPLETA_ANALYTICS.md.
 -- -----------------------------------------------------------------------------
 CREATE MATERIALIZED VIEW bi_mv_mano_obra AS
 SELECT
@@ -498,47 +500,38 @@ SELECT
     c.departamento AS department_code,
     d.department_name,
     c.tipo,
-    CASE c.tipo
-        WHEN 'P' THEN 'Planificado'
-        WHEN 'R' THEN 'Real'
-        ELSE COALESCE(c.tipo::text, '')
-    END AS tipo_label,
+    CASE c.tipo WHEN 'P' THEN 'Planificado' WHEN 'R' THEN 'Real'
+                ELSE COALESCE(c.tipo::text, '') END AS tipo_label,
     c.tipo_proyecto,
     c.estado,
     c.job,
-    (c.job::text || ' --- '::text) || "left"(COALESCE(c.descripcion, ''::character varying)::text, 36) AS proyecto,
-    SUM(c.coste) FILTER (WHERE c.month = 1) AS m01,
-    SUM(c.coste) FILTER (WHERE c.month = 2) AS m02,
-    SUM(c.coste) FILTER (WHERE c.month = 3) AS m03,
-    SUM(c.coste) FILTER (WHERE c.month = 4) AS m04,
-    SUM(c.coste) FILTER (WHERE c.month = 5) AS m05,
-    SUM(c.coste) FILTER (WHERE c.month = 6) AS m06,
-    SUM(c.coste) FILTER (WHERE c.month = 7) AS m07,
-    SUM(c.coste) FILTER (WHERE c.month = 8) AS m08,
-    SUM(c.coste) FILTER (WHERE c.month = 9) AS m09,
+    (c.job::text || ' --- ') || left(COALESCE(c.descripcion,''), 36) AS proyecto,
+    COALESCE(NULLIF(TRIM(r.name),''), NULLIF(TRIM(c.nr),''), '(sin recurso)') AS recurso,
+    SUM(c.coste) FILTER (WHERE c.month =  1) AS m01,
+    SUM(c.coste) FILTER (WHERE c.month =  2) AS m02,
+    SUM(c.coste) FILTER (WHERE c.month =  3) AS m03,
+    SUM(c.coste) FILTER (WHERE c.month =  4) AS m04,
+    SUM(c.coste) FILTER (WHERE c.month =  5) AS m05,
+    SUM(c.coste) FILTER (WHERE c.month =  6) AS m06,
+    SUM(c.coste) FILTER (WHERE c.month =  7) AS m07,
+    SUM(c.coste) FILTER (WHERE c.month =  8) AS m08,
+    SUM(c.coste) FILTER (WHERE c.month =  9) AS m09,
     SUM(c.coste) FILTER (WHERE c.month = 10) AS m10,
     SUM(c.coste) FILTER (WHERE c.month = 11) AS m11,
     SUM(c.coste) FILTER (WHERE c.month = 12) AS m12,
     SUM(c.coste) AS total
 FROM v_se_coste c
 LEFT JOIN mb_v_dim_departamento d
-    ON d.company_name = c.empresa
-   AND d.department_code = c.departamento
-WHERE c.tipo IN ('P', 'R')
+    ON d.company_name = c.empresa AND d.department_code = c.departamento
+LEFT JOIN bc_resource r
+    ON r.code = c.nr AND r.company_name = c.empresa
+WHERE c.tipo IN ('P','R')
   AND c.tipo_proyecto = 'Operational'
-  AND COALESCE(c.estado, '') IN ('Completed', 'Open', 'Planning')
-  -- PBI Coste de Mano de Obra: solo type_line Resource
-  AND COALESCE(c.type_line, '') = 'Resource'
-GROUP BY
-    c.empresa,
-    c.year,
-    c.departamento,
-    d.department_name,
-    c.tipo,
-    c.tipo_proyecto,
-    c.estado,
-    c.job,
-    c.descripcion
+  AND COALESCE(c.estado,'') IN ('Completed','Open','Planning')
+  AND COALESCE(c.type_line,'') = 'Resource'
+  AND (COALESCE(TRIM(c.descripcion_ca),'') = '' OR c.descripcion_ca LIKE 'Mano de Obra%')
+GROUP BY c.empresa, c.year, c.departamento, d.department_name,
+         c.tipo, c.tipo_proyecto, c.estado, c.job, c.descripcion, c.nr, r.name
 HAVING ABS(SUM(c.coste)) > 0.0001;
 
 CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx0 ON bi_mv_mano_obra (empresa, year);
@@ -549,9 +542,9 @@ CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx3 ON bi_mv_mano_obra (proyecto);
 CREATE VIEW bi_v_mano_obra AS SELECT * FROM bi_mv_mano_obra;
 
 COMMENT ON VIEW bi_v_mano_obra IS
-  'Mano de Obra PBI: Operational + Completed/Open/Planning; solo type_line Resource; pivot coste×mes Encabezado; total>0. (materializada: bi_mv_mano_obra; REFRESH tras sync 004).';
+  'Mano de Obra: filas planas proyecto+recurso (coste×mes). Jerarquía Proyecto→Recurso se agrupa en el consumidor (API/React), no en SQL.';
 COMMENT ON MATERIALIZED VIEW bi_mv_mano_obra IS
-  'Snapshot de bi_v_mano_obra; refrescar tras sync BC→Analytics.';
+  'Snapshot bi_v_mano_obra (filas planas); refrescar tras sync BC→Analytics.';
 
 -- KPI agregados por empresa/año (referencia / legacy; tarjetas usan bi_v_planificacion_kpi)
 CREATE OR REPLACE VIEW bi_v_kpi_anual_empresa AS

@@ -695,13 +695,33 @@ def gastos_matriz_params() -> dict[str, Any]:
 
 
 def mano_obra_matriz_params() -> dict[str, Any]:
-    """Tabla PBI Mano de Obra: Proyectos × meses 01-12 + Total (coste Resource)."""
-    return _month_pivot_params(
+    """Tabla PBI Mano de Obra (interina, sin jerarquía): Proyecto + Recurso × meses 01-12 + Total.
+    bi_v_mano_obra es plana (proyecto+recurso); la jerarquía Proyecto→Recurso se
+    construirá en el módulo React (power-solution-apps, TanStack Table), no aquí.
+    """
+    params = _month_pivot_params(
         dim_col="proyecto",
-        dim_label="Proyectos",
+        dim_label="Encabezado",
         dim_width=280,
         order_label="orden_proyecto",
     )
+    params["groupby"] = ["proyecto", "recurso"]
+    params["column_config"]["recurso"] = {
+        "customColumnName": "Recurso",
+        "truncateLongCells": True,
+        "columnWidth": 180,
+    }
+    params["order_by_cols"] = [
+        json.dumps(
+            [{"expressionType": "SQL", "sqlExpression": "proyecto", "label": "orden_proyecto"}, True],
+            ensure_ascii=False,
+        ),
+        json.dumps(
+            [{"expressionType": "SQL", "sqlExpression": "recurso", "label": "orden_recurso"}, True],
+            ensure_ascii=False,
+        ),
+    ]
+    return params
 
 
 def facturacion_matriz_params() -> dict[str, Any]:
@@ -821,12 +841,13 @@ def persist_dashboard_config(
         + evo_chart_ids
         + prob_chart_ids
     )
+    # Orden UI: Resumen → Facturación → Unidad → Gastos → Mano de Obra → Gráficos
     tabs_all = [
         "TAB-RESUMEN",
+        "TAB-FACTURACION",
         "TAB-UNIDAD",
         "TAB-GASTOS",
         "TAB-MANO-OBRA",
-        "TAB-FACTURACION",
         "TAB-GRAFICOS",
     ]
 
@@ -1796,10 +1817,10 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "id": "TABS-MAIN",
             "children": [
                 "TAB-RESUMEN",
+                "TAB-FACTURACION",
                 "TAB-UNIDAD",
                 "TAB-GASTOS",
                 "TAB-MANO-OBRA",
-                "TAB-FACTURACION",
                 "TAB-GRAFICOS",
             ],
             "parents": ["ROOT_ID", "GRID_ID"],
