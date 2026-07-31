@@ -492,47 +492,102 @@ COMMENT ON MATERIALIZED VIEW bi_mv_gastos IS
 -- Mano de Obra PBI: filas planas proyecto+recurso (una fila por combinación).
 -- Sin nivel/sort_key: la jerarquía Proyecto→Recurso se construye en el consumidor
 -- (agrupación cliente/API), no en SQL. Ver docs/GUIA_COMPLETA_ANALYTICS.md.
+-- m0N_closed: mes cerrado por proyecto (bc_meses_cerrados × empresa+job+year+month).
 -- -----------------------------------------------------------------------------
 CREATE MATERIALIZED VIEW bi_mv_mano_obra AS
+WITH base AS (
+    SELECT
+        c.empresa,
+        c.year,
+        c.departamento AS department_code,
+        d.department_name,
+        c.tipo,
+        CASE c.tipo WHEN 'P' THEN 'Planificado' WHEN 'R' THEN 'Real'
+                    ELSE COALESCE(c.tipo::text, '') END AS tipo_label,
+        c.tipo_proyecto,
+        c.estado,
+        c.job,
+        (c.job::text || ' --- ') || left(COALESCE(c.descripcion,''), 36) AS proyecto,
+        COALESCE(NULLIF(TRIM(r.name),''), NULLIF(TRIM(c.nr),''), '(sin recurso)') AS recurso,
+        SUM(c.coste) FILTER (WHERE c.month =  1) AS m01,
+        SUM(c.coste) FILTER (WHERE c.month =  2) AS m02,
+        SUM(c.coste) FILTER (WHERE c.month =  3) AS m03,
+        SUM(c.coste) FILTER (WHERE c.month =  4) AS m04,
+        SUM(c.coste) FILTER (WHERE c.month =  5) AS m05,
+        SUM(c.coste) FILTER (WHERE c.month =  6) AS m06,
+        SUM(c.coste) FILTER (WHERE c.month =  7) AS m07,
+        SUM(c.coste) FILTER (WHERE c.month =  8) AS m08,
+        SUM(c.coste) FILTER (WHERE c.month =  9) AS m09,
+        SUM(c.coste) FILTER (WHERE c.month = 10) AS m10,
+        SUM(c.coste) FILTER (WHERE c.month = 11) AS m11,
+        SUM(c.coste) FILTER (WHERE c.month = 12) AS m12,
+        SUM(c.coste) AS total
+    FROM v_se_coste c
+    LEFT JOIN mb_v_dim_departamento d
+        ON d.company_name = c.empresa AND d.department_code = c.departamento
+    LEFT JOIN bc_resource r
+        ON r.code = c.nr AND r.company_name = c.empresa
+    WHERE c.tipo IN ('P','R')
+      AND c.tipo_proyecto = 'Operational'
+      AND COALESCE(c.estado,'') IN ('Completed','Open','Planning')
+      AND COALESCE(c.type_line,'') = 'Resource'
+      AND (COALESCE(TRIM(c.descripcion_ca),'') = '' OR c.descripcion_ca LIKE 'Mano de Obra%')
+    GROUP BY c.empresa, c.year, c.departamento, d.department_name,
+             c.tipo, c.tipo_proyecto, c.estado, c.job, c.descripcion, c.nr, r.name
+    HAVING ABS(SUM(c.coste)) > 0.0001
+),
+closed AS (
+    SELECT
+        company_name,
+        job_no,
+        year,
+        BOOL_OR(month =  1) AS m01_closed,
+        BOOL_OR(month =  2) AS m02_closed,
+        BOOL_OR(month =  3) AS m03_closed,
+        BOOL_OR(month =  4) AS m04_closed,
+        BOOL_OR(month =  5) AS m05_closed,
+        BOOL_OR(month =  6) AS m06_closed,
+        BOOL_OR(month =  7) AS m07_closed,
+        BOOL_OR(month =  8) AS m08_closed,
+        BOOL_OR(month =  9) AS m09_closed,
+        BOOL_OR(month = 10) AS m10_closed,
+        BOOL_OR(month = 11) AS m11_closed,
+        BOOL_OR(month = 12) AS m12_closed
+    FROM bc_meses_cerrados
+    GROUP BY company_name, job_no, year
+)
 SELECT
-    c.empresa,
-    c.year,
-    c.departamento AS department_code,
-    d.department_name,
-    c.tipo,
-    CASE c.tipo WHEN 'P' THEN 'Planificado' WHEN 'R' THEN 'Real'
-                ELSE COALESCE(c.tipo::text, '') END AS tipo_label,
-    c.tipo_proyecto,
-    c.estado,
-    c.job,
-    (c.job::text || ' --- ') || left(COALESCE(c.descripcion,''), 36) AS proyecto,
-    COALESCE(NULLIF(TRIM(r.name),''), NULLIF(TRIM(c.nr),''), '(sin recurso)') AS recurso,
-    SUM(c.coste) FILTER (WHERE c.month =  1) AS m01,
-    SUM(c.coste) FILTER (WHERE c.month =  2) AS m02,
-    SUM(c.coste) FILTER (WHERE c.month =  3) AS m03,
-    SUM(c.coste) FILTER (WHERE c.month =  4) AS m04,
-    SUM(c.coste) FILTER (WHERE c.month =  5) AS m05,
-    SUM(c.coste) FILTER (WHERE c.month =  6) AS m06,
-    SUM(c.coste) FILTER (WHERE c.month =  7) AS m07,
-    SUM(c.coste) FILTER (WHERE c.month =  8) AS m08,
-    SUM(c.coste) FILTER (WHERE c.month =  9) AS m09,
-    SUM(c.coste) FILTER (WHERE c.month = 10) AS m10,
-    SUM(c.coste) FILTER (WHERE c.month = 11) AS m11,
-    SUM(c.coste) FILTER (WHERE c.month = 12) AS m12,
-    SUM(c.coste) AS total
-FROM v_se_coste c
-LEFT JOIN mb_v_dim_departamento d
-    ON d.company_name = c.empresa AND d.department_code = c.departamento
-LEFT JOIN bc_resource r
-    ON r.code = c.nr AND r.company_name = c.empresa
-WHERE c.tipo IN ('P','R')
-  AND c.tipo_proyecto = 'Operational'
-  AND COALESCE(c.estado,'') IN ('Completed','Open','Planning')
-  AND COALESCE(c.type_line,'') = 'Resource'
-  AND (COALESCE(TRIM(c.descripcion_ca),'') = '' OR c.descripcion_ca LIKE 'Mano de Obra%')
-GROUP BY c.empresa, c.year, c.departamento, d.department_name,
-         c.tipo, c.tipo_proyecto, c.estado, c.job, c.descripcion, c.nr, r.name
-HAVING ABS(SUM(c.coste)) > 0.0001;
+    b.empresa,
+    b.year,
+    b.department_code,
+    b.department_name,
+    b.tipo,
+    b.tipo_label,
+    b.tipo_proyecto,
+    b.estado,
+    b.job,
+    b.proyecto,
+    b.recurso,
+    b.m01, b.m02, b.m03, b.m04, b.m05, b.m06,
+    b.m07, b.m08, b.m09, b.m10, b.m11, b.m12,
+    b.total,
+    COALESCE(cl.m01_closed, false) AS m01_closed,
+    COALESCE(cl.m02_closed, false) AS m02_closed,
+    COALESCE(cl.m03_closed, false) AS m03_closed,
+    COALESCE(cl.m04_closed, false) AS m04_closed,
+    COALESCE(cl.m05_closed, false) AS m05_closed,
+    COALESCE(cl.m06_closed, false) AS m06_closed,
+    COALESCE(cl.m07_closed, false) AS m07_closed,
+    COALESCE(cl.m08_closed, false) AS m08_closed,
+    COALESCE(cl.m09_closed, false) AS m09_closed,
+    COALESCE(cl.m10_closed, false) AS m10_closed,
+    COALESCE(cl.m11_closed, false) AS m11_closed,
+    COALESCE(cl.m12_closed, false) AS m12_closed
+FROM base b
+LEFT JOIN closed cl
+    ON cl.company_name = b.empresa
+   AND cl.job_no = b.job
+   AND cl.year = b.year;
 
 CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx0 ON bi_mv_mano_obra (empresa, year);
 CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx1 ON bi_mv_mano_obra (department_code);
@@ -542,9 +597,9 @@ CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx3 ON bi_mv_mano_obra (proyecto);
 CREATE VIEW bi_v_mano_obra AS SELECT * FROM bi_mv_mano_obra;
 
 COMMENT ON VIEW bi_v_mano_obra IS
-  'Mano de Obra: filas planas proyecto+recurso (coste×mes). Jerarquía Proyecto→Recurso se agrupa en el consumidor (API/React), no en SQL.';
+  'Mano de Obra: filas planas proyecto+recurso (coste×mes) + m0N_closed desde bc_meses_cerrados. Jerarquía Proyecto→Recurso se agrupa en el consumidor (API/React), no en SQL.';
 COMMENT ON MATERIALIZED VIEW bi_mv_mano_obra IS
-  'Snapshot bi_v_mano_obra (filas planas); refrescar tras sync BC→Analytics.';
+  'Snapshot bi_v_mano_obra (filas planas + flags mes cerrado); refrescar tras sync BC→Analytics.';
 
 -- KPI agregados por empresa/año (referencia / legacy; tarjetas usan bi_v_planificacion_kpi)
 CREATE OR REPLACE VIEW bi_v_kpi_anual_empresa AS

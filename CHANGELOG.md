@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-07-31b] — Mano de Obra: flags mes cerrado en la vista
+
+### Added
+- `bi_mv_mano_obra` / `bi_v_mano_obra`: columnas `m01_closed`…`m12_closed`
+  (boolean) desde `bc_meses_cerrados` join por `empresa`+`job`+`year`.
+  Fuente única para pintar celdas de mes cerrado en Apps (Seguimiento Económico)
+  y en cualquier consumidor de la vista.
+
 ## [2026-07-31] — Mano de Obra: filtro CA + orden pestañas + tabla plana (árbol AG Grid descartado)
 
 ### Fixed
