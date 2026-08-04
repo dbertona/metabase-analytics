@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [2026-08-04c] — ExpedienteMes: `job_unit_no` (evitar colapsar unidades con mismo invoice)
+
+### Fixed
+- Dos unidades del mismo job-mes pueden compartir el mismo Planned Amount
+  (ej. PSI-OT-25-2005 / 2026-06: unidades 04 y 05 → 16.758,45 cada una).
+  El `exactKey` / `DISTINCT ON (…, invoice)` descartaba una → total 22.344,61
+  en vez de **39.103,06**.
+- Columna `job_unit_no` en `bc_expediente_mes` (PK ampliada).
+- Workflow 004: OData `jobUnitNo` → `job_unit_no` en `$select`, Transform
+  (`exactKey` + clave de agregación) y Upsert (partition overwrite intacto).
+- `v_se_lineas_expedientes`: Distinct incluye `job_unit_no`; columna expuesta
+  para drill-down. `v_se_facturacion` suma todas las filas (UNION por nombres).
+
+### Docs
+- `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md`
+- `docs/shared/analytics/ANALYTICS_FACTURACION_PBI_ALIGNMENT.md`
+- Migración: `sql/tables/bc_expediente_mes_job_unit_no.sql`
+
 ## [2026-08-04b] — Fix: historico_planificacion_mes particiones estáticas (sin Discovery)
 
 ### Fixed
