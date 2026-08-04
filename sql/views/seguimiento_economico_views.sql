@@ -287,12 +287,14 @@ COMMENT ON VIEW public.v_se_lineas_movimientos IS
 CREATE OR REPLACE VIEW public.v_se_lineas_expedientes AS
  -- Lógica PBI: cada mes usa su propia versión de presupuesto (budget_date_month = month).
  -- No se usa vigente global; se muestra el expediente planificado para ese mes específico.
+ -- job_unit_no: obligatorio en dedup — dos unidades pueden compartir el mismo invoice.
  WITH src AS (
          SELECT e.company_name AS empresa,
             e.job_no AS job,
             e.year,
             e.month,
             e.invoice,
+            COALESCE(e.job_unit_no, ''::text) AS job_unit_no,
             COALESCE(NULLIF(btrim(e.departamento::text), ''::text), NULLIF(btrim(j.departamento::text), ''::text))::character varying(20) AS departamento,
             COALESCE(e.description, j.description) AS descripcion,
             COALESCE(e.status, j.status) AS estado,
@@ -311,11 +313,12 @@ CREATE OR REPLACE VIEW public.v_se_lineas_expedientes AS
             AND e.month_closing_status = 'Open'
             AND COALESCE(e.status, j.status, ''::character varying)::text <> ALL (ARRAY['Completed'::text, 'Lost'::text])
         ), dedup AS (
-         SELECT DISTINCT ON (s.empresa, s.job, s.year, s.month, s.invoice) s.empresa,
+         SELECT DISTINCT ON (s.empresa, s.job, s.year, s.month, s.job_unit_no, s.invoice) s.empresa,
             s.job,
             s.year,
             s.month,
             s.invoice,
+            s.job_unit_no,
             s.departamento,
             s.descripcion,
             s.estado,
@@ -325,13 +328,14 @@ CREATE OR REPLACE VIEW public.v_se_lineas_expedientes AS
             s.budget_date_month,
             s.status1
            FROM src s
-          ORDER BY s.empresa, s.job, s.year, s.month, s.invoice
+          ORDER BY s.empresa, s.job, s.year, s.month, s.job_unit_no, s.invoice
         )
  SELECT d.empresa,
     d.job,
     d.year,
     d.month,
     d.invoice,
+    d.job_unit_no,
     NULL::numeric(15,5) AS cost,
     NULL::character varying(20) AS nr,
     NULL::character varying(50) AS type_line,
@@ -356,7 +360,7 @@ CREATE OR REPLACE VIEW public.v_se_lineas_expedientes AS
     (d.empresa || ':'::text) || d.year::text AS empresa_ano,
     d.empresa || ':'::text AS empresa_recurso
    FROM dedup d;
-COMMENT ON VIEW public.v_se_lineas_expedientes IS 'PBI Lineas Expedientes: budget_date_month=month (lógica PBI — cada mes usa su propio presupuesto), Distinct(job,year,month,invoice), month_closing_status=Open (status1 del mes), excluye Job Completed/Lost.';
+COMMENT ON VIEW public.v_se_lineas_expedientes IS 'PBI Lineas Expedientes: budget_date_month=month, Distinct(job,year,month,job_unit_no,invoice), month_closing_status=Open, excluye Job Completed/Lost. job_unit_no evita colapsar unidades con mismo Planned Amount.';
 
 -- ---------------------------------------------------------------------------
 -- View: v_se_lineas_meses_cerrados
