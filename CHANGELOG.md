@@ -17,6 +17,7 @@
   - Inmune a modificaciones masivas
 - `Split Historico Partitions` (batchSize=1) + `Loop Feedback Historico`
   (siempre 1 item) para avanzar el loop aunque Transform/Upsert den 0 filas.
+  ⚠️ SplitInBatches v3: `out0=done`, `out1=loop` (invertido respecto a v1).
 - `Compute now ISO`: watermark = `NOW()-5min` (buffer clock skew); ya no
   depende de `_maxRowTimestamp` del Discover.
 - Nodos Discovery antiguos deshabilitados (`[DISABLED]`).
