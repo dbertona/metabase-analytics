@@ -15,6 +15,9 @@
   4. `Transform` lee del Snapshot; watermark solo en la 1ª fila
   5. `Compute now ISO`: watermark desde Discover/`first()` (sin releer todo el Transform);
      si no hay avance real conserva `prevSync` (no `new Date()`)
+  6. `Split Historico Partitions` (batchSize=1): Transform/Upsert por partición,
+     sin acumular todos los snapshots en memoria
+  7. Discovery acotado por `year eq Y` + ventana 7d (y jobBatch por año)
 - Liberados 3 mutex `running` huérfanos Iberia (ids 20187, 20201, 20209).
 
 ## [2026-07-31c] — Fix: historico_planificacion_mes Invalid string length
