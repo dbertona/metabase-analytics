@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [2026-08-04] — Fix: historico_planificacion_mes partición year|month (Invalid string length)
+
+### Fixed
+- `historico_planificacion_mes`: el fix 2026-07-31c (1 campo filter) no bastaba —
+  el watermark llevaba atascado desde 2026-07-27 y el delta completo en un solo
+  GET OData seguía provocando `Invalid string length` (V8) de forma intermitente.
+- Alineado con `PlanificacionMes` / `ExpedienteMes`:
+  1. `Prepare`: ventanas de 7 días + `$select` ligero (solo partición + timestamps)
+  2. `Discover Partitions HistoricoPlanificacionMes` → year|month
+  3. `Prepare Snapshot` + `BC API - HistoricoPlanificacionMes Snapshot` por partición
+  4. `Transform` lee del Snapshot; watermark solo en la 1ª fila
+  5. `Compute now ISO`: watermark desde Discover/`first()` (sin releer todo el Transform);
+     si no hay avance real conserva `prevSync` (no `new Date()`)
+- Liberados 3 mutex `running` huérfanos Iberia (ids 20187, 20201, 20209).
+
 ## [2026-07-31c] — Fix: historico_planificacion_mes Invalid string length
 
 ### Fixed

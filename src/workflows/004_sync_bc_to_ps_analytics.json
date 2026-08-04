@@ -2428,11 +2428,11 @@
         "name": "Transform HistoricoPlanificacionMes",
         "type": "n8n-nodes-base.code",
         "position": [
-          3136,
-          9168
+          3360,
+          9400
         ],
         "parameters": {
-          "jsCode": "\nconst toIso = (v) => {\n  if (v === null || v === undefined) return '';\n  const s = String(v).trim();\n  if (!s || s.startsWith('0001-01-01')) return '';\n  const d = new Date(s.includes('T') ? s : s.replace(' ', 'T'));\n  return Number.isNaN(d.getTime()) ? '' : d.toISOString();\n};\nconst maxTsFromRow = (r, fields) => {\n  let max = '';\n  for (const f of fields) {\n    const candidates = [r[f], r[f.charAt(0).toUpperCase() + f.slice(1)]];\n    for (const c of candidates) {\n      const iso = toIso(c);\n      if (iso && (!max || iso > max)) max = iso;\n    }\n  }\n  return max;\n};\nconst __TS_FIELDS__ = [\"lastModifiedDateTime\", \"jobLastModifiedDateTime\", \"monthClosingLastModifiedDateTime\"];\nlet __GLOBAL_MAX_TS__ = '';\nconst input=$input.all(); if(!input.length) return []; const val=[]; for (const it of input){ const raw=it?.json??{}; if(raw.error||raw.statusCode>=400) continue; const src=raw?.body??raw; const chunk=Array.isArray(src.value)?src.value:(Array.isArray(src)?src:(src&&typeof src==='object'&&!src.body?[src]:[])); if(Array.isArray(chunk)) val.push(...chunk);} if(!val.length) return []; const out=[]; const companyName=$items('Build sync_state map')[0]?.json?.company||''; const toNum=(v)=>{ if(v===null||v===undefined) return ''; const n=Number(v); return Number.isFinite(n)?String(n):''; }; for(const r of val){ const __rowMax__ = maxTsFromRow(r, __TS_FIELDS__); if (__rowMax__ && (!__GLOBAL_MAX_TS__ || __rowMax__ > __GLOBAL_MAX_TS__)) __GLOBAL_MAX_TS__ = __rowMax__; const jobNo=String(r.job??r.Job??'').trim(); const year=Number(r.year??r.Year??0)||0; const month=Number(r.month??r.Month??0)||0; const closingCode=String(r.closingMonthCode??r.ClosingMonthCode??'').trim(); if(!jobNo||!year||!month) continue; if(jobNo.startsWith('PP')||jobNo.startsWith('PY')) continue; out.push({json:{ companyName, job_no:jobNo, year, month, closing_month_code:closingCode, nr:'', type_line:'P', line_type:'', invoice:toNum(r.invoice??r.Invoice), cost:toNum(r.cost??r.Cost), quantity:'', departamento:String(r.departamento??r.Departamento??'').trim(), description:String(r.descripcion??r.Descripcion??'').trim(), status:String(r.estado??r.Estado??'').trim(), tipo_proyecto:String(r.tipoProyecto??r.TipoProyecto??'').trim(), probability:toNum(r.probability??r.Probability), do_not_consolidate:'false', budget_date_year:'', budget_date_month:'', month_closing_status:String(r.status1??r.Status1??'').trim(), status_filter_only:'' }});} if (__GLOBAL_MAX_TS__) { for (const o of out) { o.json._maxRowTimestamp = __GLOBAL_MAX_TS__; } }\nreturn out;"
+          "jsCode": "\nconst toIso = (v) => {\n  if (v === null || v === undefined) return '';\n  const s = String(v).trim();\n  if (!s || s.startsWith('0001-01-01')) return '';\n  const d = new Date(s.includes('T') ? s : s.replace(' ', 'T'));\n  return Number.isNaN(d.getTime()) ? '' : d.toISOString();\n};\nconst maxTsFromRow = (r, fields) => {\n  let max = '';\n  for (const f of fields) {\n    const candidates = [r[f], r[f.charAt(0).toUpperCase() + f.slice(1)]];\n    for (const c of candidates) {\n      const iso = toIso(c);\n      if (iso && (!max || iso > max)) max = iso;\n    }\n  }\n  return max;\n};\nconst __TS_FIELDS__ = [\"lastModifiedDateTime\", \"jobLastModifiedDateTime\", \"monthClosingLastModifiedDateTime\"];\nlet __GLOBAL_MAX_TS__ = '';\nconst input = (() => {\n  try {\n    const snap = $items('BC API - HistoricoPlanificacionMes Snapshot');\n    if (snap && snap.length) return snap;\n  } catch (e) {}\n  return $input.all();\n})();\nif (!input.length) return [];\ntry {\n  const disc = $('Discover Partitions HistoricoPlanificacionMes').first()?.json?._maxRowTimestamp;\n  if (disc) __GLOBAL_MAX_TS__ = disc;\n} catch (e) {}\nconst val = [];\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  if (raw.error || raw.statusCode >= 400) continue;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : (src && typeof src === 'object' && !src.body ? [src] : []));\n  if (Array.isArray(chunk)) val.push(...chunk);\n}\nif (!val.length) return [];\nconst out = [];\nconst companyName = $items('Build sync_state map')[0]?.json?.company || '';\nconst toNum = (v) => { if (v === null || v === undefined) return ''; const n = Number(v); return Number.isFinite(n) ? String(n) : ''; };\nfor (const r of val) {\n  const __rowMax__ = maxTsFromRow(r, __TS_FIELDS__);\n  if (__rowMax__ && (!__GLOBAL_MAX_TS__ || __rowMax__ > __GLOBAL_MAX_TS__)) __GLOBAL_MAX_TS__ = __rowMax__;\n  const jobNo = String(r.job ?? r.Job ?? '').trim();\n  const year = Number(r.year ?? r.Year ?? 0) || 0;\n  const month = Number(r.month ?? r.Month ?? 0) || 0;\n  const closingCode = String(r.closingMonthCode ?? r.ClosingMonthCode ?? '').trim();\n  if (!jobNo || !year || !month) continue;\n  if (jobNo.startsWith('PP') || jobNo.startsWith('PY')) continue;\n  out.push({ json: {\n    companyName, job_no: jobNo, year, month, closing_month_code: closingCode,\n    nr: '', type_line: 'P', line_type: '',\n    invoice: toNum(r.invoice ?? r.Invoice), cost: toNum(r.cost ?? r.Cost), quantity: '',\n    departamento: String(r.departamento ?? r.Departamento ?? '').trim(),\n    description: String(r.descripcion ?? r.Descripcion ?? '').trim(),\n    status: String(r.estado ?? r.Estado ?? '').trim(),\n    tipo_proyecto: String(r.tipoProyecto ?? r.TipoProyecto ?? '').trim(),\n    probability: toNum(r.probability ?? r.Probability),\n    do_not_consolidate: 'false', budget_date_year: '', budget_date_month: '',\n    month_closing_status: String(r.status1 ?? r.Status1 ?? '').trim(),\n    status_filter_only: '',\n  }});\n}\n// Stamp ONLY first item with watermark (Compute reads first item — avoids huge $items scan)\nif (__GLOBAL_MAX_TS__ && out.length) {\n  out[0].json._maxRowTimestamp = __GLOBAL_MAX_TS__;\n}\nreturn out;\n"
         },
         "typeVersion": 2
       },
@@ -2441,8 +2441,8 @@
         "name": "Upsert HistoricoPlanificacionMes",
         "type": "n8n-nodes-base.postgres",
         "position": [
-          3360,
-          9168
+          3584,
+          9400
         ],
         "parameters": {
           "query": "INSERT INTO public.bc_historico_planificacion_mes\n(company_name, job_no, year, month, closing_month_code, nr, type_line, line_type, invoice, cost, quantity,\n departamento, description, status, tipo_proyecto, probability, do_not_consolidate,\n budget_date_year, budget_date_month, month_closing_status, status_filter_only, updated_at)\nSELECT $1,$2::text,$3::int,$4::int,$5::text,$6::text,$7::text,$8::text,NULLIF($9::text,'')::numeric,NULLIF($10::text,'')::numeric,NULLIF($11::text,'')::numeric,\n       $12::text,$13::text,$14::text,$15::text,NULLIF($16::text,'')::numeric,\n       CASE WHEN $17::text IN ('true','1','t','yes') THEN true ELSE false END,\n       NULLIF($18::text,'')::integer,NULLIF($19::text,'')::integer,$20,$21,NOW()\nWHERE $2::text <> '' AND $3::int <> 0 AND $4::int <> 0\nON CONFLICT (company_name, job_no, year, month, closing_month_code, nr, type_line, line_type) DO UPDATE SET\n  invoice=EXCLUDED.invoice, cost=EXCLUDED.cost, quantity=EXCLUDED.quantity,\n  departamento=EXCLUDED.departamento, description=EXCLUDED.description, status=EXCLUDED.status,\n  tipo_proyecto=EXCLUDED.tipo_proyecto, probability=EXCLUDED.probability,\n  do_not_consolidate=EXCLUDED.do_not_consolidate, budget_date_year=EXCLUDED.budget_date_year,\n  budget_date_month=EXCLUDED.budget_date_month, month_closing_status=EXCLUDED.month_closing_status,\n  status_filter_only=EXCLUDED.status_filter_only, updated_at=NOW() RETURNING *;",
@@ -2469,7 +2469,7 @@
           9216
         ],
         "parameters": {
-          "jsCode": "const upsertItems = $items('Upsert HistoricoPlanificacionMes');\nif (!upsertItems.length) { return []; }\nfor (const it of upsertItems) {\n  const j = it?.json || {};\n  if (j.error) { return []; }\n}\nconst map = $('Build sync_state map').first()?.json || {};\nconst companyName = map.company || '';\nconst prevSync = map.syncStateByEntity?.['historico_planificacion_mes'] || '1900-01-01T00:00:00.000Z';\nconst tsFields = [\"lastModifiedDateTime\", \"jobLastModifiedDateTime\", \"monthClosingLastModifiedDateTime\"];\nlet maxTs = '';\nconst transformItems = $items('Transform HistoricoPlanificacionMes');\nfor (const it of transformItems) {\n  const t = it?.json?._maxRowTimestamp;\n  if (t && (!maxTs || t > maxTs)) maxTs = t;\n}\nif (!maxTs || maxTs <= prevSync) {\n  maxTs = new Date().toISOString();\n}\nreturn [{ json: { companyName, nowIso: maxTs } }];"
+          "jsCode": "const upsertItems = $items('Upsert HistoricoPlanificacionMes');\nif (!upsertItems.length) { return []; }\nfor (const it of upsertItems) {\n  const j = it?.json || {};\n  if (j.error) { return []; }\n}\nconst map = $('Build sync_state map').first()?.json || {};\nconst companyName = map.company || '';\nconst prevSync = map.syncStateByEntity?.['historico_planificacion_mes'] || '1900-01-01T00:00:00.000Z';\nlet maxTs = '';\n// 1) Prefer discovery watermark (single item — no OOM)\ntry {\n  const disc = $('Discover Partitions HistoricoPlanificacionMes').first()?.json?._maxRowTimestamp;\n  if (disc) maxTs = disc;\n} catch (e) {}\n// 2) Fallback: first transform item only (watermark stamped once)\ntry {\n  const t0 = $('Transform HistoricoPlanificacionMes').first()?.json?._maxRowTimestamp;\n  if (t0 && (!maxTs || t0 > maxTs)) maxTs = t0;\n} catch (e) {}\n// Solo avanzar watermark si hay timestamp real. Si no, conservar prevSync (evita saltar huecos).\nif (!maxTs || maxTs <= prevSync) {\n  maxTs = prevSync;\n}\nreturn [{ json: { companyName, nowIso: maxTs } }];\n"
         },
         "typeVersion": 2
       },
@@ -2506,7 +2506,7 @@
           8976
         ],
         "parameters": {
-          "jsCode": "const items=$input.all(); let failed=0; let firstErr=''; for(const it of items){ const j=it?.json||{}; const statusCode=Number(j?.statusCode??j?.response?.statusCode??0); const bodyErr=j?.body?.error?.message||(typeof j?.body==='string'?j.body:null); const msg=j?.error?.message||j?.message||j?.data?.error||j?.response?.body||j?.responseBody||bodyErr||null; if(!firstErr&&msg) firstErr=String(msg); if(msg||statusCode>=400) failed++; } const success=items.length-failed; const synced=success; const res={ key:'historico_planificacion_mes', causeNode:'Upsert HistoricoPlanificacionMes'}; if(failed>0){ res.status='error'; res.synced=success; res.failed=failed; res.message=firstErr||('HTTP '+(items[0]?.json?.statusCode||'error')); } else { res.status='ok'; res.synced=synced; res.success=success; } return [{json:res}];"
+          "jsCode": "const items = $input.all();\nlet failed = 0;\nlet firstErr = '';\nlet upsertSuccess = 0;\nfor (const it of items) {\n  const j = it?.json || {};\n  const statusCode = Number(j?.statusCode ?? j?.response?.statusCode ?? 0);\n  const bodyErr = j?.body?.error?.message || (typeof j?.body === 'string' ? j.body : null);\n  const msg = j?.error?.message || j?.message || j?.data?.error || j?.response?.body || j?.responseBody || bodyErr || null;\n  if (!firstErr && msg) firstErr = String(msg);\n  if (msg || statusCode >= 400) {\n    failed++;\n    continue;\n  }\n  // Contar solo filas de Upsert (tienen job_no); ignorar payloads HTTP de discovery\n  if (j.job_no !== undefined || j.company_name !== undefined || j.companyName !== undefined) {\n    upsertSuccess++;\n  }\n}\nconst res = { key: 'historico_planificacion_mes', causeNode: 'Upsert HistoricoPlanificacionMes' };\nif (failed > 0) {\n  res.status = 'error';\n  res.synced = upsertSuccess;\n  res.failed = failed;\n  res.message = firstErr || ('HTTP ' + (items[0]?.json?.statusCode || 'error'));\n} else {\n  res.status = 'ok';\n  res.synced = upsertSuccess;\n  res.success = upsertSuccess;\n}\nreturn [{ json: res }];\n"
         },
         "typeVersion": 2
       },
@@ -3798,7 +3798,7 @@
           9168
         ],
         "parameters": {
-          "jsCode": "const map = ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json) || {};\nconst ls = map.syncStateByEntity?.['historico_planificacion_mes'] || '1900-01-01T00:00:00.000Z';\nconst companyId = map.companyId;\nconst env = (($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })());\nconst base = 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/'\n  + env + '/api/Power_Solution/PS_API/v2.0/companies(' + companyId + ')/HistoricoPlanificacionMes';\nconst select = 'job,year,month,invoice,cost,closingMonthCode,departamento,descripcion,estado,tipoProyecto,probability,status1,lastModifiedDateTime,jobLastModifiedDateTime,monthClosingLastModifiedDateTime';\nconst fields = [\"lastModifiedDateTime\"];\nconst out = [];\nfor (const f of fields) {\n  const filt = f + ' ge ' + ls;\n  out.push({\n    json: {\n      url: base + '?$filter=' + encodeURIComponent(filt) + '&$select=' + select,\n      filterField: f,\n      entityKey: 'historico_planificacion_mes',\n    },\n  });\n}\n// Job fallback as SEPARATE request — BC rejects OR across distinct fields\nif (map.aggregateJobBatchFilter) {\n  out.push({\n    json: {\n      url: base + '?$filter=' + encodeURIComponent(map.aggregateJobBatchFilter) + '&$select=' + select,\n      filterField: 'jobBatch',\n      entityKey: 'historico_planificacion_mes',\n    },\n  });\n}\nreturn out;\n"
+          "jsCode": "const map = ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json) || {};\nconst ls = map.syncStateByEntity?.['historico_planificacion_mes'] || '1900-01-01T00:00:00.000Z';\nconst companyId = map.companyId;\nconst env = (($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })());\nconst base = 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/'\n  + env + '/api/Power_Solution/PS_API/v2.0/companies(' + companyId + ')/HistoricoPlanificacionMes';\n// Discovery select ligero: solo campos de partición + timestamps (evita OOM)\nconst select = 'job,year,month,lastModifiedDateTime,jobLastModifiedDateTime,monthClosingLastModifiedDateTime';\nconst fields = [\"lastModifiedDateTime\"]; // 1 campo: evita inflación Nx + OOM\n\nconst p = map.partition || {};\nconst sinceYear = Number(p.sinceYear) || new Date().getUTCFullYear() - 5;\nconst windowDays = Math.max(1, Number(p.windowDays) || 7);\nconst maxWindows = Math.max(1, Number(p.maxWindows) || 180);\n\nconst parseIso = (v) => {\n  const d = new Date(String(v || '').replace(' ', 'T'));\n  return Number.isNaN(d.getTime()) ? null : d;\n};\nconst minDate = new Date(Date.UTC(sinceYear, 0, 1, 0, 0, 0, 0));\nconst now = new Date();\nconst startFromSync = parseIso(ls) || minDate;\nconst start = startFromSync > minDate ? startFromSync : minDate;\nconst stepMs = windowDays * 24 * 60 * 60 * 1000;\n\nconst windows = [];\nlet cursor = new Date(start.getTime());\nwhile (cursor < now && windows.length < maxWindows) {\n  const end = new Date(Math.min(now.getTime(), cursor.getTime() + stepMs));\n  windows.push({ start: new Date(cursor.getTime()), end });\n  cursor = end;\n}\nif (!windows.length) {\n  windows.push({ start, end: now });\n}\n\nconst out = [];\nfor (const f of fields) {\n  for (const w of windows) {\n    const filt = `${f} ge ${w.start.toISOString()} and ${f} lt ${w.end.toISOString()}`;\n    out.push({\n      json: {\n        url: base + '?$filter=' + encodeURIComponent(filt) + '&$select=' + select,\n        filterField: f,\n        entityKey: 'historico_planificacion_mes',\n        partitionKey: `${f}:${w.start.toISOString()}..${w.end.toISOString()}`,\n      },\n    });\n  }\n}\n// Job fallback: ALSO windowed implicitly via discovery→snapshot by year|month.\n// Keep jobBatch as discovery-only signal; Snapshot will re-fetch by year|month (safe).\nif (map.aggregateJobBatchFilter) {\n  out.push({\n    json: {\n      url: base + '?$filter=' + encodeURIComponent(map.aggregateJobBatchFilter) + '&$select=' + select,\n      filterField: 'jobBatch',\n      entityKey: 'historico_planificacion_mes',\n      partitionKey: 'jobBatch',\n    },\n  });\n}\nreturn out;\n"
         },
         "typeVersion": 2
       },
@@ -3951,6 +3951,64 @@
           "jsCode": "// Tras REFRESH de bi_mv_*, restaurar el payload de Compute Execution Summary\n// (el nodo Postgres sustituye $json por el resultado del SELECT).\nreturn [$('Compute Execution Summary').first()];\n"
         },
         "typeVersion": 2
+      },
+      {
+        "id": "c00bfdde-dc73-4d68-9c7e-bc26a228533b",
+        "name": "Discover Partitions HistoricoPlanificacionMes",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          3024,
+          9168
+        ],
+        "parameters": {
+          "jsCode": "const toIso = (v) => {\n  if (v === null || v === undefined) return '';\n  const s = String(v).trim();\n  if (!s || s.startsWith('0001-01-01')) return '';\n  const d = new Date(s.includes('T') ? s : s.replace(' ', 'T'));\n  return Number.isNaN(d.getTime()) ? '' : d.toISOString();\n};\nconst maxTsFromRow = (r, fields) => {\n  let max = '';\n  for (const f of fields) {\n    const candidates = [r[f], r[f.charAt(0).toUpperCase() + f.slice(1)]];\n    for (const c of candidates) {\n      const iso = toIso(c);\n      if (iso && (!max || iso > max)) max = iso;\n    }\n  }\n  return max;\n};\n\nconst __TS_FIELDS__ = [\"lastModifiedDateTime\", \"jobLastModifiedDateTime\", \"monthClosingLastModifiedDateTime\"];\nlet __GLOBAL_MAX_TS__ = '';\nconst partitions = new Map(); // key \"year|month\" → {year, month}\nconst input = $input.all();\nif (!input.length) return [];\n\nconst companyName = $items('Build sync_state map')[0]?.json?.company || '';\n\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  const statusCode = Number(raw?.statusCode ?? raw?.response?.statusCode ?? 0);\n  if (statusCode >= 400) continue;\n  if (raw?.error) continue;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value)\n    ? src.value\n    : (Array.isArray(src) ? src : (src && typeof src === 'object' && !src.body && (src.year !== undefined || src.Year !== undefined) ? [src] : []));\n\n  for (const r of chunk) {\n    const __rowMax__ = maxTsFromRow(r, __TS_FIELDS__);\n    if (__rowMax__ && (!__GLOBAL_MAX_TS__ || __rowMax__ > __GLOBAL_MAX_TS__)) __GLOBAL_MAX_TS__ = __rowMax__;\n\n    const year = Number(r.year ?? r.Year ?? 0) || 0;\n    const month = Number(r.month ?? r.Month ?? 0) || 0;\n    if (!year || !month) continue;\n    const key = year + '|' + month;\n    if (!partitions.has(key)) partitions.set(key, { year, month });\n  }\n}\n\nconst parts = [...partitions.values()].sort((a, b) => a.year - b.year || a.month - b.month);\nif (!parts.length) return [];\n\nreturn [{\n  json: {\n    companyName,\n    partitions: parts,\n    partitionsJson: JSON.stringify(parts),\n    partitionCount: parts.length,\n    _maxRowTimestamp: __GLOBAL_MAX_TS__ || undefined,\n    entityKey: 'historico_planificacion_mes',\n  },\n}];\n"
+        }
+      },
+      {
+        "id": "ace66981-4a3a-4d13-ab73-b99ef3eec554",
+        "name": "Prepare Snapshot HistoricoPlanificacionMes",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          3136,
+          9400
+        ],
+        "parameters": {
+          "jsCode": "const item = $input.first()?.json || {};\nconst parts = Array.isArray(item.partitions) ? item.partitions : [];\nif (!parts.length) return [];\n\nconst map = ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json) || {};\nconst companyId = map.companyId;\nconst env = (($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })());\nconst base = 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/'\n  + env + '/api/Power_Solution/PS_API/v2.0/companies(' + companyId + ')/HistoricoPlanificacionMes';\nconst select = 'job,year,month,invoice,cost,closingMonthCode,departamento,descripcion,estado,tipoProyecto,probability,status1,lastModifiedDateTime,jobLastModifiedDateTime,monthClosingLastModifiedDateTime';\n\nconst out = [];\nfor (const p of parts) {\n  const year = Number(p.year) || 0;\n  const month = Number(p.month) || 0;\n  if (!year || !month) continue;\n  const filt = `year eq ${year} and month eq ${month}`;\n  out.push({\n    json: {\n      url: base + '?$filter=' + encodeURIComponent(filt) + '&$select=' + select,\n      filterField: 'partition',\n      entityKey: 'historico_planificacion_mes',\n      partitionKey: `${year}-${String(month).padStart(2, '0')}`,\n      year,\n      month,\n      _discoveryMaxTs: item._maxRowTimestamp || undefined,\n      partitions: parts,\n      partitionsJson: item.partitionsJson,\n      companyName: item.companyName,\n    },\n  });\n}\nreturn out;\n"
+        }
+      },
+      {
+        "id": "a1bfc16b-5fb8-48a8-9387-b14acbc8315f",
+        "name": "BC API - HistoricoPlanificacionMes Snapshot",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          3248,
+          9400
+        ],
+        "parameters": {
+          "url": "={{ $json.url }}",
+          "options": {
+            "pagination": {
+              "pagination": {
+                "nextURL": "={{ $response.body['@odata.nextLink'] }}",
+                "paginationMode": "responseContainsNextURL",
+                "completeExpression": "={{ !$response.body['@odata.nextLink'] }}",
+                "paginationCompleteWhen": "other"
+              }
+            }
+          },
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api"
+        },
+        "credentials": {
+          "oAuth2Api": {
+            "id": "5caHilW1m87Snw87",
+            "name": "Business Central"
+          }
+        },
+        "continueOnFail": true
       }
     ],
     "connections": {
@@ -5230,7 +5288,12 @@
         "main": [
           [
             {
-              "node": "Transform HistoricoPlanificacionMes",
+              "node": "Discover Partitions HistoricoPlanificacionMes",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Result HistoricoPlanificacionMes",
               "type": "main",
               "index": 0
             }
@@ -6234,6 +6297,39 @@
           [
             {
               "node": "Release Mutex 004",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Discover Partitions HistoricoPlanificacionMes": {
+        "main": [
+          [
+            {
+              "node": "Prepare Snapshot HistoricoPlanificacionMes",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prepare Snapshot HistoricoPlanificacionMes": {
+        "main": [
+          [
+            {
+              "node": "BC API - HistoricoPlanificacionMes Snapshot",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BC API - HistoricoPlanificacionMes Snapshot": {
+        "main": [
+          [
+            {
+              "node": "Transform HistoricoPlanificacionMes",
               "type": "main",
               "index": 0
             }

@@ -90,6 +90,27 @@ Esperado plan PSI 2026: **4.193.215 €** (`v_se_kpi_cards`, incluye tipo P + ob
 
 ---
 
+## Troubleshooting: `historico_planificacion_mes` → Invalid string length
+
+Síntoma: sync Iberia `partial_error`, solo falla histórico; watermark
+`bc_historico_planificacion_mes` no avanza.
+
+Causa: un único GET OData paginado acumula demasiado JSON en n8n (límite V8).
+
+Fix (2026-08-04): mismo patrón que Planif/Expediente — ventanas 7d + discover
+`year|month` + snapshot por partición. Ver CHANGELOG `[2026-08-04]`.
+
+Comprobar watermark:
+
+```sql
+SELECT entity, last_sync_at
+FROM sync_state
+WHERE company_name = 'Power Solution Iberia SL'
+  AND entity = 'bc_historico_planificacion_mes';
+```
+
+---
+
 ## Referencias
 
 - `src/workflows/004_sync_bc_to_ps_analytics.json` — definición del workflow en este repo
