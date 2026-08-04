@@ -335,7 +335,6 @@ CREATE OR REPLACE VIEW public.v_se_lineas_expedientes AS
     d.year,
     d.month,
     d.invoice,
-    d.job_unit_no,
     NULL::numeric(15,5) AS cost,
     NULL::character varying(20) AS nr,
     NULL::character varying(50) AS type_line,
@@ -358,7 +357,8 @@ CREATE OR REPLACE VIEW public.v_se_lineas_expedientes AS
     (d.empresa || ':'::text) || COALESCE(d.departamento, ''::character varying)::text AS codigo_unico_departamento,
     make_date(d.year, d.month, 1) AS fecha_calculada,
     (d.empresa || ':'::text) || d.year::text AS empresa_ano,
-    d.empresa || ':'::text AS empresa_recurso
+    d.empresa || ':'::text AS empresa_recurso,
+    d.job_unit_no
    FROM dedup d;
 COMMENT ON VIEW public.v_se_lineas_expedientes IS 'PBI Lineas Expedientes: budget_date_month=month, Distinct(job,year,month,job_unit_no,invoice), month_closing_status=Open, excluye Job Completed/Lost. job_unit_no evita colapsar unidades con mismo Planned Amount.';
 
