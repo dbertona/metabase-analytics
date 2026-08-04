@@ -93,21 +93,31 @@ Esperado plan PSI 2026: **4.193.215 €** (`v_se_kpi_cards`, incluye tipo P + ob
 ## Troubleshooting: `historico_planificacion_mes` → Invalid string length
 
 Síntoma: sync Iberia `partial_error`, solo falla histórico; watermark
-`bc_historico_planificacion_mes` no avanza.
+`bc_historico_planificacion_mes` no avanza (o avanza sin escribir filas).
 
-Causa: un único GET OData paginado acumula demasiado JSON en n8n (límite V8).
+Causa: un único GET OData / Discovery del delta acumula demasiado JSON en n8n
+(límite V8). Empeora con modificaciones masivas en BC (p. ej. 42k filas el
+2026-08-03).
 
-Fix (2026-08-04): mismo patrón que Planif/Expediente — ventanas 7d + discover
-`year|month` + snapshot por partición. Ver CHANGELOG `[2026-08-04]`.
+Fix (2026-08-04b): **sin Discovery**. Particiones year|month estáticas +
+`lastModifiedDateTime ge watermark` por Snapshot + `SplitInBatches` +
+`Loop Feedback`. Ver CHANGELOG `[2026-08-04b]`.
 
-Comprobar watermark:
+Comprobar watermark y datos recientes:
 
 ```sql
 SELECT entity, last_sync_at
 FROM sync_state
 WHERE company_name = 'Power Solution Iberia SL'
   AND entity = 'bc_historico_planificacion_mes';
+
+SELECT MAX(updated_at), COUNT(*) FILTER (WHERE updated_at > NOW() - INTERVAL '1 day')
+FROM bc_historico_planificacion_mes
+WHERE company_name ILIKE '%Iberia%';
 ```
+
+Si el watermark avanzó sin datos (falso positivo): resetear a la última
+`MAX(updated_at)` real y re-lanzar sync solo de `historico_planificacion_mes`.
 
 ---
 

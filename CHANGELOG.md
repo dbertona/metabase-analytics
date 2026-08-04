@@ -2,22 +2,31 @@
 
 ## [Unreleased]
 
+## [2026-08-04b] — Fix: historico_planificacion_mes particiones estáticas (sin Discovery)
+
+### Fixed
+- Causa raíz del `Invalid string length` / OOM: la fase **Discovery** paginaba
+  TODOS los cambios del delta (42k+ filas tras modificación masiva en BC el
+  2026-08-03) solo para descubrir year|month → V8 heap explotaba →
+  `continueOnFail` silenciaba → watermark avanzaba sin escribir filas.
+- Rediseño profesional: **eliminar Discovery**. `Prepare` genera particiones
+  year|month estáticas (sinceYear..untilYear × 12 meses) con filtro
+  `lastModifiedDateTime ge watermark` en cada Snapshot.
+  - Partición vacía → 0 filas, ~100ms
+  - Partición con cambios → volumen acotado por mes (~cientos/miles filas)
+  - Inmune a modificaciones masivas
+- `Split Historico Partitions` (batchSize=1) + `Loop Feedback Historico`
+  (siempre 1 item) para avanzar el loop aunque Transform/Upsert den 0 filas.
+- `Compute now ISO`: watermark = `NOW()-5min` (buffer clock skew); ya no
+  depende de `_maxRowTimestamp` del Discover.
+- Nodos Discovery antiguos deshabilitados (`[DISABLED]`).
+- Watermark Iberia reseteado a 2026-07-27 (antes de la masa) para re-sync.
+
 ## [2026-08-04] — Fix: historico_planificacion_mes partición year|month (Invalid string length)
 
 ### Fixed
-- `historico_planificacion_mes`: el fix 2026-07-31c (1 campo filter) no bastaba —
-  el watermark llevaba atascado desde 2026-07-27 y el delta completo en un solo
-  GET OData seguía provocando `Invalid string length` (V8) de forma intermitente.
-- Alineado con `PlanificacionMes` / `ExpedienteMes`:
-  1. `Prepare`: ventanas de 7 días + `$select` ligero (solo partición + timestamps)
-  2. `Discover Partitions HistoricoPlanificacionMes` → year|month
-  3. `Prepare Snapshot` + `BC API - HistoricoPlanificacionMes Snapshot` por partición
-  4. `Transform` lee del Snapshot; watermark solo en la 1ª fila
-  5. `Compute now ISO`: watermark desde Discover/`first()` (sin releer todo el Transform);
-     si no hay avance real conserva `prevSync` (no `new Date()`)
-  6. `Split Historico Partitions` (batchSize=1): Transform/Upsert por partición,
-     sin acumular todos los snapshots en memoria
-  7. Discovery acotado por `year eq Y` + ventana 7d (y jobBatch por año)
+- Primer intento (Discovery + Snapshot + Split). Insuficiente ante delta masivo:
+  Discovery seguía paginando todo el delta. Sustituido por `[2026-08-04b]`.
 - Liberados 3 mutex `running` huérfanos Iberia (ids 20187, 20201, 20209).
 
 ## [2026-07-31c] — Fix: historico_planificacion_mes Invalid string length
