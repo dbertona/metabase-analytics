@@ -681,7 +681,7 @@
           3456
         ],
         "parameters": {
-          "jsCode": "const batch = $('Resolve Company').first()?.json?.batch || { syncAll: true, enabledEntities: [] };\nconst syncAll = batch.syncAll !== false && (!Array.isArray(batch.enabledEntities) || batch.enabledEntities.length === 0);\nconst enabledEntities = syncAll ? [] : (batch.enabledEntities || []);\nconst AGG = new Set(['job_planning_line','job_ledger_entry_month','expediente_mes','historico_planificacion_mes']);\nconst enabled = enabledEntities || [];\nconst needsJobFallback = !syncAll && enabled.includes('job') && enabled.some(k => AGG.has(k));\nconst rows = $input.all().flatMap(i => Array.isArray(i.json) ? i.json : [i.json]);\nconst entities = [\n  'resource','ps_year','job','job_team','job_task',\n  'centers_of_responsibility','user_configuration',\n  'technologies','typologies','departments',\n  'job_ledger_entry_month','job_planning_line',\n  'expediente_mes','meses_cerrados','objectives_by_department',\n  'historico_planificacion_mes','dias_imputacion'\n];\nconst alias = {\n  bc_resource: 'resource',\n  bc_ps_year: 'ps_year',\n  bc_job: 'job',\n  bc_job_team: 'job_team',\n  bc_job_task: 'job_task',\n  bc_responsibility_center: 'centers_of_responsibility',\n  bc_user_configuration: 'user_configuration',\n  bc_technology: 'technologies',\n  bc_typology: 'typologies',\n  bc_department: 'departments',\n  bc_job_ledger_entry_month: 'job_ledger_entry_month',\n  bc_job_planning_line: 'job_planning_line',\n  bc_expediente_mes: 'expediente_mes',\n  bc_meses_cerrados: 'meses_cerrados',\n  bc_objectives_by_department: 'objectives_by_department',\n  bc_historico_planificacion_mes: 'historico_planificacion_mes',\n  bc_dias_imputacion: 'dias_imputacion',\n  resource: 'resource', ps_year: 'ps_year', job: 'job', job_team: 'job_team', job_task: 'job_task',\n  centers_of_responsibility: 'centers_of_responsibility', user_configuration: 'user_configuration',\n  technologies: 'technologies', typologies: 'typologies', departments: 'departments',\n  job_ledger_entry: 'job_ledger_entry_month', job_ledger_entry_month: 'job_ledger_entry_month',\n  job_planning_line: 'job_planning_line'\n};\nconst byEntity = {};\nfor (const r of rows) {\n  const rawEntity = String(r.entity || '').trim();\n  const key = alias[rawEntity] || rawEntity.replace(/^bc_/, '');\n  const raw = String(r.last_sync_at || '').trim();\n  if (!key || !raw) continue;\n  const iso = new Date(raw.replace(' ', 'T')).toISOString();\n  if (!byEntity[key] || iso > byEntity[key]) byEntity[key] = iso;\n}\nconst defaultDate = '1900-01-01T00:00:00.000Z';\nfor (const entity of entities) if (!byEntity[entity]) byEntity[entity] = defaultDate;\n\nconst companyName = $('Resolve Company').first().json.companyName;\nconst companyId = $('Resolve Company').first().json.companyId;\n\nconst now = new Date();\nconst currentYear = now.getUTCFullYear();\nconst partition = batch.partition && typeof batch.partition === 'object' ? batch.partition : {};\nconst parsedSinceYear = Number(batch.sinceYear ?? partition.sinceYear);\nconst sinceYear = Number.isFinite(parsedSinceYear) && parsedSinceYear >= 2000\n  ? Math.floor(parsedSinceYear)\n  : currentYear - 2;\nconst parsedWindowDays = Number(batch.windowDays ?? partition.windowDays);\nconst windowDays = Number.isFinite(parsedWindowDays) && parsedWindowDays >= 1\n  ? Math.floor(parsedWindowDays)\n  : 21;\nconst parsedMaxWindows = Number(batch.maxWindows ?? partition.maxWindows);\nconst maxWindows = Number.isFinite(parsedMaxWindows) && parsedMaxWindows >= 1\n  ? Math.floor(parsedMaxWindows)\n  : 120;\n\nreturn [{ json: {\n  syncStateByEntity: byEntity,\n  company: companyName,\n  companyId,\n  syncAll,\n  enabledEntities,\n  batchReason: batch.reason || null,\n  batchQueuedAt: batch.queued_at || null,\n  needsJobFallback,\n  modifiedJobNos: [],\n  partition: {\n    sinceYear,\n    windowDays,\n    maxWindows,\n  },\n} }];"
+          "jsCode": "const batch = $('Resolve Company').first()?.json?.batch || { syncAll: true, enabledEntities: [] };\nconst syncAll = batch.syncAll !== false && (!Array.isArray(batch.enabledEntities) || batch.enabledEntities.length === 0);\nconst enabledEntities = syncAll ? [] : (batch.enabledEntities || []);\nconst AGG = new Set(['job_planning_line','job_ledger_entry_month','expediente_mes','historico_planificacion_mes']);\nconst enabled = enabledEntities || [];\nconst needsJobFallback = !syncAll && enabled.includes('job') && enabled.some(k => AGG.has(k));\nconst rows = $input.all().flatMap(i => Array.isArray(i.json) ? i.json : [i.json]);\nconst entities = [\n  'resource','ps_year','job','job_team','job_task',\n  'centers_of_responsibility','user_configuration',\n  'technologies','typologies','departments',\n  'job_ledger_entry_month','job_ledger_cert_open','job_planning_line',\n  'expediente_mes','meses_cerrados','objectives_by_department',\n  'historico_planificacion_mes','dias_imputacion'\n];\nconst alias = {\n  bc_resource: 'resource',\n  bc_ps_year: 'ps_year',\n  bc_job: 'job',\n  bc_job_team: 'job_team',\n  bc_job_task: 'job_task',\n  bc_responsibility_center: 'centers_of_responsibility',\n  bc_user_configuration: 'user_configuration',\n  bc_technology: 'technologies',\n  bc_typology: 'typologies',\n  bc_department: 'departments',\n  bc_job_ledger_entry_month: 'job_ledger_entry_month',\n  bc_job_ledger_cert_open: 'job_ledger_cert_open',\n  bc_job_planning_line: 'job_planning_line',\n  bc_expediente_mes: 'expediente_mes',\n  bc_meses_cerrados: 'meses_cerrados',\n  bc_objectives_by_department: 'objectives_by_department',\n  bc_historico_planificacion_mes: 'historico_planificacion_mes',\n  bc_dias_imputacion: 'dias_imputacion',\n  resource: 'resource', ps_year: 'ps_year', job: 'job', job_team: 'job_team', job_task: 'job_task',\n  centers_of_responsibility: 'centers_of_responsibility', user_configuration: 'user_configuration',\n  technologies: 'technologies', typologies: 'typologies', departments: 'departments',\n  job_ledger_entry: 'job_ledger_entry_month', job_ledger_entry_month: 'job_ledger_entry_month',\n  job_ledger_cert_open: 'job_ledger_cert_open',\n  job_planning_line: 'job_planning_line'\n};\nconst byEntity = {};\nfor (const r of rows) {\n  const rawEntity = String(r.entity || '').trim();\n  const key = alias[rawEntity] || rawEntity.replace(/^bc_/, '');\n  const raw = String(r.last_sync_at || '').trim();\n  if (!key || !raw) continue;\n  const iso = new Date(raw.replace(' ', 'T')).toISOString();\n  if (!byEntity[key] || iso > byEntity[key]) byEntity[key] = iso;\n}\nconst defaultDate = '1900-01-01T00:00:00.000Z';\nfor (const entity of entities) if (!byEntity[entity]) byEntity[entity] = defaultDate;\n\nconst companyName = $('Resolve Company').first().json.companyName;\nconst companyId = $('Resolve Company').first().json.companyId;\n\nconst now = new Date();\nconst currentYear = now.getUTCFullYear();\nconst partition = batch.partition && typeof batch.partition === 'object' ? batch.partition : {};\nconst parsedSinceYear = Number(batch.sinceYear ?? partition.sinceYear);\nconst sinceYear = Number.isFinite(parsedSinceYear) && parsedSinceYear >= 2000\n  ? Math.floor(parsedSinceYear)\n  : currentYear - 2;\nconst parsedWindowDays = Number(batch.windowDays ?? partition.windowDays);\nconst windowDays = Number.isFinite(parsedWindowDays) && parsedWindowDays >= 1\n  ? Math.floor(parsedWindowDays)\n  : 21;\nconst parsedMaxWindows = Number(batch.maxWindows ?? partition.maxWindows);\nconst maxWindows = Number.isFinite(parsedMaxWindows) && parsedMaxWindows >= 1\n  ? Math.floor(parsedMaxWindows)\n  : 120;\n\nreturn [{ json: {\n  syncStateByEntity: byEntity,\n  company: companyName,\n  companyId,\n  syncAll,\n  enabledEntities,\n  batchReason: batch.reason || null,\n  batchQueuedAt: batch.queued_at || null,\n  needsJobFallback,\n  modifiedJobNos: [],\n  partition: {\n    sinceYear,\n    windowDays,\n    maxWindows,\n  },\n} }];"
         },
         "typeVersion": 2
       },
@@ -4097,6 +4097,205 @@
         },
         "typeVersion": 4.2,
         "continueOnFail": true
+      },
+      {
+        "id": "47553b4f-248e-4c8e-a4b2-8dae5843c3cf",
+        "name": "Ensure sync_state (Cert Open Ingresos)",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.4,
+        "position": [
+          4020,
+          6288
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "WITH up AS (\n  INSERT INTO public.sync_state (company_name, entity, last_sync_at)\n  VALUES ($1, 'bc_job_ledger_cert_open', '1900-01-01'::timestamptz)\n  ON CONFLICT (company_name, entity) DO NOTHING\n  RETURNING company_name\n)\nSELECT COALESCE((SELECT company_name FROM up LIMIT 1), $1::text) AS company_name;",
+          "options": {
+            "queryReplacement": "={{ $('Build sync_state map').first().json.company }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "TTHI6C7o3V8eVzzr",
+            "name": "Postgres PS_Analytics"
+          }
+        }
+      },
+      {
+        "id": "a0d9d407-88b6-4ec7-88fc-2fcf96dd2396",
+        "name": "Prepare Cert Open Ingresos",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          4240,
+          6288
+        ],
+        "parameters": {
+          "jsCode": "const map = ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json) || {};\nconst syncAll = map.syncAll !== false && (!Array.isArray(map.enabledEntities) || map.enabledEntities.length === 0);\nconst enabled = map.enabledEntities || [];\nif (!syncAll && !enabled.includes('job_ledger_entry_month')) {\n  return [{ json: { skipped: true, key: 'job_ledger_cert_open' } }];\n}\nconst ls = map.syncStateByEntity?.['job_ledger_cert_open'] || '1900-01-01T00:00:00.000Z';\nconst companyId = map.companyId;\nconst env = (($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })());\nconst base = 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/'\n  + env + '/api/Power_Solution/PS_API/v2.0/companies(' + companyId + ')/movimientosProyectos';\n// Solo Ingresos reales de certificacion de expediente (FlowField PS tieneCertificacion).\n// Requiere extension BC publicada (verificado en Pruebas_PS 2026-08-05).\nconst filt = \"descripcion eq 'Ingresos' and tieneCertificacion eq true and lastModifiedDateTime ge \" + ls;\nconst select = [\n  'entryNo','entryType','documentNo','jobNo','jobTaskNo','no','description',\n  'quantity','totalCost','totalPrice','globalDimension1Code','documentDate',\n  'month','year','ca','descripcion','tieneCertificacion','lastModifiedDateTime'\n].join(',');\nreturn [{\n  json: {\n    url: base + '?$filter=' + encodeURIComponent(filt) + '&$select=' + select,\n    entityKey: 'job_ledger_cert_open',\n    watermark: ls,\n  },\n}];\n"
+        }
+      },
+      {
+        "id": "eca6f48a-b2e4-4439-a121-2aa94fe85f4f",
+        "name": "IF Cert Open has request",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          4460,
+          6288
+        ],
+        "parameters": {
+          "options": {},
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "strict"
+            },
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "ef43f72e-a246-40ec-82d1-feda446f318f",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                },
+                "leftValue": "={{ !$json.skipped && !!$json.url }}",
+                "rightValue": ""
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "86b122e0-2a4d-4648-8f72-47cbf32290ff",
+        "name": "BC API - Cert Open Ingresos",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          4680,
+          6208
+        ],
+        "parameters": {
+          "url": "={{ $json.url }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "options": {
+            "pagination": {
+              "pagination": {
+                "nextURL": "={{ $response.body['@odata.nextLink'] }}",
+                "paginationMode": "responseContainsNextURL",
+                "completeExpression": "={{ !$response.body['@odata.nextLink'] }}",
+                "paginationCompleteWhen": "other"
+              }
+            }
+          }
+        },
+        "credentials": {
+          "oAuth2Api": {
+            "id": "5caHilW1m87Snw87",
+            "name": "Business Central"
+          }
+        }
+      },
+      {
+        "id": "6bfa0851-a081-48a7-ba58-fdffd4d97d4c",
+        "name": "Transform Cert Open Ingresos",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          4900,
+          6208
+        ],
+        "parameters": {
+          "jsCode": "const toIso = (v) => {\n  if (v === null || v === undefined) return '';\n  const s = String(v).trim();\n  if (!s || s.startsWith('0001-01-01')) return '';\n  const d = new Date(s.includes('T') ? s : s.replace(' ', 'T'));\n  return Number.isNaN(d.getTime()) ? '' : d.toISOString();\n};\nconst input = $input.all();\nif (!input.length) return [];\nconst first = input[0]?.json || {};\nif (first.skipped) {\n  return [{ json: { skipped: true, key: 'job_ledger_cert_open', companyName: '', rowsJson: '[]', batchSize: 0, _maxRowTimestamp: undefined } }];\n}\n\nconst companyName = $items('Build sync_state map')[0]?.json?.company || '';\nconst cleanDate = (v) => {\n  const s = String(v ?? '').trim();\n  if (!s || s === '0001-01-01' || s.startsWith('0001-01-01')) return '';\n  return s.length >= 10 ? s.slice(0, 10) : s;\n};\nconst toNum = (v) => {\n  if (v === null || v === undefined) return 0;\n  const n = Number(v);\n  return Number.isFinite(n) ? n : 0;\n};\n\nlet __GLOBAL_MAX_TS__ = '';\nconst m = new Map();\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  const statusCode = Number(raw?.statusCode ?? raw?.response?.statusCode ?? 0);\n  if (statusCode >= 400) continue;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value)\n    ? src.value\n    : (Array.isArray(src) ? src : (src && typeof src === 'object' && !src.body ? [src] : []));\n  if (!Array.isArray(chunk)) continue;\n  for (const r of chunk) {\n    const hasCert = r.tieneCertificacion === true || r.tieneCertificacion === 'true' || r.TieneCertificacion === true;\n    if (!hasCert) continue;\n    const concepto = String(r.descripcion ?? r.Descripcion ?? '').trim();\n    if (concepto !== 'Ingresos') continue;\n\n    const ts = toIso(r.lastModifiedDateTime ?? r.LastModifiedDateTime);\n    if (ts && (!__GLOBAL_MAX_TS__ || ts > __GLOBAL_MAX_TS__)) __GLOBAL_MAX_TS__ = ts;\n\n    const jobNo = String(r.jobNo ?? r.JobNo ?? '').trim();\n    const year = Number(r.year ?? r.Year ?? 0) || 0;\n    const month = Number(r.month ?? r.Month ?? 0) || 0;\n    if (!jobNo || !year || !month) continue;\n    if (jobNo.startsWith('PP') || jobNo.startsWith('PY')) continue;\n\n    const nr = String(r.no ?? r.No ?? '').trim();\n    // Alineado con filas autoritativas de MovimientosProyectosMes (Ingresos Sale)\n    const typeLine = 'G/L Account';\n    const lineType = 'Billable';\n    const documentNo = String(r.documentNo ?? r.DocumentNo ?? '').trim();\n    // totalPrice viene negativo en Sale; mismo signo que Mes (invoice neg) → * -1\n    const totalPrice = toNum(r.totalPrice ?? r.TotalPrice);\n    const invoice = totalPrice * -1;\n    const cost = toNum(r.totalCost ?? r.TotalCost);\n    const quantity = toNum(r.quantity ?? r.Quantity);\n    const key = [jobNo, year, month, nr, typeLine, lineType, concepto, documentNo].join('|');\n    if (m.has(key)) {\n      const e = m.get(key);\n      e.invoice = Number(e.invoice || 0) + invoice;\n      e.cost = Number(e.cost || 0) + cost;\n      e.quantity = Number(e.quantity || 0) + quantity;\n      continue;\n    }\n    m.set(key, {\n      job_no: jobNo,\n      year,\n      month,\n      nr,\n      type_line: typeLine,\n      line_type: lineType,\n      concepto_analitico_descripcion: concepto,\n      document_no: documentNo,\n      document_date: cleanDate(r.documentDate ?? r.DocumentDate ?? ''),\n      timesheet_date: '',\n      invoice,\n      cost,\n      quantity,\n      departamento: String(r.globalDimension1Code ?? r.GlobalDimension1Code ?? '').trim(),\n      description: String(r.description ?? r.Description ?? '').trim(),\n      status: '',\n      tipo_proyecto: '',\n      probability: 0,\n      do_not_consolidate: false,\n      budget_date_year: null,\n      budget_date_month: null,\n      month_closing_status: 'Open',\n      concepto_analitico_code: String(r.ca ?? r.Ca ?? '').trim(),\n    });\n  }\n}\n\nconst rows = [...m.values()];\nconst chunkSize = 500;\nconst out = [];\nconst chunks = [];\nfor (let i = 0; i < rows.length; i += chunkSize) chunks.push(rows.slice(i, i + chunkSize));\nif (!chunks.length) chunks.push([]);\nfor (const chunk of chunks) {\n  out.push({\n    json: {\n      companyName,\n      rowsJson: JSON.stringify(chunk),\n      batchSize: chunk.length,\n      _maxRowTimestamp: __GLOBAL_MAX_TS__ || undefined,\n      key: 'job_ledger_cert_open',\n    },\n  });\n}\nreturn out;\n"
+        }
+      },
+      {
+        "id": "cec94407-f14e-48b4-8d0c-1d41dc1ef93f",
+        "name": "Upsert Cert Open Ingresos",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.4,
+        "position": [
+          5120,
+          6208
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "WITH src AS (\n  SELECT *\n  FROM jsonb_to_recordset($2::jsonb) AS r(\n    job_no text,\n    year integer,\n    month integer,\n    nr text,\n    type_line text,\n    line_type text,\n    concepto_analitico_descripcion text,\n    document_no text,\n    document_date text,\n    timesheet_date text,\n    invoice numeric,\n    cost numeric,\n    quantity numeric,\n    departamento text,\n    description text,\n    status text,\n    tipo_proyecto text,\n    probability numeric,\n    do_not_consolidate boolean,\n    budget_date_year integer,\n    budget_date_month integer,\n    month_closing_status text,\n    concepto_analitico_code text\n  )\n),\nopen_only AS (\n  SELECT s.*\n  FROM src s\n  WHERE COALESCE(NULLIF(s.job_no, ''), '') <> ''\n    AND COALESCE(s.year, 0) <> 0\n    AND COALESCE(s.month, 0) <> 0\n    AND NOT EXISTS (\n      SELECT 1 FROM public.bc_meses_cerrados c\n      WHERE c.company_name = $1\n        AND c.job_no = s.job_no\n        AND c.year = s.year\n        AND c.month = s.month\n    )\n),\nupserted AS (\n  INSERT INTO public.bc_job_ledger_entry_month\n  (company_name, job_no, year, month, nr, type_line, line_type, concepto_analitico_descripcion, document_no,\n   document_date, timesheet_date, invoice, cost, quantity, departamento, description, status, tipo_proyecto,\n   probability, do_not_consolidate, budget_date_year, budget_date_month, month_closing_status, concepto_analitico_code, updated_at)\n  SELECT\n    $1,\n    COALESCE(NULLIF(open_only.job_no, ''), ''),\n    COALESCE(open_only.year, 0),\n    COALESCE(open_only.month, 0),\n    COALESCE(NULLIF(open_only.nr, ''), ''),\n    COALESCE(NULLIF(open_only.type_line, ''), ''),\n    COALESCE(NULLIF(open_only.line_type, ''), ''),\n    COALESCE(NULLIF(open_only.concepto_analitico_descripcion, ''), ''),\n    COALESCE(NULLIF(open_only.document_no, ''), ''),\n    NULLIF(NULLIF(open_only.document_date, ''), '0001-01-01')::date,\n    NULLIF(NULLIF(open_only.timesheet_date, ''), '0001-01-01')::date,\n    open_only.invoice,\n    open_only.cost,\n    open_only.quantity,\n    NULLIF(open_only.departamento, ''),\n    NULLIF(open_only.description, ''),\n    NULLIF(open_only.status, ''),\n    NULLIF(open_only.tipo_proyecto, ''),\n    open_only.probability,\n    COALESCE(open_only.do_not_consolidate, false),\n    open_only.budget_date_year,\n    open_only.budget_date_month,\n    NULLIF(open_only.month_closing_status, ''),\n    NULLIF(open_only.concepto_analitico_code, ''),\n    NOW()\n  FROM open_only\n  ON CONFLICT (company_name, job_no, year, month, nr, type_line, line_type, concepto_analitico_descripcion, document_no)\n  DO UPDATE SET\n    document_date = EXCLUDED.document_date,\n    timesheet_date = EXCLUDED.timesheet_date,\n    invoice = EXCLUDED.invoice,\n    cost = EXCLUDED.cost,\n    quantity = EXCLUDED.quantity,\n    departamento = EXCLUDED.departamento,\n    description = EXCLUDED.description,\n    status = EXCLUDED.status,\n    tipo_proyecto = EXCLUDED.tipo_proyecto,\n    probability = EXCLUDED.probability,\n    do_not_consolidate = EXCLUDED.do_not_consolidate,\n    budget_date_year = EXCLUDED.budget_date_year,\n    budget_date_month = EXCLUDED.budget_date_month,\n    month_closing_status = EXCLUDED.month_closing_status,\n    concepto_analitico_code = EXCLUDED.concepto_analitico_code,\n    updated_at = NOW()\n  RETURNING 1\n)\nSELECT COUNT(*)::int AS affected FROM upserted;\n",
+          "options": {
+            "queryReplacement": "{{$json.companyName}}\n{{$json.rowsJson}}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "TTHI6C7o3V8eVzzr",
+            "name": "Postgres PS_Analytics"
+          }
+        }
+      },
+      {
+        "id": "f25a1c02-de99-4055-9041-797933088bca",
+        "name": "Compute now ISO (Cert Open Ingresos)",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          5340,
+          6128
+        ],
+        "parameters": {
+          "jsCode": "const upsertItems = $items('Upsert Cert Open Ingresos');\nif (!upsertItems.length) { return []; }\nfor (const it of upsertItems) {\n  const j = it?.json || {};\n  if (j.error) { return []; }\n  if (j.skipped) { return []; }\n}\nconst map = $('Build sync_state map').first()?.json || {};\nconst companyName = map.company || '';\nconst prevSync = map.syncStateByEntity?.['job_ledger_cert_open'] || '1900-01-01T00:00:00.000Z';\nlet maxTs = '';\nconst transformItems = $items('Transform Cert Open Ingresos');\nfor (const it of transformItems) {\n  const t = it?.json?._maxRowTimestamp;\n  if (t && (!maxTs || t > maxTs)) maxTs = t;\n}\nif (!maxTs || maxTs <= prevSync) {\n  maxTs = prevSync;\n}\nreturn [{ json: { companyName, nowIso: maxTs } }];\n"
+        }
+      },
+      {
+        "id": "3280840c-b633-4811-96a8-456aa541b59e",
+        "name": "Update sync_state (Cert Open Ingresos)",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.4,
+        "position": [
+          5560,
+          6128
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "UPDATE public.sync_state\nSET last_sync_at = $2::timestamptz\nWHERE company_name = $1 AND entity = 'bc_job_ledger_cert_open'\nRETURNING *;",
+          "options": {
+            "queryReplacement": "{{$json.companyName}}\n{{$json.nowIso}}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "TTHI6C7o3V8eVzzr",
+            "name": "Postgres PS_Analytics"
+          }
+        }
+      },
+      {
+        "id": "924ec350-e3d8-4342-b22d-619631708299",
+        "name": "Skip Result Cert Open Ingresos",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          4680,
+          6388
+        ],
+        "parameters": {
+          "jsCode": "return [{ json: { status: 'skipped', key: 'job_ledger_cert_open', synced: 0, success: 0, skipped: true } }];"
+        }
+      },
+      {
+        "id": "8ec7d9b7-86a3-4665-a68c-207f5f7e8125",
+        "name": "Result Cert Open Ingresos",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          5340,
+          6288
+        ],
+        "parameters": {
+          "jsCode": "const items = $input.all();\nlet failed = 0;\nlet firstErr = '';\nlet affected = 0;\nfor (const it of items) {\n  const j = it?.json || {};\n  if (j.skipped) {\n    return [{ json: { key: 'job_ledger_cert_open', status: 'ok', synced: 0, success: 0, skipped: true } }];\n  }\n  const statusCode = Number(j?.statusCode ?? j?.response?.statusCode ?? 0);\n  const bodyErr = j?.body?.error?.message || (typeof j?.body === 'string' ? j.body : null);\n  const msg = j?.error?.message || j?.message || j?.data?.error || bodyErr || null;\n  if (!firstErr && msg) firstErr = String(msg);\n  if (msg || statusCode >= 400) failed++;\n  const n = Number(j?.affected ?? 0);\n  if (Number.isFinite(n)) affected += n;\n}\nconst success = items.length - failed;\nconst synced = affected || success;\nconst res = { key: 'job_ledger_cert_open', causeNode: 'Upsert Cert Open Ingresos' };\nif (failed > 0) {\n  res.status = 'error';\n  res.synced = synced;\n  res.failed = failed;\n  res.message = firstErr || ('HTTP ' + (items[0]?.json?.statusCode || 'error'));\n} else {\n  res.status = 'ok';\n  res.synced = synced;\n  res.success = success;\n  res.affected = affected;\n}\nreturn [{ json: res }];\n"
+        }
       }
     ],
     "connections": {
@@ -4511,9 +4710,9 @@
         "main": [
           [
             {
-              "index": 10,
-              "node": "Merge",
-              "type": "main"
+              "node": "Ensure sync_state (Cert Open Ingresos)",
+              "type": "main",
+              "index": 0
             }
           ]
         ]
@@ -5814,9 +6013,9 @@
         "main": [
           [
             {
-              "index": 0,
-              "node": "Result MovimientosProyectos",
-              "type": "main"
+              "node": "Skip Result Cert Open Ingresos",
+              "type": "main",
+              "index": 0
             }
           ]
         ]
@@ -6446,6 +6645,122 @@
           [
             {
               "node": "Transform MovimientosProyectos",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Ensure sync_state (Cert Open Ingresos)": {
+        "main": [
+          [
+            {
+              "node": "Prepare Cert Open Ingresos",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prepare Cert Open Ingresos": {
+        "main": [
+          [
+            {
+              "node": "IF Cert Open has request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IF Cert Open has request": {
+        "main": [
+          [
+            {
+              "node": "BC API - Cert Open Ingresos",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Skip Result Cert Open Ingresos",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BC API - Cert Open Ingresos": {
+        "main": [
+          [
+            {
+              "node": "Transform Cert Open Ingresos",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Transform Cert Open Ingresos": {
+        "main": [
+          [
+            {
+              "node": "Upsert Cert Open Ingresos",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Upsert Cert Open Ingresos": {
+        "main": [
+          [
+            {
+              "node": "Compute now ISO (Cert Open Ingresos)",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Result Cert Open Ingresos",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Compute now ISO (Cert Open Ingresos)": {
+        "main": [
+          [
+            {
+              "node": "Update sync_state (Cert Open Ingresos)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Update sync_state (Cert Open Ingresos)": {
+        "main": [
+          []
+        ]
+      },
+      "Skip Result Cert Open Ingresos": {
+        "main": [
+          [
+            {
+              "node": "Result Cert Open Ingresos",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Result Cert Open Ingresos": {
+        "main": [
+          [
+            {
+              "node": "Merge",
               "type": "main",
               "index": 0
             }

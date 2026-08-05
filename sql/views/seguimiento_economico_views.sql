@@ -309,8 +309,16 @@ CREATE OR REPLACE VIEW public.v_se_lineas_expedientes AS
             AND e.job_no::text !~~ 'PP%'::text AND e.job_no::text !~~ 'PY%'::text
             AND e.budget_date_month = e.month AND e.budget_date_year = e.year
             -- status1 = cierre del MES (Open/Close), no estado del Job (Completed/Lost).
-            -- Solo meses Open entran en P; Close ya está cubierto por Tipo R.
-            AND e.month_closing_status = 'Open'
+            -- Igual que v_se_lineas_planificacion: si ya hay Ingresos reales en ledger
+            -- (Mes cerrado o provisional desde certificaciones en mes abierto), no duplicar como P.
+            AND NOT EXISTS (
+              SELECT 1 FROM bc_job_ledger_entry_month m
+              WHERE m.company_name = e.company_name
+                AND m.job_no::text = e.job_no::text
+                AND m.year = e.year
+                AND m.month = e.month
+                AND m.concepto_analitico_descripcion = 'Ingresos'
+            )
             AND COALESCE(e.status, j.status, ''::character varying)::text <> ALL (ARRAY['Completed'::text, 'Lost'::text])
         ), dedup AS (
          SELECT DISTINCT ON (s.empresa, s.job, s.year, s.month, s.job_unit_no, s.invoice) s.empresa,
@@ -360,7 +368,7 @@ CREATE OR REPLACE VIEW public.v_se_lineas_expedientes AS
     d.empresa || ':'::text AS empresa_recurso,
     d.job_unit_no
    FROM dedup d;
-COMMENT ON VIEW public.v_se_lineas_expedientes IS 'PBI Lineas Expedientes: budget_date_month=month, Distinct(job,year,month,job_unit_no,invoice), month_closing_status=Open, excluye Job Completed/Lost. job_unit_no evita colapsar unidades con mismo Planned Amount.';
+COMMENT ON VIEW public.v_se_lineas_expedientes IS 'PBI Lineas Expedientes: budget_date_month=month, Distinct(job,year,month,job_unit_no,invoice), excluye si ya hay Ingresos en ledger (anti doble conteo P/R), excluye Job Completed/Lost. job_unit_no evita colapsar unidades con mismo Planned Amount.';
 
 -- ---------------------------------------------------------------------------
 -- View: v_se_lineas_meses_cerrados

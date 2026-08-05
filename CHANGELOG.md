@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [2026-08-05b] — Ingresos de certificación en meses abiertos
+
+### Added
+- Workflow 004: tramo `job_ledger_cert_open` tras MovimientosProyectosMes —
+  lee `movimientosProyectos` con `descripcion eq 'Ingresos' and tieneCertificacion eq true`,
+  UPSERT a `bc_job_ledger_entry_month` solo si el job-mes no está en `bc_meses_cerrados`.
+  Watermark propio `bc_job_ledger_cert_open`. Requiere campo BC `tieneCertificacion`
+  en el entorno (OK en Pruebas_PS; Production pendiente de publish).
+
+### Changed
+- `v_se_lineas_expedientes`: deja de filtrar `month_closing_status = 'Open'`;
+  usa `NOT EXISTS` Ingresos en ledger (paridad con planificación, anti doble P/R).
+
+### Docs
+- `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md`
+- `docs/shared/analytics/ANALYTICS_FACTURACION_PBI_ALIGNMENT.md` (Fix 5 evolucionado)
+
 ## [2026-08-05] — Movimientos: partition overwrite por cierre de mes (health 021)
 
 ### Fixed
