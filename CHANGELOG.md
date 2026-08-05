@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+## [2026-08-05] — Movimientos: partition overwrite por cierre de mes (health 021)
+
+### Fixed
+- Health check 021 `tipo_r_sum` PSI: BC 2.724.184,04 vs Analytics 2.688.861,29
+  (Δ 35.322,75). Causa: Ingresos de jun-2026 “aparecieron” en
+  `MovimientosProyectosMes` al cerrar el mes (timestamps
+  `monthClosingLastModifiedDateTime` / `jobLastModifiedDateTime` en ago-2026)
+  sin actualizar `lastModifiedDateTime` del movimiento → el sync incremental
+  del 004 no los pedía.
+- Upsert quirúrgico en Analytics de 6 PKs jun-2026 (facturas + abonos
+  PSI-OT-25-2053/2048/2018/2008, PSI-OT-24-2033, PSI-OT-23-2017) → paridad
+  exacta `tipo_r_sum` = 2.724.184,04.
+
+### Changed
+- Workflow 004 `job_ledger_entry_month`: mismo patrón que PlanificacionMes —
+  discovery por `lastModifiedDateTime` **+** `jobLastModifiedDateTime` **+**
+  `monthClosingLastModifiedDateTime` → particiones year|month → snapshot OData
+  del mes → DELETE+INSERT (sin inflación 3×: discovery no suma importes).
+
+### Docs
+- `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md`
+- `docs/HEALTH_CHECK_021.md`
+
 ## [2026-08-04c] — ExpedienteMes: `job_unit_no` (evitar colapsar unidades con mismo invoice)
 
 ### Fixed

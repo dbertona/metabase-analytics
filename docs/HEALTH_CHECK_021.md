@@ -14,6 +14,12 @@ Por eso el 021 **no** alerta por bruto de plan BC vs `bc_job_planning_line`.
 | Check | BC | Analytics | Criterio |
 |-------|----|-----------|----------|
 | `tipo_r_sum` | `movimientosProyectosMes` year + Ingresos (ABS) | `bc_job_ledger_entry_month` Ingresos | fail si \|Δ\| > 0,5 € |
+
+> **2026-08-05:** un fail en `tipo_r_sum` con Analytics “congelado” y BC al día
+> suele ser **cierre de mes** en BC (`monthClosingLastModifiedDateTime` reciente,
+> `lastModifiedDateTime` antiguo). El 004 ya descubre esos cambios vía partition
+> overwrite de movimientos. Mitigación inmediata: upsert de las PKs faltantes o
+> resync de partición year|month; ver `004_SYNC_BC_ANALYTICS.md` § flujo Movimientos.
 | `meses_cerrados_count` | `mesesCerrados` excl. PP/PY | `bc_meses_cerrados` | warn si Δ>50; fail si Δ>5 % |
 | `budget0_past_with_invoice` | — | plan `budget_date_year=0` con importe en meses pasados | fail si > 0 |
 | `sync_freshness_hours` | — | `MAX(sync_state)` entidades clave | warn si > 26 h |
