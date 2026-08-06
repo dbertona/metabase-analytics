@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [2026-08-06] — Documentación exhaustiva auditoría OT 2026 (§10)
+
+### Docs
+- `ANALYTICS_FACTURACION_PBI_ALIGNMENT.md` §10 (471 líneas): documentación completa de la
+  auditoría del departamento OT (`1-02`) año 2026, incluyendo:
+  - Reglas de negocio P/R acordadas (`Open` = P+R · `Close` = solo R)
+  - Guías paso a paso para leer valores directamente en BC (MCP, OData, SQL)
+  - Arquitectura interna del PBIX: 4 queries M, ponderación probabilidad, anti-join M code
+  - Consultas DAX correctas para DAX Studio (por empresa, status1, job a job)
+  - Tabla de cifras clave OT 2026: PBI visual 2.745.895 € · BC ref 2.759.731 € · gap 13.835 €
+  - Análisis del gap residual y acción pendiente (deploy 004 en prod)
+  - Checklist de auditoría reproducible para cualquier departamento
+  - 9 lecciones aprendidas (ALL() en DAX, probability weighting, status1 vs estado, etc.)
+
 ## [2026-08-05b] — Ingresos de certificación en meses abiertos
 
 ### Added
