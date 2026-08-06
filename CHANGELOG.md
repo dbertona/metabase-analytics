@@ -2,6 +2,60 @@
 
 ## [Unreleased]
 
+## [2026-08-06] — Documentación exhaustiva auditoría OT 2026 (§10)
+
+### Docs
+- `ANALYTICS_FACTURACION_PBI_ALIGNMENT.md` §10 (471 líneas): documentación completa de la
+  auditoría del departamento OT (`1-02`) año 2026, incluyendo:
+  - Reglas de negocio P/R acordadas (`Open` = P+R · `Close` = solo R)
+  - Guías paso a paso para leer valores directamente en BC (MCP, OData, SQL)
+  - Arquitectura interna del PBIX: 4 queries M, ponderación probabilidad, anti-join M code
+  - Consultas DAX correctas para DAX Studio (por empresa, status1, job a job)
+  - Tabla de cifras clave OT 2026: PBI visual 2.745.895 € · BC ref 2.759.731 € · gap 13.835 €
+  - Análisis del gap residual y acción pendiente (deploy 004 en prod)
+  - Checklist de auditoría reproducible para cualquier departamento
+  - 9 lecciones aprendidas (ALL() en DAX, probability weighting, status1 vs estado, etc.)
+
+## [2026-08-05b] — Ingresos de certificación en meses abiertos
+
+### Added
+- Workflow 004: tramo `job_ledger_cert_open` tras MovimientosProyectosMes —
+  lee `movimientosProyectos` con `descripcion eq 'Ingresos' and tieneCertificacion eq true`,
+  UPSERT a `bc_job_ledger_entry_month` solo si el job-mes no está en `bc_meses_cerrados`.
+  Watermark propio `bc_job_ledger_cert_open`. Requiere campo BC `tieneCertificacion`
+  en el entorno (OK en Pruebas_PS; Production pendiente de publish).
+
+### Changed
+- `v_se_lineas_expedientes`: deja de filtrar `month_closing_status = 'Open'`;
+  usa `NOT EXISTS` Ingresos en ledger (paridad con planificación, anti doble P/R).
+
+### Docs
+- `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md`
+- `docs/shared/analytics/ANALYTICS_FACTURACION_PBI_ALIGNMENT.md` (Fix 5 evolucionado)
+
+## [2026-08-05] — Movimientos: partition overwrite por cierre de mes (health 021)
+
+### Fixed
+- Health check 021 `tipo_r_sum` PSI: BC 2.724.184,04 vs Analytics 2.688.861,29
+  (Δ 35.322,75). Causa: Ingresos de jun-2026 “aparecieron” en
+  `MovimientosProyectosMes` al cerrar el mes (timestamps
+  `monthClosingLastModifiedDateTime` / `jobLastModifiedDateTime` en ago-2026)
+  sin actualizar `lastModifiedDateTime` del movimiento → el sync incremental
+  del 004 no los pedía.
+- Upsert quirúrgico en Analytics de 6 PKs jun-2026 (facturas + abonos
+  PSI-OT-25-2053/2048/2018/2008, PSI-OT-24-2033, PSI-OT-23-2017) → paridad
+  exacta `tipo_r_sum` = 2.724.184,04.
+
+### Changed
+- Workflow 004 `job_ledger_entry_month`: mismo patrón que PlanificacionMes —
+  discovery por `lastModifiedDateTime` **+** `jobLastModifiedDateTime` **+**
+  `monthClosingLastModifiedDateTime` → particiones year|month → snapshot OData
+  del mes → DELETE+INSERT (sin inflación 3×: discovery no suma importes).
+
+### Docs
+- `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md`
+- `docs/HEALTH_CHECK_021.md`
+
 ## [2026-08-04c] — ExpedienteMes: `job_unit_no` (evitar colapsar unidades con mismo invoice)
 
 ### Fixed
