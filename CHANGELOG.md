@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-08-07d] — PBI: quitar Distinct en Lineas PLanificacion
+
+### Fixed
+- PBIP `Lineas PLanificacion.tmdl`: eliminado `Table.Distinct` por
+  `(job,year,month,invoice,cost,nr,descripcionCA)` — mismo fix que Analytics
+  Transform 004 (`PSI-OT-26-2001`). Docs §11.9 en
+  `ANALYTICS_FACTURACION_PBI_ALIGNMENT.md`.
+
 ## [2026-08-07c] — Health 021: paridad planif + Tipo R con cert open
 
 ### Changed
