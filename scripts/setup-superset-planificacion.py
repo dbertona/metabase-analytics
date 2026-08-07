@@ -1097,6 +1097,17 @@ def persist_dashboard_config(
         ".dashboard-component-tabs .ant-tabs-nav {\n"
         "  flex: 0 0 auto !important;\n"
         "}\n"
+        "/* Barra de pestañas: con 7 tabs el overflow debe ser scrolleable */\n"
+        ".dashboard-component-tabs .ant-tabs-nav-wrap {\n"
+        "  overflow-x: auto !important;\n"
+        "  overflow-y: hidden !important;\n"
+        "}\n"
+        ".dashboard-component-tabs .ant-tabs-nav-list {\n"
+        "  flex-wrap: nowrap !important;\n"
+        "}\n"
+        ".dashboard-component-tabs .ant-tabs-nav-operations {\n"
+        "  display: flex !important;\n"
+        "}\n"
         ".dashboard-component-tabs .ant-tabs-content-holder,\n"
         ".dashboard-component-tabs .ant-tabs-content,\n"
         ".dashboard-component-tabs .ant-tabs-tabpane-active,\n"
@@ -2040,9 +2051,10 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "id": "TAB-MOR",
             "children": ["ROW-MOR-TOP", "ROW-MOR-HORAS", "ROW-MOR-COSTE"],
             "parents": ["ROOT_ID", "GRID_ID", "TABS-MAIN"],
+            # Etiqueta corta: el nombre PBI completo no cabe en la barra (7 tabs).
             "meta": {
-                "text": "Mano de Obra Recursos/Perfiles",
-                "defaultText": "Mano de Obra Recursos/Perfiles",
+                "text": "Recursos/Perfiles",
+                "defaultText": "Recursos/Perfiles",
             },
         },
         "TAB-FACTURACION": {
