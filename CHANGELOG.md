@@ -2,13 +2,15 @@
 
 ## [Unreleased]
 
-## [2026-08-07c] — Health 021: paridad planificacionMes sin Distinct
+## [2026-08-07c] — Health 021: paridad planif + Tipo R con cert open
 
 ### Changed
 - Workflow 021: nuevo check `tipo_p_planif_sum` — compara `planificacionMes` BC
   (SUM todas las líneas, mismos filtros que Transform 004) vs
   `bc_job_planning_line`. Tolerancia 0,5 € → `fail`.
-- Alineado al fix 2026-08-07b (sin Distinct por importe). Docs `HEALTH_CHECK_021.md`.
+- Workflow 021 `tipo_r_sum`: BC = `movimientosProyectosMes` + certificaciones
+  abiertas (`movimientosProyectos` `tieneCertificacion`, excl. meses cerrados),
+  alineado al path 004 `job_ledger_cert_open`. Docs `HEALTH_CHECK_021.md`.
 
 ## [2026-08-07b] — Planificación: sumar líneas con mismo importe (Excel/BC)
 

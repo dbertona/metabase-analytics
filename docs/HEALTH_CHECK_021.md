@@ -7,7 +7,7 @@ Si hay diferencias, envía email desde `noreply@powersolution.es` a `dbertona@po
 
 | Check | BC | Analytics | Criterio |
 |-------|----|-----------|----------|
-| `tipo_r_sum` | `movimientosProyectosMes` year + Ingresos (ABS) | `bc_job_ledger_entry_month` Ingresos | fail si \|Δ\| > 0,5 € |
+| `tipo_r_sum` | `movimientosProyectosMes` Ingresos (ABS) **+** cert open (`movimientosProyectos` `tieneCertificacion`, solo meses **no** cerrados) — misma composición que ledger Analytics | `bc_job_ledger_entry_month` Ingresos | fail si \|Δ\| > 0,5 € |
 | `tipo_p_planif_sum` | `planificacionMes` year — **SUM todas las líneas** (sin Distinct por importe); filtros estado + `budgetDate` = Transform 004 | `bc_job_planning_line` mismos filtros | fail si \|Δ\| > 0,5 € |
 | `meses_cerrados_count` | `mesesCerrados` excl. PP/PY | `bc_meses_cerrados` | warn si Δ>50; fail si Δ>5 % |
 | `budget0_past_with_invoice` | — | plan `budget_date_year=0` con importe en meses pasados | fail si > 0 |
@@ -19,6 +19,10 @@ Si hay diferencias, envía email desde `noreply@powersolution.es` a `dbertona@po
 > Analytics vs BC/Excel (caso `PSI-OT-26-2001`). Ahora BC y tabla sync deben
 > coincidir al céntimo. El KPI Apps/Superset (`v_se_facturacion` P+R) sigue
 > siendo distinto (excluye meses cerrados / con Ingresos, etc.) → check `info`.
+>
+> **2026-08-07 (tipo_r):** BC = Mes cerrados + Cert Open abiertos (path 004
+> `job_ledger_cert_open`). Sin cert open, el 021 fallaba ~18 k€ (jul PSI) porque
+> Analytics sí incluye R provisional y `movimientosProyectosMes` no.
 
 > **2026-08-05:** un fail en `tipo_r_sum` con Analytics “congelado” y BC al día
 > suele ser **cierre de mes** en BC (`monthClosingLastModifiedDateTime` reciente,
