@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [2026-08-07] — Expedientes: anti-join solo en meses Close (paridad PBI)
+
+### Fixed
+- `v_se_lineas_expedientes`: el `NOT EXISTS` contra Ingresos en ledger aplica solo
+  cuando `month_closing_status = 'Close'`. En meses Open se mantienen P + R
+  (misma regla que `Lineas Expedientes` del PBIX).
+- Gap corregido PSI 2026: +35.460,31 € Tipo P (`PSI-OT-23-2017` y `PSI-OT-24-2034` jul).
+
+### Docs
+- Alineación documentada con regla negocio Open=P+R / Close=solo R.
+
 ## [2026-08-06] — Documentación exhaustiva auditoría OT 2026 (§10)
 
 ### Docs
