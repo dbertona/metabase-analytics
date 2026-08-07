@@ -39,6 +39,14 @@ DROP VIEW IF EXISTS bi_v_gastos CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS bi_mv_gastos CASCADE;
 DROP VIEW IF EXISTS bi_v_mano_obra CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS bi_mv_mano_obra CASCADE;
+DROP VIEW IF EXISTS bi_v_mano_obra_recursos_horas CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS bi_mv_mano_obra_recursos_horas CASCADE;
+DROP VIEW IF EXISTS bi_v_mano_obra_recursos_coste CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS bi_mv_mano_obra_recursos_coste CASCADE;
+DROP VIEW IF EXISTS bi_v_mano_obra_recursos_prob CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS bi_mv_mano_obra_recursos_prob CASCADE;
+DROP VIEW IF EXISTS bi_v_mano_obra_recursos_perfil CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS bi_mv_mano_obra_recursos_perfil CASCADE;
 DROP VIEW IF EXISTS bi_v_facturacion CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS bi_mv_facturacion CASCADE;
 
@@ -600,6 +608,273 @@ COMMENT ON VIEW bi_v_mano_obra IS
   'Mano de Obra: filas planas proyecto+recurso (coste×mes) + m0N_closed desde bc_meses_cerrados. Jerarquía Proyecto→Recurso se agrupa en el consumidor (API/React), no en SQL.';
 COMMENT ON MATERIALIZED VIEW bi_mv_mano_obra IS
   'Snapshot bi_v_mano_obra (filas planas + flags mes cerrado); refrescar tras sync BC→Analytics.';
+
+-- -----------------------------------------------------------------------------
+-- Pestaña PBI «Mano de Obra Recursos/Perfiles»
+-- Fuente M: Table.Combine(Planif+Expedientes+Proyectos+MesesCerrados)
+--   → typeLine null→Resource, solo Resource, lineType<>Billable,
+--   Coste/Cantidad ponderados por probabilidad, excl. job PP*,
+--   filtros página: tipoProyecto=Operational (+ typeLine Resource).
+-- department_code = dept del recurso (bc_resource), no de la línea.
+-- -----------------------------------------------------------------------------
+
+-- Horas (cantidad) por Nombre × mes — grano nombre+proyecto (expand PBI)
+CREATE MATERIALIZED VIEW bi_mv_mano_obra_recursos_horas AS
+SELECT
+    f.empresa,
+    f.year,
+    COALESCE(NULLIF(TRIM(r.department_code), ''), f.departamento) AS department_code,
+    d.department_name,
+    f.tipo,
+    CASE f.tipo WHEN 'P' THEN 'Planificado' WHEN 'R' THEN 'Real'
+                ELSE COALESCE(f.tipo::text, '') END AS tipo_label,
+    f.tipo_proyecto,
+    f.job,
+    (f.job::text || ' --- ') || left(COALESCE(f.descripcion, ''), 36) AS proyecto,
+    f.nr,
+    COALESCE(NULLIF(TRIM(r.name), ''), NULLIF(TRIM(f.nr), ''), '(sin recurso)') AS nombre,
+    COALESCE(NULLIF(TRIM(r.perfil), ''), '(sin perfil)') AS perfil,
+    SUM(f.cantidad) FILTER (WHERE f.month =  1) AS m01,
+    SUM(f.cantidad) FILTER (WHERE f.month =  2) AS m02,
+    SUM(f.cantidad) FILTER (WHERE f.month =  3) AS m03,
+    SUM(f.cantidad) FILTER (WHERE f.month =  4) AS m04,
+    SUM(f.cantidad) FILTER (WHERE f.month =  5) AS m05,
+    SUM(f.cantidad) FILTER (WHERE f.month =  6) AS m06,
+    SUM(f.cantidad) FILTER (WHERE f.month =  7) AS m07,
+    SUM(f.cantidad) FILTER (WHERE f.month =  8) AS m08,
+    SUM(f.cantidad) FILTER (WHERE f.month =  9) AS m09,
+    SUM(f.cantidad) FILTER (WHERE f.month = 10) AS m10,
+    SUM(f.cantidad) FILTER (WHERE f.month = 11) AS m11,
+    SUM(f.cantidad) FILTER (WHERE f.month = 12) AS m12,
+    SUM(f.cantidad) AS total
+FROM v_se_facturacion f
+LEFT JOIN bc_resource r
+    ON r.code = f.nr AND r.company_name = f.empresa
+LEFT JOIN mb_v_dim_departamento d
+    ON d.company_name = f.empresa
+   AND d.department_code = COALESCE(NULLIF(TRIM(r.department_code), ''), f.departamento)
+WHERE f.tipo IN ('P', 'R')
+  AND f.tipo_proyecto = 'Operational'
+  AND COALESCE(f.type_line, 'Resource') = 'Resource'
+  AND COALESCE(f.line_type, '') <> 'Billable'
+  AND NOT (f.job LIKE 'PP%')
+GROUP BY
+    f.empresa, f.year,
+    COALESCE(NULLIF(TRIM(r.department_code), ''), f.departamento),
+    d.department_name,
+    f.tipo, f.tipo_proyecto, f.job, f.descripcion, f.nr, r.name, r.perfil
+HAVING ABS(SUM(f.cantidad)) > 0.0001;
+
+CREATE INDEX IF NOT EXISTS bi_mv_mor_horas_idx0 ON bi_mv_mano_obra_recursos_horas (empresa, year);
+CREATE INDEX IF NOT EXISTS bi_mv_mor_horas_idx1 ON bi_mv_mano_obra_recursos_horas (department_code);
+CREATE INDEX IF NOT EXISTS bi_mv_mor_horas_idx2 ON bi_mv_mano_obra_recursos_horas (tipo_label);
+CREATE INDEX IF NOT EXISTS bi_mv_mor_horas_idx3 ON bi_mv_mano_obra_recursos_horas (nombre);
+
+CREATE VIEW bi_v_mano_obra_recursos_horas AS SELECT * FROM bi_mv_mano_obra_recursos_horas;
+
+COMMENT ON VIEW bi_v_mano_obra_recursos_horas IS
+  'PBI Mano de Obra Recursos/Perfiles — matriz Horas (cantidad×prob) por nombre×proyecto×mes. Filtros: Operational, Resource, not Billable, no PP.';
+COMMENT ON MATERIALIZED VIEW bi_mv_mano_obra_recursos_horas IS
+  'Snapshot bi_v_mano_obra_recursos_horas; REFRESH tras sync 004.';
+
+-- Coste de Mano de Obra por Nombre × mes
+CREATE MATERIALIZED VIEW bi_mv_mano_obra_recursos_coste AS
+SELECT
+    f.empresa,
+    f.year,
+    COALESCE(NULLIF(TRIM(r.department_code), ''), f.departamento) AS department_code,
+    d.department_name,
+    f.tipo,
+    CASE f.tipo WHEN 'P' THEN 'Planificado' WHEN 'R' THEN 'Real'
+                ELSE COALESCE(f.tipo::text, '') END AS tipo_label,
+    f.tipo_proyecto,
+    f.job,
+    (f.job::text || ' --- ') || left(COALESCE(f.descripcion, ''), 36) AS proyecto,
+    f.nr,
+    COALESCE(NULLIF(TRIM(r.name), ''), NULLIF(TRIM(f.nr), ''), '(sin recurso)') AS nombre,
+    COALESCE(NULLIF(TRIM(r.perfil), ''), '(sin perfil)') AS perfil,
+    SUM(f.coste) FILTER (WHERE f.month =  1) AS m01,
+    SUM(f.coste) FILTER (WHERE f.month =  2) AS m02,
+    SUM(f.coste) FILTER (WHERE f.month =  3) AS m03,
+    SUM(f.coste) FILTER (WHERE f.month =  4) AS m04,
+    SUM(f.coste) FILTER (WHERE f.month =  5) AS m05,
+    SUM(f.coste) FILTER (WHERE f.month =  6) AS m06,
+    SUM(f.coste) FILTER (WHERE f.month =  7) AS m07,
+    SUM(f.coste) FILTER (WHERE f.month =  8) AS m08,
+    SUM(f.coste) FILTER (WHERE f.month =  9) AS m09,
+    SUM(f.coste) FILTER (WHERE f.month = 10) AS m10,
+    SUM(f.coste) FILTER (WHERE f.month = 11) AS m11,
+    SUM(f.coste) FILTER (WHERE f.month = 12) AS m12,
+    SUM(f.coste) AS total
+FROM v_se_facturacion f
+LEFT JOIN bc_resource r
+    ON r.code = f.nr AND r.company_name = f.empresa
+LEFT JOIN mb_v_dim_departamento d
+    ON d.company_name = f.empresa
+   AND d.department_code = COALESCE(NULLIF(TRIM(r.department_code), ''), f.departamento)
+WHERE f.tipo IN ('P', 'R')
+  AND f.tipo_proyecto = 'Operational'
+  AND COALESCE(f.type_line, 'Resource') = 'Resource'
+  AND COALESCE(f.line_type, '') <> 'Billable'
+  AND NOT (f.job LIKE 'PP%')
+GROUP BY
+    f.empresa, f.year,
+    COALESCE(NULLIF(TRIM(r.department_code), ''), f.departamento),
+    d.department_name,
+    f.tipo, f.tipo_proyecto, f.job, f.descripcion, f.nr, r.name, r.perfil
+HAVING ABS(SUM(f.coste)) > 0.0001;
+
+CREATE INDEX IF NOT EXISTS bi_mv_mor_coste_idx0 ON bi_mv_mano_obra_recursos_coste (empresa, year);
+CREATE INDEX IF NOT EXISTS bi_mv_mor_coste_idx1 ON bi_mv_mano_obra_recursos_coste (department_code);
+CREATE INDEX IF NOT EXISTS bi_mv_mor_coste_idx2 ON bi_mv_mano_obra_recursos_coste (tipo_label);
+CREATE INDEX IF NOT EXISTS bi_mv_mor_coste_idx3 ON bi_mv_mano_obra_recursos_coste (nombre);
+
+CREATE VIEW bi_v_mano_obra_recursos_coste AS SELECT * FROM bi_mv_mano_obra_recursos_coste;
+
+COMMENT ON VIEW bi_v_mano_obra_recursos_coste IS
+  'PBI Mano de Obra Recursos/Perfiles — matriz Coste (coste×prob) por nombre×proyecto×mes.';
+COMMENT ON MATERIALIZED VIEW bi_mv_mano_obra_recursos_coste IS
+  'Snapshot bi_v_mano_obra_recursos_coste; REFRESH tras sync 004.';
+
+-- Horas por Probabilidad (barras): buckets 100 / 90 / 70 / Otros
+CREATE MATERIALIZED VIEW bi_mv_mano_obra_recursos_prob AS
+SELECT
+    f.empresa,
+    f.year,
+    COALESCE(NULLIF(TRIM(r.department_code), ''), f.departamento) AS department_code,
+    d.department_name,
+    f.tipo,
+    CASE f.tipo WHEN 'P' THEN 'Planificado' WHEN 'R' THEN 'Real'
+                ELSE COALESCE(f.tipo::text, '') END AS tipo_label,
+    f.job,
+    (f.job::text || ' --- ') || left(COALESCE(f.descripcion, ''), 36) AS proyecto,
+    CASE
+        WHEN f.pct IN (100, 90, 70) THEN f.pct
+        ELSE -1::numeric
+    END AS probabilidad,
+    CASE
+        WHEN f.pct = 100 THEN '100%'
+        WHEN f.pct = 90 THEN '90%'
+        WHEN f.pct = 70 THEN '70%'
+        ELSE 'Otros'
+    END AS probabilidad_label,
+    SUM(f.cantidad) AS horas
+FROM v_se_facturacion f
+LEFT JOIN bc_resource r
+    ON r.code = f.nr AND r.company_name = f.empresa
+LEFT JOIN mb_v_dim_departamento d
+    ON d.company_name = f.empresa
+   AND d.department_code = COALESCE(NULLIF(TRIM(r.department_code), ''), f.departamento)
+WHERE f.tipo IN ('P', 'R')
+  AND f.tipo_proyecto = 'Operational'
+  AND COALESCE(f.type_line, 'Resource') = 'Resource'
+  AND COALESCE(f.line_type, '') <> 'Billable'
+  AND NOT (f.job LIKE 'PP%')
+GROUP BY
+    f.empresa, f.year,
+    COALESCE(NULLIF(TRIM(r.department_code), ''), f.departamento),
+    d.department_name,
+    f.tipo, f.job, f.descripcion,
+    CASE WHEN f.pct IN (100, 90, 70) THEN f.pct ELSE -1::numeric END,
+    CASE
+        WHEN f.pct = 100 THEN '100%'
+        WHEN f.pct = 90 THEN '90%'
+        WHEN f.pct = 70 THEN '70%'
+        ELSE 'Otros'
+    END
+HAVING ABS(SUM(f.cantidad)) > 0.0001;
+
+CREATE INDEX IF NOT EXISTS bi_mv_mor_prob_idx0 ON bi_mv_mano_obra_recursos_prob (empresa, year);
+CREATE INDEX IF NOT EXISTS bi_mv_mor_prob_idx1 ON bi_mv_mano_obra_recursos_prob (department_code);
+CREATE INDEX IF NOT EXISTS bi_mv_mor_prob_idx2 ON bi_mv_mano_obra_recursos_prob (probabilidad);
+
+CREATE VIEW bi_v_mano_obra_recursos_prob AS SELECT * FROM bi_mv_mano_obra_recursos_prob;
+
+COMMENT ON VIEW bi_v_mano_obra_recursos_prob IS
+  'PBI Horas por Probabilidad (100/90/70/Otros) — cantidad ponderada Resource Operational.';
+COMMENT ON MATERIALIZED VIEW bi_mv_mano_obra_recursos_prob IS
+  'Snapshot bi_v_mano_obra_recursos_prob; REFRESH tras sync 004.';
+
+-- Por Perfil: horas planificadas vs horas imputables (calendario recurso)
+CREATE MATERIALIZED VIEW bi_mv_mano_obra_recursos_perfil AS
+WITH horas AS (
+    SELECT
+        f.empresa,
+        f.year,
+        COALESCE(NULLIF(TRIM(r.department_code), ''), f.departamento) AS department_code,
+        d.department_name,
+        f.tipo,
+        CASE f.tipo WHEN 'P' THEN 'Planificado' WHEN 'R' THEN 'Real'
+                    ELSE COALESCE(f.tipo::text, '') END AS tipo_label,
+        COALESCE(NULLIF(TRIM(r.perfil), ''), '(sin perfil)') AS perfil,
+        SUM(f.cantidad) AS horas
+    FROM v_se_facturacion f
+    LEFT JOIN bc_resource r
+        ON r.code = f.nr AND r.company_name = f.empresa
+    LEFT JOIN mb_v_dim_departamento d
+        ON d.company_name = f.empresa
+       AND d.department_code = COALESCE(NULLIF(TRIM(r.department_code), ''), f.departamento)
+    WHERE f.tipo IN ('P', 'R')
+      AND f.tipo_proyecto = 'Operational'
+      AND COALESCE(f.type_line, 'Resource') = 'Resource'
+      AND COALESCE(f.line_type, '') <> 'Billable'
+      AND NOT (f.job LIKE 'PP%')
+    GROUP BY
+        f.empresa, f.year,
+        COALESCE(NULLIF(TRIM(r.department_code), ''), f.departamento),
+        d.department_name,
+        f.tipo,
+        COALESCE(NULLIF(TRIM(r.perfil), ''), '(sin perfil)')
+    HAVING ABS(SUM(f.cantidad)) > 0.0001
+),
+targets AS (
+    SELECT
+        r.company_name AS empresa,
+        y.year,
+        COALESCE(NULLIF(TRIM(r.department_code), ''), '') AS department_code,
+        COALESCE(NULLIF(TRIM(r.perfil), ''), '(sin perfil)') AS perfil,
+        SUM(d.imputables) AS target_horas
+    FROM bc_resource r
+    CROSS JOIN (SELECT DISTINCT year FROM v_se_facturacion) y
+    JOIN bc_dias_imputacion d
+      ON d.company_name = r.company_name
+     AND d.calendar_code = r.calendar_type
+     AND EXTRACT(YEAR FROM d.day)::int = y.year
+    WHERE COALESCE(TRIM(r.perfil), '') <> ''
+      AND (r.fecha_de_baja IS NULL OR r.fecha_de_baja >= make_date(y.year, 1, 1))
+      AND COALESCE(TRIM(r.calendar_type), '') <> ''
+    GROUP BY
+        r.company_name, y.year,
+        COALESCE(NULLIF(TRIM(r.department_code), ''), ''),
+        COALESCE(NULLIF(TRIM(r.perfil), ''), '(sin perfil)')
+)
+SELECT
+    h.empresa,
+    h.year,
+    h.department_code,
+    h.department_name,
+    h.tipo,
+    h.tipo_label,
+    h.perfil,
+    h.horas,
+    COALESCE(t.target_horas, 0::numeric) AS target_horas
+FROM horas h
+LEFT JOIN targets t
+  ON t.empresa = h.empresa
+ AND t.year = h.year
+ AND t.department_code = h.department_code
+ AND t.perfil = h.perfil;
+
+CREATE INDEX IF NOT EXISTS bi_mv_mor_perfil_idx0 ON bi_mv_mano_obra_recursos_perfil (empresa, year);
+CREATE INDEX IF NOT EXISTS bi_mv_mor_perfil_idx1 ON bi_mv_mano_obra_recursos_perfil (department_code);
+CREATE INDEX IF NOT EXISTS bi_mv_mor_perfil_idx2 ON bi_mv_mano_obra_recursos_perfil (perfil);
+
+CREATE VIEW bi_v_mano_obra_recursos_perfil AS SELECT * FROM bi_mv_mano_obra_recursos_perfil;
+
+COMMENT ON VIEW bi_v_mano_obra_recursos_perfil IS
+  'PBI Por Perfil: horas Resource Operational vs target imputables (bc_dias_imputacion × calendario recurso).';
+COMMENT ON MATERIALIZED VIEW bi_mv_mano_obra_recursos_perfil IS
+  'Snapshot bi_v_mano_obra_recursos_perfil; REFRESH tras sync 004.';
 
 -- KPI agregados por empresa/año (referencia / legacy; tarjetas usan bi_v_planificacion_kpi)
 CREATE OR REPLACE VIEW bi_v_kpi_anual_empresa AS
