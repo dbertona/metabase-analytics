@@ -10,8 +10,9 @@
   Completed/Lost). Tolerancia 0,5 € → `fail`.
 - Workflow 021: freshness por entidad
   `sync_freshness_planif_hours` / `sync_freshness_expediente_hours`
-  (warn >26 h, fail >48 h). Evita que un ledger/planif fresco oculte
-  watermark stale de expediente (incidente OT 1-02 ~13.835 €).
+  (warn >26 h, fail >48 h) basada en `sync_executions` con synced>10 —
+  no en watermark (max LMDT). Detecta sync expediente “vacío” prolongado
+  (incidente OT 1-02 ~13.835 €).
 - Docs: `HEALTH_CHECK_021.md`.
 
 ## [2026-08-07d] — PBI: quitar Distinct en Lineas PLanificacion
