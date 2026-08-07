@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [2026-08-07f] — Sync 004: discovery 3 LMDTs en Planif/Expediente
+
+### Fixed
+- Workflow 004 `Prepare Planificacion BC Requests` y
+  `Prepare Expediente BC Requests`: discovery con
+  `lastModifiedDateTime` + `jobLastModifiedDateTime` +
+  `monthClosingLastModifiedDateTime` (mismo patrón que Movimientos).
+- `$select` slim en discovery (`year,month` + LMDTs); el snapshot sigue
+  trayendo las filas completas. Sin inflación: `Discover Partitions` hace
+  UNION de meses y el Transform lee solo el snapshot.
+- Cubre cierres de mes / cambios de job que no tocaban LMDT de línea
+  (huérfanos OT 1-02 / planif PSI). Docs `004_SYNC_BC_ANALYTICS.md`.
+
 ## [2026-08-07e] — Health 021: expediente + freshness por entidad
 
 ### Changed
