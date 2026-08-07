@@ -3,27 +3,28 @@
 Reconciliación diaria entre **Business Central (OData)** y **PostgreSQL Analytics**.
 Si hay diferencias, envía email desde `noreply@powersolution.es` a `dbertona@powersolution.es`.
 
-## Qué compara (y qué NO)
-
-PBI y Superset cuadran en **Planificación Actual = Tipo P + Tipo R** (`v_se_facturacion`).
-Ese KPI **no** es la suma bruta de `planificacionMes` Open/Planning (excluye meses
-cerrados, meses con ingresos reales, vigente `budget_date`, etc.).
-
-Por eso el 021 **no** alerta por bruto de plan BC vs `bc_job_planning_line`.
+## Qué compara
 
 | Check | BC | Analytics | Criterio |
 |-------|----|-----------|----------|
 | `tipo_r_sum` | `movimientosProyectosMes` year + Ingresos (ABS) | `bc_job_ledger_entry_month` Ingresos | fail si \|Δ\| > 0,5 € |
+| `tipo_p_planif_sum` | `planificacionMes` year — **SUM todas las líneas** (sin Distinct por importe); filtros estado + `budgetDate` = Transform 004 | `bc_job_planning_line` mismos filtros | fail si \|Δ\| > 0,5 € |
+| `meses_cerrados_count` | `mesesCerrados` excl. PP/PY | `bc_meses_cerrados` | warn si Δ>50; fail si Δ>5 % |
+| `budget0_past_with_invoice` | — | plan `budget_date_year=0` con importe en meses pasados | fail si > 0 |
+| `sync_freshness_hours` | — | `MAX(sync_state)` entidades clave | warn si > 26 h |
+| `planificacion_actual_p_plus_r` | — (contexto) | `SUM(facturado)` P+R en `v_se_facturacion` | solo info (OK) |
+
+> **2026-08-07:** `tipo_p_planif_sum` alineado al Transform 004 (SUM sin Distinct).
+> Antes el 021 **no** alertaba por plan bruto porque el Distinct PBI deflactaba
+> Analytics vs BC/Excel (caso `PSI-OT-26-2001`). Ahora BC y tabla sync deben
+> coincidir al céntimo. El KPI Apps/Superset (`v_se_facturacion` P+R) sigue
+> siendo distinto (excluye meses cerrados / con Ingresos, etc.) → check `info`.
 
 > **2026-08-05:** un fail en `tipo_r_sum` con Analytics “congelado” y BC al día
 > suele ser **cierre de mes** en BC (`monthClosingLastModifiedDateTime` reciente,
 > `lastModifiedDateTime` antiguo). El 004 ya descubre esos cambios vía partition
 > overwrite de movimientos. Mitigación inmediata: upsert de las PKs faltantes o
 > resync de partición year|month; ver `004_SYNC_BC_ANALYTICS.md` § flujo Movimientos.
-| `meses_cerrados_count` | `mesesCerrados` excl. PP/PY | `bc_meses_cerrados` | warn si Δ>50; fail si Δ>5 % |
-| `budget0_past_with_invoice` | — | plan `budget_date_year=0` con importe en meses pasados | fail si > 0 |
-| `sync_freshness_hours` | — | `MAX(sync_state)` entidades clave | warn si > 26 h |
-| `planificacion_actual_p_plus_r` | — (contexto) | `SUM(facturado)` P+R en `v_se_facturacion` | solo info (OK) |
 
 Empresas: **PSI** + **PS Lab**. Año: calendario UTC actual.
 
@@ -36,8 +37,8 @@ Para evitar fatiga de alarma por diferencias menores (p. ej. desajustes de
 - **Solo se envía email si algún check quedó en `status = 'fail'`** en esa
   ejecución. Los `warn` (diferencias menores) quedan solo en la tabla para
   revisión periódica, sin interrumpir por email.
-- Único check con tolerancia cero real: `tipo_r_sum` (dinero) y
-  `budget0_past_with_invoice` (señal binaria de plan sin versionar en mes
+- Checks con tolerancia cero real: `tipo_r_sum`, `tipo_p_planif_sum` (dinero)
+  y `budget0_past_with_invoice` (señal binaria de plan sin versionar en mes
   cerrado — el bug de PS Lab de julio 2026).
 
 ## Artefactos

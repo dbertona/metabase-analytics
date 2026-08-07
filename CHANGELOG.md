@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026-08-07c] — Health 021: paridad planificacionMes sin Distinct
+
+### Changed
+- Workflow 021: nuevo check `tipo_p_planif_sum` — compara `planificacionMes` BC
+  (SUM todas las líneas, mismos filtros que Transform 004) vs
+  `bc_job_planning_line`. Tolerancia 0,5 € → `fail`.
+- Alineado al fix 2026-08-07b (sin Distinct por importe). Docs `HEALTH_CHECK_021.md`.
+
 ## [2026-08-07b] — Planificación: sumar líneas con mismo importe (Excel/BC)
 
 ### Fixed
