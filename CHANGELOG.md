@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2026-08-07g] — Analytics: v_se_lineas_planificacion sin Distinct ON
+
+### Fixed
+- `v_se_lineas_planificacion`: elimina `DISTINCT ON (job,year,month,invoice,cost,nr,descripcion_ca)`.
+  Alineado con Transform 004 y PBIP (packs Billable mismo importe, `PSI-OT-26-2001`).
+- PBIP: anti-join planif vs Ingresos R + meses cerrados (OneDrive; docs §11.9).
+
 ## [2026-08-07f] — Sync 004: discovery 3 LMDTs en Planif/Expediente
 
 ### Fixed

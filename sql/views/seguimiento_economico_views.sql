@@ -138,7 +138,7 @@ CREATE OR REPLACE VIEW public.v_se_lineas_planificacion AS
                     AND (p2.status::text = ANY (ARRAY['Open'::text, 'Planning'::text]))
                ))
               OR
-              -- Mes actual y futuros: sin filtro budget_date_month (toma todas las versiones; dedup elimina duplicados)
+              -- Mes actual y futuros: sin filtro budget_date_month (todas las versiones de presupuesto)
               make_date(p.year, p.month, 1) >= date_trunc('month', CURRENT_DATE)
             )
             AND NOT EXISTS (SELECT 1 FROM bc_meses_cerrados c
@@ -147,60 +147,37 @@ CREATE OR REPLACE VIEW public.v_se_lineas_planificacion AS
                   WHERE m.company_name = p.company_name AND m.job_no::text = p.job_no::text
                   AND m.year = p.year AND m.month = p.month
                   AND m.concepto_analitico_descripcion = 'Ingresos')
-        ), dedup AS (
-         SELECT DISTINCT ON (s.job, s.year, s.month, s.invoice, s.cost, s.nr, s.descripcion_ca) s.empresa,
-            s.job,
-            s.year,
-            s.month,
-            s.invoice,
-            s.cost,
-            s.nr,
-            s.type_line,
-            s.quantity,
-            s.line_type,
-            s.departamento,
-            s.descripcion,
-            s.estado,
-            s.tipo_proyecto,
-            s.probability,
-            s.do_not_consolidate,
-            s.budget_date_year,
-            s.budget_date_month,
-            s.status1,
-            s.descripcion_ca
-           FROM src s
-          ORDER BY s.job, s.year, s.month, s.invoice, s.cost, s.nr, s.descripcion_ca
         )
- SELECT d.empresa,
-    d.job,
-    d.year,
-    d.month,
-    d.invoice,
-    d.cost,
-    d.nr,
-    d.type_line,
-    d.quantity,
-    d.line_type,
-    d.departamento,
-    d.descripcion,
-    d.estado,
-    d.tipo_proyecto,
-    d.probability,
-    d.budget_date_year,
-    d.budget_date_month,
-    d.status1,
-    d.descripcion_ca,
+ SELECT s.empresa,
+    s.job,
+    s.year,
+    s.month,
+    s.invoice,
+    s.cost,
+    s.nr,
+    s.type_line,
+    s.quantity,
+    s.line_type,
+    s.departamento,
+    s.descripcion,
+    s.estado,
+    s.tipo_proyecto,
+    s.probability,
+    s.budget_date_year,
+    s.budget_date_month,
+    s.status1,
+    s.descripcion_ca,
     'P'::text AS tipo,
-    se_weight_amount(d.probability, d.invoice) AS facturado,
-    se_prob_pct(d.probability) AS prob_pct,
-    se_weight_amount(d.probability, d.cost) AS coste,
-    se_weight_amount(d.probability, d.quantity) AS cantidad,
-    (d.empresa || ':'::text) || COALESCE(d.departamento, ''::character varying)::text AS codigo_unico_departamento,
-    make_date(d.year, d.month, 1) AS fecha_calculada,
-    (d.empresa || ':'::text) || d.year::text AS empresa_ano,
-    (d.empresa || ':'::text) || COALESCE(d.nr, ''::character varying)::text AS empresa_recurso
-   FROM dedup d;
-COMMENT ON VIEW public.v_se_lineas_planificacion IS 'PBI Lineas Planificacion: híbrido — pasados: MAX(budget_date_month)<=month (fallback Structure); futuros: todas las versiones + dedup. Excluye bc_meses_cerrados y meses con Ingresos reales. Distinct, Open/Planning.';
+    se_weight_amount(s.probability, s.invoice) AS facturado,
+    se_prob_pct(s.probability) AS prob_pct,
+    se_weight_amount(s.probability, s.cost) AS coste,
+    se_weight_amount(s.probability, s.quantity) AS cantidad,
+    (s.empresa || ':'::text) || COALESCE(s.departamento, ''::character varying)::text AS codigo_unico_departamento,
+    make_date(s.year, s.month, 1) AS fecha_calculada,
+    (s.empresa || ':'::text) || s.year::text AS empresa_ano,
+    (s.empresa || ':'::text) || COALESCE(s.nr, ''::character varying)::text AS empresa_recurso
+   FROM src s;
+COMMENT ON VIEW public.v_se_lineas_planificacion IS 'PBI Lineas Planificacion: híbrido — pasados: MAX(budget_date_month)<=month (fallback Structure); futuros: todas las versiones. Excluye bc_meses_cerrados y meses con Ingresos reales. Sin Distinct por importe (2026-08-07, paridad Excel/BC/PSI-OT-26-2001). Open/Planning.';
 
 -- ---------------------------------------------------------------------------
 -- View: v_se_lineas_movimientos
