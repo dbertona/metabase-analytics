@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [2026-08-07b] — Planificación: sumar líneas con mismo importe (Excel/BC)
+
+### Fixed
+- Workflow 004 `Transform PlanificacionMes`: elimina Distinct PBI por
+  `(job,year,month,invoice,cost,nr,descripcionCA)`. Ese Distinct descartaba
+  packs Billable legítimos con el mismo importe (caso `PSI-OT-26-2001` ago:
+  4×38.959 → Analytics mostraba 38.959; Excel/BC = 155.836).
+- Aggregation vigente: SUM de todas las filas BC al PK de upsert.
+  Partition overwrite (1 request/mes) sigue evitando inflación OData 3×.
+
+### Verificación
+- Target Excel `PSI-OT-26-2001` 2026: **323.064,30 €** (ago 155.836,20 ·
+  sep–nov · dic 65.042,25).
+
 ## [2026-08-07] — Expedientes: anti-join solo en meses Close (paridad PBI)
 
 ### Fixed
