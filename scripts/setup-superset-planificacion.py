@@ -63,6 +63,10 @@ DATASETS = [
     "bi_v_unidad",
     "bi_v_gastos",
     "bi_v_mano_obra",
+    "bi_v_mano_obra_recursos_horas",
+    "bi_v_mano_obra_recursos_coste",
+    "bi_v_mano_obra_recursos_prob",
+    "bi_v_mano_obra_recursos_perfil",
     "bi_v_facturacion",
 ]
 
@@ -76,6 +80,10 @@ DEPT_FILTERED_VIEWS = [
     "bi_v_unidad",
     "bi_v_gastos",
     "bi_v_mano_obra",
+    "bi_v_mano_obra_recursos_horas",
+    "bi_v_mano_obra_recursos_coste",
+    "bi_v_mano_obra_recursos_prob",
+    "bi_v_mano_obra_recursos_perfil",
     "bi_v_facturacion",
 ]
 
@@ -86,6 +94,9 @@ JOB_GRAINED_VIEWS = {
     "bi_v_resumen_proyectos",
     "bi_v_gastos",
     "bi_v_mano_obra",
+    "bi_v_mano_obra_recursos_horas",
+    "bi_v_mano_obra_recursos_coste",
+    "bi_v_mano_obra_recursos_prob",
     "bi_v_facturacion",
 }
 
@@ -606,6 +617,8 @@ def _month_pivot_params(
     dim_label: str,
     dim_width: int,
     order_label: str,
+    currency: bool = True,
+    number_format: str = ",.0f",
 ) -> dict[str, Any]:
     """Matriz mes a mes (01–12 + Total) estilo PBI Unidad/Facturación."""
     month_cols = [
@@ -633,13 +646,15 @@ def _month_pivot_params(
     metrics: list[dict[str, Any]] = []
     for col, label in month_cols:
         metrics.append(metric_sum(col, label))
-        column_config[label] = {
-            "d3NumberFormat": ",.0f",
-            "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
+        cfg: dict[str, Any] = {
+            "d3NumberFormat": number_format,
             "showCellBars": False,
             "truncateLongCells": True,
             "columnWidth": 128 if label == "Total" else 70,
         }
+        if currency:
+            cfg["currencyFormat"] = {"symbol": "EUR", "symbolPosition": "suffix"}
+        column_config[label] = cfg
     return {
         "adhoc_filters": dim_adhoc_filters("tipo_label"),
         "query_mode": "aggregate",
@@ -722,6 +737,138 @@ def mano_obra_matriz_params() -> dict[str, Any]:
         ),
     ]
     return params
+
+
+def mor_horas_matriz_params() -> dict[str, Any]:
+    """PBI Mano de Obra Recursos/Perfiles — matriz Horas (Nombre + Proyecto × mes)."""
+    params = _month_pivot_params(
+        dim_col="nombre",
+        dim_label="Nombre",
+        dim_width=200,
+        order_label="orden_nombre",
+        currency=False,
+        number_format=",.2f",
+    )
+    params["groupby"] = ["nombre", "proyecto"]
+    params["column_config"]["proyecto"] = {
+        "customColumnName": "Proyecto",
+        "truncateLongCells": True,
+        "columnWidth": 240,
+    }
+    params["order_by_cols"] = [
+        json.dumps(
+            [{"expressionType": "SQL", "sqlExpression": "nombre", "label": "orden_nombre"}, True],
+            ensure_ascii=False,
+        ),
+        json.dumps(
+            [{"expressionType": "SQL", "sqlExpression": "proyecto", "label": "orden_proyecto"}, True],
+            ensure_ascii=False,
+        ),
+    ]
+    return params
+
+
+def mor_coste_matriz_params() -> dict[str, Any]:
+    """PBI Mano de Obra Recursos/Perfiles — matriz Coste (Nombre + Proyecto × mes)."""
+    params = _month_pivot_params(
+        dim_col="nombre",
+        dim_label="Nombre",
+        dim_width=200,
+        order_label="orden_nombre",
+        currency=True,
+        number_format=",.2f",
+    )
+    params["groupby"] = ["nombre", "proyecto"]
+    params["column_config"]["proyecto"] = {
+        "customColumnName": "Proyecto",
+        "truncateLongCells": True,
+        "columnWidth": 240,
+    }
+    params["order_by_cols"] = [
+        json.dumps(
+            [{"expressionType": "SQL", "sqlExpression": "nombre", "label": "orden_nombre"}, True],
+            ensure_ascii=False,
+        ),
+        json.dumps(
+            [{"expressionType": "SQL", "sqlExpression": "proyecto", "label": "orden_proyecto"}, True],
+            ensure_ascii=False,
+        ),
+    ]
+    return params
+
+
+def mor_probabilidad_bar_params() -> dict[str, Any]:
+    """Barras PBI: Horas por Probabilidad (100/90/70/Otros)."""
+    return {
+        "adhoc_filters": dim_adhoc_filters("tipo_label", "proyecto"),
+        "x_axis": "probabilidad_label",
+        "metrics": [metric_sum("horas", "Horas")],
+        "groupby": [],
+        "orientation": "vertical",
+        "seriesType": "bar",
+        "show_value": True,
+        "y_axis_format": ",.0f",
+        "x_axis_title": "",
+        "y_axis_title": "",
+        "rich_tooltip": True,
+        "show_legend": False,
+        "row_limit": 20,
+        "truncate_metric": True,
+        "x_axis_sort_asc": False,
+        "x_axis_sort_series": "name",
+        "x_axis_sort_series_ascending": False,
+        "color_scheme": "supersetColors",
+    }
+
+
+def mor_perfil_table_params() -> dict[str, Any]:
+    """Tabla Por Perfil: horas vs target imputables."""
+    return {
+        "adhoc_filters": dim_adhoc_filters("tipo_label"),
+        "query_mode": "aggregate",
+        "groupby": ["perfil"],
+        "metrics": [
+            metric_sum("horas", "Horas"),
+            metric_sum("target_horas", "Imputables"),
+        ],
+        "percent_metrics": [],
+        "order_by_cols": [
+            json.dumps(
+                [
+                    {
+                        "expressionType": "SQL",
+                        "sqlExpression": "SUM(horas)",
+                        "label": "orden_horas",
+                    },
+                    False,
+                ],
+                ensure_ascii=False,
+            ),
+        ],
+        "order_desc": True,
+        "row_limit": 50,
+        "server_pagination": False,
+        "show_totals": True,
+        "include_search": False,
+        "show_cell_bars": True,
+        "column_config": {
+            "perfil": {
+                "customColumnName": "Perfil",
+                "truncateLongCells": True,
+                "columnWidth": 120,
+            },
+            "Horas": {
+                "d3NumberFormat": ",.0f",
+                "showCellBars": True,
+                "columnWidth": 110,
+            },
+            "Imputables": {
+                "d3NumberFormat": ",.0f",
+                "showCellBars": False,
+                "columnWidth": 110,
+            },
+        },
+    }
 
 
 def facturacion_matriz_params() -> dict[str, Any]:
@@ -812,6 +959,22 @@ def persist_dashboard_config(
     gastos_id = by_name.get("Gastos")
     mano_obra_id = by_name.get("Mano de Obra")
     facturacion_id = by_name.get("Facturación")
+    mor_horas_id = by_name.get("Horas")
+    mor_coste_id = by_name.get("Coste de Mano de Obra")
+    mor_prob_id = by_name.get("Horas por Probabilidad")
+    mor_perfil_id = by_name.get("Por Perfil")
+    mor_perfil_total_id = by_name.get("Por Perfil Total")
+    mor_chart_ids = [
+        cid
+        for cid in (
+            mor_horas_id,
+            mor_coste_id,
+            mor_prob_id,
+            mor_perfil_id,
+            mor_perfil_total_id,
+        )
+        if cid
+    ]
     prob_chart_ids = (
         [by_name["Facturación por Probabilidad"]]
         if "Facturación por Probabilidad" in by_name
@@ -830,6 +993,7 @@ def persist_dashboard_config(
         + ([gastos_id] if gastos_id else [])
         + ([mano_obra_id] if mano_obra_id else [])
         + ([facturacion_id] if facturacion_id else [])
+        + [cid for cid in (mor_horas_id, mor_coste_id, mor_prob_id) if cid]
     )
     filter_scope_all = (
         kpi_chart_ids
@@ -838,16 +1002,18 @@ def persist_dashboard_config(
         + ([gastos_id] if gastos_id else [])
         + ([mano_obra_id] if mano_obra_id else [])
         + ([facturacion_id] if facturacion_id else [])
+        + mor_chart_ids
         + evo_chart_ids
         + prob_chart_ids
     )
-    # Orden UI: Resumen → Facturación → Unidad → Gastos → Mano de Obra → Gráficos
+    # Orden UI: Resumen → Facturación → Unidad → Gastos → Mano de Obra → Recursos/Perfiles → Gráficos
     tabs_all = [
         "TAB-RESUMEN",
         "TAB-FACTURACION",
         "TAB-UNIDAD",
         "TAB-GASTOS",
         "TAB-MANO-OBRA",
+        "TAB-MOR",
         "TAB-GRAFICOS",
     ]
 
@@ -1026,27 +1192,27 @@ def persist_dashboard_config(
         " * [A],[B] .hijo (la coma aplica el hijo solo al último).\n"
         " * --ps-unidad-top = top del chart-slice → aire inferior ~8–9px.\n"
         " */\n"
-        ".grid-row:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']),\n"
-        ".dragdroppable-row:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) {\n"
+        ".grid-row:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']),\n"
+        ".dragdroppable-row:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) {\n"
         "  height: calc(100dvh - var(--ps-unidad-top)) !important;\n"
         "  max-height: calc(100dvh - var(--ps-unidad-top)) !important;\n"
         "  min-height: 220px !important;\n"
         "}\n"
-        ".dashboard-component-chart-holder:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) {\n"
+        ".dashboard-component-chart-holder:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) {\n"
         "  height: calc(100dvh - var(--ps-unidad-top)) !important;\n"
         "  max-height: calc(100dvh - var(--ps-unidad-top)) !important;\n"
         "  min-height: 220px !important;\n"
         "  display: flex !important;\n"
         "  flex-direction: column !important;\n"
         "}\n"
-        ".resizable-container:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']),\n"
-        ".dragdroppable-column:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']),\n"
-        ".with-popover-menu:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) {\n"
+        ".resizable-container:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']),\n"
+        ".dragdroppable-column:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']),\n"
+        ".with-popover-menu:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) {\n"
         "  height: 100% !important;\n"
         "  max-height: 100% !important;\n"
         "  min-height: 0 !important;\n"
         "}\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) {\n"
         "  flex: 1 1 auto !important;\n"
         "  height: 100% !important;\n"
         "  max-height: 100% !important;\n"
@@ -1055,7 +1221,7 @@ def persist_dashboard_config(
         "  flex-direction: column !important;\n"
         "}\n"
         "/* Wrapper intermedio Superset: sin esto el grid se queda ~560px y el card vacío */\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .dashboard-chart {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .dashboard-chart {\n"
         "  display: flex !important;\n"
         "  flex-direction: column !important;\n"
         "  flex: 1 1 auto !important;\n"
@@ -1063,8 +1229,8 @@ def persist_dashboard_config(
         "  max-height: none !important;\n"
         "  min-height: 0 !important;\n"
         "}\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .slice_container,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .chart-container {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .slice_container,\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .chart-container {\n"
         "  height: 100% !important;\n"
         "  max-height: 100% !important;\n"
         "  min-height: 0 !important;\n"
@@ -1072,7 +1238,7 @@ def persist_dashboard_config(
         "  position: relative !important;\n"
         "  overflow: hidden !important;\n"
         "}\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) [class*='ag-theme'] {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) [class*='ag-theme'] {\n"
         "  position: absolute !important;\n"
         "  inset: 0 !important;\n"
         "  width: 100% !important;\n"
@@ -1080,23 +1246,23 @@ def persist_dashboard_config(
         "  max-height: none !important;\n"
         "  min-height: 0 !important;\n"
         "}\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-root-wrapper,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-root-wrapper-body,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-root {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-root-wrapper,\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-root-wrapper-body,\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-root {\n"
         "  height: 100% !important;\n"
         "  max-height: 100% !important;\n"
         "  min-height: 0 !important;\n"
         "  width: 100% !important;\n"
         "}\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-root {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-root {\n"
         "  display: flex !important;\n"
         "  flex-direction: column !important;\n"
         "}\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-body-viewport {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-body-viewport {\n"
         "  flex: 1 1 auto !important;\n"
         "  min-height: 0 !important;\n"
         "}\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-floating-bottom {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-floating-bottom {\n"
         "  flex-shrink: 0 !important;\n"
         "}\n"
         "/* Card base: blanca, radio, sombra suave */\n"
@@ -1149,11 +1315,11 @@ def persist_dashboard_config(
         "/* Tablas: padding uniforme sin alterar el layout nativo del card */\n"
         ".dashboard-component-chart-holder[data-test-chart-name*='Resumen mensual'],\n"
         ".dashboard-component-chart-holder[data-test-chart-name*='Proyectos'],\n"
-        ".dashboard-component-chart-holder:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) {\n"
+        ".dashboard-component-chart-holder:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) {\n"
         "  padding: 8px !important;\n"
         "}\n"
         "/* Matrices mes×dim: ocupar alto disponible sin scroll de página */\n"
-        ".dashboard-component-chart-holder:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) {\n"
+        ".dashboard-component-chart-holder:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) {\n"
         "  width: 100% !important;\n"
         "  max-width: 100% !important;\n"
         "  margin-left: 0 !important;\n"
@@ -1161,15 +1327,15 @@ def persist_dashboard_config(
         "  display: flex !important;\n"
         "  flex-direction: column !important;\n"
         "}\n"
-        ".dashboard-component-chart-holder:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .chart-slice {\n"
+        ".dashboard-component-chart-holder:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .chart-slice {\n"
         "  display: flex !important;\n"
         "  flex-direction: column !important;\n"
         "  height: 100% !important;\n"
         "  flex: 1 1 auto !important;\n"
         "  min-height: 0 !important;\n"
         "}\n"
-        ".dragdroppable-row:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']),\n"
-        ".grid-row:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) {\n"
+        ".dragdroppable-row:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']),\n"
+        ".grid-row:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) {\n"
         "  width: 100% !important;\n"
         "  max-width: 100% !important;\n"
         "}\n"
@@ -1189,7 +1355,7 @@ def persist_dashboard_config(
         " [data-test='slice-header'] .header-controls,\n"
         ".dashboard-component-chart-holder[data-test-chart-name*='Proyectos']"
         " [data-test='slice-header'] .header-controls,\n"
-        ".dashboard-component-chart-holder:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'])"
+        ".dashboard-component-chart-holder:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra'])"
         " [data-test='slice-header'] .header-controls {\n"
         "  display: flex !important;\n"
         "  align-items: center !important;\n"
@@ -1436,17 +1602,17 @@ def persist_dashboard_config(
         "[data-test-chart-name*='Resumen mensual'] select[aria-label*='page'],\n"
         "[data-test-chart-name*='Resumen mensual'] .row-count-container,\n"
         "[data-test-chart-name*='Proyectos'] .dt-length,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .dt-length,\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .dt-length,\n"
         "[data-test-chart-name*='Proyectos'] .dataTables_length,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .dataTables_length,\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .dataTables_length,\n"
         "[data-test-chart-name*='Proyectos'] .ant-pagination,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ant-pagination,\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ant-pagination,\n"
         "[data-test-chart-name*='Proyectos'] .pagination-container,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .pagination-container,\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .pagination-container,\n"
         "[data-test-chart-name*='Proyectos'] select[aria-label*='page'],\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) select[aria-label*='page'],\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) select[aria-label*='page'],\n"
         "[data-test-chart-name*='Proyectos'] .row-count-container,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .row-count-container {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .row-count-container {\n"
         "  display: none !important;\n"
         "}\n"
         "/* Resumen: sin fila de controles vacía (Proyectos la oculta al mover el buscador) */\n"
@@ -1461,10 +1627,10 @@ def persist_dashboard_config(
         "/* Cabeceras/celdas AG Grid: 1.26em × 0.95 × 0.90 → 1.077em */\n"
         "[data-test-chart-name*='Resumen mensual'] thead th,\n"
         "[data-test-chart-name*='Proyectos'] thead th,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) thead th,\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) thead th,\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-header-cell,\n"
         "[data-test-chart-name*='Proyectos'] .ag-header-cell,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-header-cell {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-header-cell {\n"
         "  white-space: nowrap !important;\n"
         "  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;\n"
         "  font-size: 1.077em !important;\n"
@@ -1474,20 +1640,20 @@ def persist_dashboard_config(
         "/* Celdas (table + AG Grid) */\n"
         "[data-test-chart-name*='Resumen mensual'] td,\n"
         "[data-test-chart-name*='Proyectos'] td,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) td,\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) td,\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-cell,\n"
         "[data-test-chart-name*='Proyectos'] .ag-cell,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-cell {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-cell {\n"
         "  font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif !important;\n"
         "  font-size: 1.077em !important;\n"
         "}\n"
         "/* Tablas: altura completa — propagar height por toda la cadena */\n"
         "[data-test-chart-name*='Resumen mensual'] .slice_container,\n"
         "[data-test-chart-name*='Proyectos'] .slice_container,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .slice_container,\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .slice_container,\n"
         "[data-test-chart-name*='Resumen mensual'] .chart-container,\n"
         "[data-test-chart-name*='Proyectos'] .chart-container,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .chart-container {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .chart-container {\n"
         "  height: calc(100% - 8px) !important;\n"
         "  overflow: hidden !important;\n"
         "  display: flex !important;\n"
@@ -1495,54 +1661,54 @@ def persist_dashboard_config(
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] .slice_container > div,\n"
         "[data-test-chart-name*='Proyectos'] .slice_container > div,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .slice_container > div,\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .slice_container > div,\n"
         "[data-test-chart-name*='Resumen mensual'] .chart-container > div,\n"
         "[data-test-chart-name*='Proyectos'] .chart-container > div,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .chart-container > div {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .chart-container > div {\n"
         "  height: 100% !important;\n"
         "  flex: 1 1 auto !important;\n"
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] [class*='ag-theme'],\n"
         "[data-test-chart-name*='Proyectos'] [class*='ag-theme'],\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) [class*='ag-theme'] {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) [class*='ag-theme'] {\n"
         "  height: 100% !important;\n"
         "  min-height: 100% !important;\n"
         "  flex: 1 1 auto !important;\n"
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-root-wrapper,\n"
         "[data-test-chart-name*='Proyectos'] .ag-root-wrapper,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-root-wrapper {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-root-wrapper {\n"
         "  height: 100% !important;\n"
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-root-wrapper-body,\n"
         "[data-test-chart-name*='Proyectos'] .ag-root-wrapper-body,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-root-wrapper-body {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-root-wrapper-body {\n"
         "  height: 100% !important;\n"
         "  flex: 1 1 auto !important;\n"
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-root,\n"
         "[data-test-chart-name*='Proyectos'] .ag-root,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-root {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-root {\n"
         "  height: 100% !important;\n"
         "}\n"
         "/* Ocultar barras internas */\n"
         "[data-test-chart-name*='Resumen mensual'] .cell-bar,\n"
         "[data-test-chart-name*='Resumen mensual'] .cell-bars,\n"
         "[data-test-chart-name*='Proyectos'] .cell-bar,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .cell-bar,\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .cell-bar,\n"
         "[data-test-chart-name*='Proyectos'] .cell-bars,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .cell-bars {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .cell-bars {\n"
         "  display: none !important;\n"
         "}\n"
         "/* Totales AG Grid: fila fija visible; etiqueta «Total» vía JS */\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-floating-bottom .anticon,\n"
         "[data-test-chart-name*='Proyectos'] .ag-floating-bottom .anticon,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-floating-bottom .anticon {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-floating-bottom .anticon {\n"
         "  display: none !important;\n"
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-floating-bottom,\n"
         "[data-test-chart-name*='Proyectos'] .ag-floating-bottom,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-floating-bottom {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-floating-bottom {\n"
         "  flex-shrink: 0 !important;\n"
         "  min-height: 40px !important;\n"
         "  height: 40px !important;\n"
@@ -1553,24 +1719,24 @@ def persist_dashboard_config(
         "}\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-floating-bottom .ag-cell,\n"
         "[data-test-chart-name*='Proyectos'] .ag-floating-bottom .ag-cell,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-floating-bottom .ag-cell {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-floating-bottom .ag-cell {\n"
         "  font-weight: 700 !important;\n"
         "  color: #0f172a !important;\n"
         "  background: #e2e8f0 !important;\n"
         "}\n"
         "/* Pie de totales dentro del área absoluta; no forzar overflow:visible\n"
         " * en slice/chart-container (rompe el fill del grid). */\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) [class*='ag-theme'] {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) [class*='ag-theme'] {\n"
         "  overflow: hidden !important;\n"
         "}\n"
         "/* Total fijado a la derecha: siempre visible */\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-pinned-right-cols-container,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-pinned-right-header,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-pinned-right-floating-bottom {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-pinned-right-cols-container,\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-pinned-right-header,\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-pinned-right-floating-bottom {\n"
         "  min-width: 128px !important;\n"
         "}\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-header-cell[col-id='Total'],\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-cell[col-id='Total'] {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-header-cell[col-id='Total'],\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-cell[col-id='Total'] {\n"
         "  font-weight: 600 !important;\n"
         "}\n"
         "/* Scroll horizontal condicional: no ocultar la barra AG Grid.\n"
@@ -1580,10 +1746,10 @@ def persist_dashboard_config(
         " * la barra (sin forzar display:block → evita scroll fantasma vacío). */\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-center-cols-viewport,\n"
         "[data-test-chart-name*='Proyectos'] .ag-center-cols-viewport,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-center-cols-viewport,\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-center-cols-viewport,\n"
         "[data-test-chart-name*='Resumen mensual'] .ag-header-viewport,\n"
         "[data-test-chart-name*='Proyectos'] .ag-header-viewport,\n"
-        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) .ag-header-viewport {\n"
+        ":is([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación'],[data-test-chart-name='Horas'],[data-test-chart-name='Coste de Mano de Obra']) .ag-header-viewport {\n"
         "  overflow-x: auto !important;\n"
         "}\n"
         "/* Resumen mensual: ocultar year/month (solo sirven para orden cronológico) */\n"
@@ -1743,7 +1909,9 @@ def persist_dashboard_config(
                 + plan_kpi_chart_ids
                 + ([unidad_id] if unidad_id else [])
                 + ([gastos_id] if gastos_id else [])
-                + ([facturacion_id] if facturacion_id else []),
+                + ([facturacion_id] if facturacion_id else [])
+                + ([mano_obra_id] if mano_obra_id else [])
+                + mor_chart_ids,
                 "tabsInScope": tabs_all,
             },
             {
@@ -1781,7 +1949,7 @@ def persist_dashboard_config(
 
 
 def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
-    """Layout: Resumen | Unidad | Gastos | Mano de Obra | Facturación | Gráficos."""
+    """Layout: Resumen | Facturación | Unidad | Gastos | Mano de Obra | Recursos/Perfiles | Gráficos."""
     obj_keys = [c["key"] for c in charts if c["section"] == "obj"]
     plan_keys = [c["key"] for c in charts if c["section"] == "plan"]
     table_keys = [c["key"] for c in charts if c["section"] == "table"]
@@ -1790,6 +1958,9 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
     gastos_keys = [c["key"] for c in charts if c["section"] == "gastos"]
     mano_obra_keys = [c["key"] for c in charts if c["section"] == "mano_obra"]
     facturacion_keys = [c["key"] for c in charts if c["section"] == "facturacion"]
+    mor_top_keys = [c["key"] for c in charts if c["section"] in ("mor_prob", "mor_perfil_kpi", "mor_perfil")]
+    mor_horas_keys = [c["key"] for c in charts if c["section"] == "mor_horas"]
+    mor_coste_keys = [c["key"] for c in charts if c["section"] == "mor_coste"]
     prob_keys = [c["key"] for c in charts if c["section"] == "prob"]
     chart_keys = [c["key"] for c in charts if c["section"] == "chart"]
     prob_key = prob_keys[0] if prob_keys else None
@@ -1801,6 +1972,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
     tab_unidad = ["ROOT_ID", "GRID_ID", "TABS-MAIN", "TAB-UNIDAD"]
     tab_gastos = ["ROOT_ID", "GRID_ID", "TABS-MAIN", "TAB-GASTOS"]
     tab_mano_obra = ["ROOT_ID", "GRID_ID", "TABS-MAIN", "TAB-MANO-OBRA"]
+    tab_mor = ["ROOT_ID", "GRID_ID", "TABS-MAIN", "TAB-MOR"]
     tab_facturacion = ["ROOT_ID", "GRID_ID", "TABS-MAIN", "TAB-FACTURACION"]
     col_parents = tab_resumen + ["ROW-KPI-BAND", "COLUMN-KPIS"]
     position: dict[str, Any] = {
@@ -1821,6 +1993,7 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
                 "TAB-UNIDAD",
                 "TAB-GASTOS",
                 "TAB-MANO-OBRA",
+                "TAB-MOR",
                 "TAB-GRAFICOS",
             ],
             "parents": ["ROOT_ID", "GRID_ID"],
@@ -1860,6 +2033,16 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "children": ["ROW-MANO-OBRA"],
             "parents": ["ROOT_ID", "GRID_ID", "TABS-MAIN"],
             "meta": {"text": "Mano de Obra", "defaultText": "Mano de Obra"},
+        },
+        "TAB-MOR": {
+            "type": "TAB",
+            "id": "TAB-MOR",
+            "children": ["ROW-MOR-TOP", "ROW-MOR-HORAS", "ROW-MOR-COSTE"],
+            "parents": ["ROOT_ID", "GRID_ID", "TABS-MAIN"],
+            "meta": {
+                "text": "Mano de Obra Recursos/Perfiles",
+                "defaultText": "Mano de Obra Recursos/Perfiles",
+            },
         },
         "TAB-FACTURACION": {
             "type": "TAB",
@@ -1954,6 +2137,27 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "parents": list(tab_mano_obra),
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
+        "ROW-MOR-TOP": {
+            "type": "ROW",
+            "id": "ROW-MOR-TOP",
+            "children": mor_top_keys,
+            "parents": list(tab_mor),
+            "meta": {"background": "BACKGROUND_TRANSPARENT"},
+        },
+        "ROW-MOR-HORAS": {
+            "type": "ROW",
+            "id": "ROW-MOR-HORAS",
+            "children": mor_horas_keys,
+            "parents": list(tab_mor),
+            "meta": {"background": "BACKGROUND_TRANSPARENT"},
+        },
+        "ROW-MOR-COSTE": {
+            "type": "ROW",
+            "id": "ROW-MOR-COSTE",
+            "children": mor_coste_keys,
+            "parents": list(tab_mor),
+            "meta": {"background": "BACKGROUND_TRANSPARENT"},
+        },
         "ROW-FACTURACION": {
             "type": "ROW", "id": "ROW-FACTURACION",
             "children": facturacion_keys,
@@ -1974,6 +2178,11 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         "gastos": (12, 78),
         "mano_obra": (12, 78),
         "facturacion": (12, 78),
+        "mor_prob": (4, 28),
+        "mor_perfil_kpi": (2, 28),
+        "mor_perfil": (6, 28),
+        "mor_horas": (12, 40),
+        "mor_coste": (12, 40),
         "prob": (6, 26),
         "chart": (6, 36),
     }
@@ -2005,6 +2214,21 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         elif c["section"] == "mano_obra":
             display_name = "Mano de Obra"
             parents = tab_mano_obra + ["ROW-MANO-OBRA"]
+        elif c["section"] == "mor_prob":
+            display_name = "Horas por Probabilidad"
+            parents = tab_mor + ["ROW-MOR-TOP"]
+        elif c["section"] == "mor_perfil_kpi":
+            display_name = "Por Perfil Total"
+            parents = tab_mor + ["ROW-MOR-TOP"]
+        elif c["section"] == "mor_perfil":
+            display_name = "Por Perfil"
+            parents = tab_mor + ["ROW-MOR-TOP"]
+        elif c["section"] == "mor_horas":
+            display_name = "Horas"
+            parents = tab_mor + ["ROW-MOR-HORAS"]
+        elif c["section"] == "mor_coste":
+            display_name = "Coste de Mano de Obra"
+            parents = tab_mor + ["ROW-MOR-COSTE"]
         elif c["section"] == "facturacion":
             display_name = "Facturación"
             parents = tab_facturacion + ["ROW-FACTURACION"]
@@ -2048,6 +2272,10 @@ def main() -> int:
     unidad_ds = dataset_ids["bi_v_unidad"]
     gastos_ds = dataset_ids["bi_v_gastos"]
     mano_obra_ds = dataset_ids["bi_v_mano_obra"]
+    mor_horas_ds = dataset_ids["bi_v_mano_obra_recursos_horas"]
+    mor_coste_ds = dataset_ids["bi_v_mano_obra_recursos_coste"]
+    mor_prob_ds = dataset_ids["bi_v_mano_obra_recursos_prob"]
+    mor_perfil_ds = dataset_ids["bi_v_mano_obra_recursos_perfil"]
     fact_ds = dataset_ids["bi_v_facturacion"]
 
     print("==> 3/4 Creando charts...")
@@ -2056,6 +2284,8 @@ def main() -> int:
         "Obj · Facturación", "Obj · Margen", "Obj · Crecimiento", "Obj · Beneficio",
         "Plan · Facturación", "Plan · Margen", "Plan · Crecimiento", "Plan · Beneficio",
         "Resumen mensual", "Proyectos", "Unidad", "Gastos", "Mano de Obra", "Facturación",
+        "Horas", "Coste de Mano de Obra", "Horas por Probabilidad", "Por Perfil",
+        "Por Perfil Total",
         "Evolución mensual", "Margen acumulado",
         "Facturación por Probabilidad",
         "Margen", "Crecimiento", "Beneficio", "Δ %",
@@ -2119,6 +2349,15 @@ def main() -> int:
         ("Gastos", "gastos", gastos_ds, "ag-grid-table", gastos_matriz_params()),
         # PBI Mano de Obra: coste Resource por proyecto×mes (Operational + estados)
         ("Mano de Obra", "mano_obra", mano_obra_ds, "ag-grid-table", mano_obra_matriz_params()),
+        # PBI Mano de Obra Recursos/Perfiles
+        ("Horas por Probabilidad", "mor_prob", mor_prob_ds, "echarts_timeseries_bar",
+         mor_probabilidad_bar_params()),
+        ("Por Perfil Total", "mor_perfil_kpi", mor_perfil_ds, "big_number_total",
+         big_number_params(metric_sum("horas", "Por Perfil"), ",.0f")),
+        ("Por Perfil", "mor_perfil", mor_perfil_ds, "ag-grid-table", mor_perfil_table_params()),
+        ("Horas", "mor_horas", mor_horas_ds, "ag-grid-table", mor_horas_matriz_params()),
+        ("Coste de Mano de Obra", "mor_coste", mor_coste_ds, "ag-grid-table",
+         mor_coste_matriz_params()),
         # PBI Facturación: facturado por encabezado×mes (Operational + estados)
         ("Facturación", "facturacion", fact_ds, "ag-grid-table", facturacion_matriz_params()),
         ("Facturación por Probabilidad", "prob", prob_ds, "echarts_timeseries_bar",

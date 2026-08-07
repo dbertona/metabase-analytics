@@ -118,6 +118,14 @@
       if (name === "Unidad") return "Unidad";
       if (name === "Gastos") return "Gastos";
       if (name === "Mano de Obra") return "Mano de Obra";
+      if (
+        name === "Horas" ||
+        name === "Coste de Mano de Obra" ||
+        name === "Horas por Probabilidad" ||
+        name === "Por Perfil" ||
+        name === "Por Perfil Total"
+      )
+        return "Mano de Obra Recursos/Perfiles";
       if (name === "Facturación") return "Facturación";
       if (name === "Evolución mensual" || name === "Margen acumulado")
         return "Gráficos";
@@ -182,7 +190,14 @@
       }
       var active = activeTabLabel();
       // Pestañas laterales
-      if (bucket === "Unidad" || bucket === "Gastos" || bucket === "Mano de Obra" || bucket === "Facturación" || bucket === "Gráficos") {
+      if (
+        bucket === "Unidad" ||
+        bucket === "Gastos" ||
+        bucket === "Mano de Obra" ||
+        bucket === "Mano de Obra Recursos/Perfiles" ||
+        bucket === "Facturación" ||
+        bucket === "Gráficos"
+      ) {
         if (active === bucket || warmed[bucket]) {
           stats.allowed += 1;
           return sendFn();
@@ -468,6 +483,9 @@
       '[data-test-chart-name="Gastos"]',
       '[data-test-chart-name="Mano de Obra"]',
       '[data-test-chart-name="Facturación"]',
+      '[data-test-chart-name="Horas"]',
+      '[data-test-chart-name="Coste de Mano de Obra"]',
+      '[data-test-chart-name="Por Perfil"]',
       '[data-test-chart-name*="Proyectos"]',
       '[data-test-chart-name*="Resumen mensual"]',
     ];
@@ -1414,7 +1432,11 @@
       '[data-test-chart-name="Mano de Obra"].ps-na-pending .ag-center-cols-container,' +
       '[data-test-chart-name="Mano de Obra"].ps-na-pending .ag-floating-bottom,' +
       '[data-test-chart-name="Facturación"].ps-na-pending .ag-center-cols-container,' +
-      '[data-test-chart-name="Facturación"].ps-na-pending .ag-floating-bottom' +
+      '[data-test-chart-name="Facturación"].ps-na-pending .ag-floating-bottom,' +
+      '[data-test-chart-name="Horas"].ps-na-pending .ag-center-cols-container,' +
+      '[data-test-chart-name="Horas"].ps-na-pending .ag-floating-bottom,' +
+      '[data-test-chart-name="Coste de Mano de Obra"].ps-na-pending .ag-center-cols-container,' +
+      '[data-test-chart-name="Coste de Mano de Obra"].ps-na-pending .ag-floating-bottom' +
       "{opacity:0 !important;}" +
       '[data-test-chart-name="Unidad"].ps-na-ready .ag-center-cols-container,' +
       '[data-test-chart-name="Unidad"].ps-na-ready .ag-floating-bottom,' +
@@ -1423,7 +1445,11 @@
       '[data-test-chart-name="Mano de Obra"].ps-na-ready .ag-center-cols-container,' +
       '[data-test-chart-name="Mano de Obra"].ps-na-ready .ag-floating-bottom,' +
       '[data-test-chart-name="Facturación"].ps-na-ready .ag-center-cols-container,' +
-      '[data-test-chart-name="Facturación"].ps-na-ready .ag-floating-bottom' +
+      '[data-test-chart-name="Facturación"].ps-na-ready .ag-floating-bottom,' +
+      '[data-test-chart-name="Horas"].ps-na-ready .ag-center-cols-container,' +
+      '[data-test-chart-name="Horas"].ps-na-ready .ag-floating-bottom,' +
+      '[data-test-chart-name="Coste de Mano de Obra"].ps-na-ready .ag-center-cols-container,' +
+      '[data-test-chart-name="Coste de Mano de Obra"].ps-na-ready .ag-floating-bottom' +
       "{opacity:1 !important;}";
     document.head.appendChild(style);
   }
@@ -1606,8 +1632,24 @@
     } catch (eObs) { /* ignore */ }
   }
 
+  function isMorMatrixChart(chart) {
+    var name = chart.getAttribute("data-test-chart-name") || "";
+    if (name === "Horas" || name === "Coste de Mano de Obra") return true;
+    var title = chart.querySelector(
+      '[data-test="slice-header"] .header-title, [data-test="slice-header"] .editable-title'
+    );
+    var t = title ? (title.textContent || "").replace(/\s+/g, " ").trim() : "";
+    return t === "Horas" || t === "Coste de Mano de Obra";
+  }
+
   function isMatrixNaChart(chart) {
-    return isGastosChart(chart) || isGastosMatrixChart(chart) || isManoDeObraMatrixChart(chart) || isFacturacionMatrixChart(chart);
+    return (
+      isGastosChart(chart) ||
+      isGastosMatrixChart(chart) ||
+      isManoDeObraMatrixChart(chart) ||
+      isFacturacionMatrixChart(chart) ||
+      isMorMatrixChart(chart)
+    );
   }
 
   function markMatrixNaPending(chart) {
