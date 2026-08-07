@@ -829,7 +829,8 @@ def mor_perfil_table_params() -> dict[str, Any]:
         "groupby": ["perfil"],
         "metrics": [
             metric_sum("horas", "Horas"),
-            metric_sum("target_horas", "Imputables"),
+            # MAX: target se repite por tipo P/R en la MV; SUM lo duplicaría.
+            metric_sql("MAX(target_horas)", "Imputables"),
         ],
         "percent_metrics": [],
         "order_by_cols": [
