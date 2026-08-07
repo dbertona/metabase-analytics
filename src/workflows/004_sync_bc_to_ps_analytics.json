@@ -2544,7 +2544,7 @@
           9744
         ],
         "parameters": {
-          "url": "={{ \n  const map = ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json);\n  const ls = map.syncStateByEntity['dias_imputacion'];\n  return 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/' + ((($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })())) + '/api/Power_Solution/PS_API/v2.0/companies('\n  + map.companyId\n  + ')/DiasdeImputacion?$select=dia,festivo,calendario,imputables,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20' + ls;\n}}",
+          "url": "={{ \n  const map = ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json);\n  const ls = map.syncStateByEntity['dias_imputacion'];\n  // BC OData requires ISO 8601 format (e.g. 2026-07-15T13:04:16Z)\n  // PostgreSQL returns timestamps with space separator (e.g. 2026-07-15 13:04:16+00) which is invalid OData\n  const lsISO = new Date(String(ls).trim()).toISOString();\n  return 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/' + ((($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })())) + '/api/Power_Solution/PS_API/v2.0/companies('\n  + map.companyId\n  + ')/DiasdeImputacion?$select=dia,festivo,calendario,imputables,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20' + encodeURIComponent(lsISO);\n}}",
           "options": {
             "pagination": {
               "pagination": {
