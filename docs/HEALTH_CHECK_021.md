@@ -9,11 +9,20 @@ Si hay diferencias, envía email desde `noreply@powersolution.es` a `dbertona@po
 |-------|----|-----------|----------|
 | `tipo_r_sum` | `movimientosProyectosMes` Ingresos (ABS) **+** cert open (`movimientosProyectos` `tieneCertificacion`, solo meses **no** cerrados) — misma composición que ledger Analytics | `bc_job_ledger_entry_month` Ingresos | fail si \|Δ\| > 0,5 € |
 | `tipo_p_planif_sum` | `planificacionMes` year — **SUM todas las líneas** (sin Distinct por importe); filtros estado + `budgetDate` = Transform 004 | `bc_job_planning_line` mismos filtros | fail si \|Δ\| > 0,5 € |
+| `tipo_p_expediente_sum` | `expedienteMes` year — SUM; excl. PP/PY y `status1` Completed/Lost (= Transform ExpedienteMes 004) | `bc_expediente_mes` mismos filtros | fail si \|Δ\| > 0,5 € |
 | `meses_cerrados_count` | `mesesCerrados` excl. PP/PY | `bc_meses_cerrados` | warn si Δ>50; fail si Δ>5 % |
 | `budget0_past_with_invoice` | — | plan `budget_date_year=0` con importe en meses pasados | fail si > 0 |
-| `sync_freshness_hours` | — | `MAX(sync_state)` entidades clave | warn si > 26 h |
+| `sync_freshness_planif_hours` | — | horas desde `sync_state` `bc_job_planning_line` | warn > 26 h; **fail > 48 h** |
+| `sync_freshness_expediente_hours` | — | horas desde `sync_state` `bc_expediente_mes` | warn > 26 h; **fail > 48 h** |
+| `sync_freshness_hours` | — | `MAX(sync_state)` planif+expediente+ledger+cerrados | warn si > 26 h (contexto) |
 | `planificacion_actual_p_plus_r` | — (contexto) | `SUM(facturado)` P+R en `v_se_facturacion` | solo info (OK) |
 
+> **2026-08-07e:** `tipo_p_expediente_sum` + freshness por entidad (planif/expediente).
+> Motivo: el incremental 004 no rediscubre particiones si BC borra líneas sin
+> `lastModifiedDateTime` nuevo → huérfanos en `bc_expediente_mes` (gap OT 1-02
+> ~13.835 €). El MAX global de freshness ocultaba watermark stale de expediente
+> cuando planif/ledger seguían al día.
+>
 > **2026-08-07:** `tipo_p_planif_sum` alineado al Transform 004 (SUM sin Distinct).
 > Antes el 021 **no** alertaba por plan bruto porque el Distinct PBI deflactaba
 > Analytics vs BC/Excel (caso `PSI-OT-26-2001`). Ahora BC y tabla sync deben
@@ -41,9 +50,22 @@ Para evitar fatiga de alarma por diferencias menores (p. ej. desajustes de
 - **Solo se envía email si algún check quedó en `status = 'fail'`** en esa
   ejecución. Los `warn` (diferencias menores) quedan solo en la tabla para
   revisión periódica, sin interrumpir por email.
-- Checks con tolerancia cero real: `tipo_r_sum`, `tipo_p_planif_sum` (dinero)
-  y `budget0_past_with_invoice` (señal binaria de plan sin versionar en mes
-  cerrado — el bug de PS Lab de julio 2026).
+- Checks con tolerancia cero real: `tipo_r_sum`, `tipo_p_planif_sum`,
+  `tipo_p_expediente_sum` (dinero), `budget0_past_with_invoice` (señal binaria)
+  y freshness planif/expediente **> 48 h**.
+
+## Mitigación típica si falla expediente / freshness
+
+```bash
+# Reset watermark + sync solo expediente (PSI)
+psql "postgresql://postgres:…@192.168.36.100:5433/postgres" -c "
+UPDATE sync_state SET last_sync_at = '1900-01-01T00:00:00Z'
+WHERE company_name = 'Power Solution Iberia SL' AND entity = 'bc_expediente_mes';"
+
+curl -sS -X POST -H 'Content-Type: application/json' \
+  -d '{"entities":["expediente_mes"]}' \
+  'https://apps.powersolution.es/n8n/webhook/sync-bc-to-analytics?company=psi'
+```
 
 ## Artefactos
 

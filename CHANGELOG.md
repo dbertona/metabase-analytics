@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [2026-08-07e] — Health 021: expediente + freshness por entidad
+
+### Changed
+- Workflow 021: nuevo check `tipo_p_expediente_sum` — BC `expedienteMes` vs
+  `bc_expediente_mes` (filtros Transform 004: excl. PP/PY y status1
+  Completed/Lost). Tolerancia 0,5 € → `fail`.
+- Workflow 021: freshness por entidad
+  `sync_freshness_planif_hours` / `sync_freshness_expediente_hours`
+  (warn >26 h, fail >48 h). Evita que un ledger/planif fresco oculte
+  watermark stale de expediente (incidente OT 1-02 ~13.835 €).
+- Docs: `HEALTH_CHECK_021.md`.
+
 ## [2026-08-07d] — PBI: quitar Distinct en Lineas PLanificacion
 
 ### Fixed
