@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+## [2026-08-07f] — Sync 004: discovery 3 LMDTs en Planif/Expediente
+
+### Fixed
+- Workflow 004 `Prepare Planificacion BC Requests` y
+  `Prepare Expediente BC Requests`: discovery con
+  `lastModifiedDateTime` + `jobLastModifiedDateTime` +
+  `monthClosingLastModifiedDateTime` (mismo patrón que Movimientos).
+- `$select` slim en discovery (`year,month` + LMDTs); el snapshot sigue
+  trayendo las filas completas. Sin inflación: `Discover Partitions` hace
+  UNION de meses y el Transform lee solo el snapshot.
+- Cubre cierres de mes / cambios de job que no tocaban LMDT de línea
+  (huérfanos OT 1-02 / planif PSI). Docs `004_SYNC_BC_ANALYTICS.md`.
+
+## [2026-08-07e] — Health 021: expediente + freshness por entidad
+
+### Changed
+- Workflow 021: nuevo check `tipo_p_expediente_sum` — BC `expedienteMes` vs
+  `bc_expediente_mes` (filtros Transform 004: excl. PP/PY y status1
+  Completed/Lost). Tolerancia 0,5 € → `fail`.
+- Workflow 021: freshness por entidad
+  `sync_freshness_planif_hours` / `sync_freshness_expediente_hours`
+  (warn >26 h, fail >48 h) basada en `sync_executions` con synced>10 —
+  no en watermark (max LMDT). Detecta sync expediente “vacío” prolongado
+  (incidente OT 1-02 ~13.835 €).
+- Docs: `HEALTH_CHECK_021.md`.
+
 ## [2026-08-07d] — PBI: quitar Distinct en Lineas PLanificacion
 
 ### Fixed
