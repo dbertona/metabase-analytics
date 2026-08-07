@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [2026-08-07e] — Pestaña Mano de Obra Recursos/Perfiles
+
+### Added
+- Pestaña Superset **Mano de Obra Recursos/Perfiles** (paridad PBI):
+  Horas por Probabilidad, Por Perfil (horas vs imputables), matrices Horas y
+  Coste de Mano de Obra.
+- Vistas/MV `bi_v_mano_obra_recursos_{horas,coste,prob,perfil}` desde
+  `v_se_facturacion` (Resource, not Billable, Operational, excl. PP*).
+- REFRESH de las 4 MVs en workflow 004 + `apply-bi-views.sh --refresh`.
+
 ## [2026-08-07d] — PBI: quitar Distinct en Lineas PLanificacion
 
 ### Fixed

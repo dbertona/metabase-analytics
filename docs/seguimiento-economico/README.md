@@ -68,7 +68,7 @@ GROUP BY tipo;
 | **1** | ✅ | Views `v_se_*` + spec DAX/PQ |
 | **2** | ✅ | Sync 004 + paridad KPI Resumen (P/R factura y coste) |
 | **3** | ✅ | Dashboard Superset «Seguimiento Económico — Resumen» (`planificacion-ps-analytics`) |
-| **4** | En curso | Resto de páginas PBI — **Unidad** ✅ · **Facturación** ✅ · **Gastos** ✅ |
+| **4** | En curso | Resto de páginas PBI — **Unidad** ✅ · **Facturación** ✅ · **Gastos** ✅ · **Mano de Obra Recursos/Perfiles** ✅ |
 
 **Dashboard Fase 3:** https://apps.powersolution.es/analytics/superset/dashboard/planificacion-ps-analytics/  
 Regenerar (API LAN): `SKIP_APPLY_BI_VIEWS=1 SUPERSET_URL=http://192.168.36.100:8088/analytics python3 scripts/setup-superset-planificacion.py`
@@ -80,8 +80,9 @@ Regenerar (API LAN): `SKIP_APPLY_BI_VIEWS=1 SUPERSET_URL=http://192.168.36.100:8
 3. **Resumen Proyectos** — Tabla por encabezado de proyecto ✅ (`bi_v_resumen_proyectos` + chart Proyectos; filtros PBI: Operational + estado Completed/Open/Planning)
 4. **Facturación** — Pivot mensual facturado ✅ (`bi_v_facturacion` + chart Facturación; mismos filtros de estado + total > 0; meses 01–12)
 5. **Gastos** — Pivot mensual costes ✅ (`bi_v_gastos` + chart Gastos; Operational + Completed/Open/Planning; **excl. `type_line=Resource`**; coste > 0; Encabezado × meses)
-6. **Mano de Obra** — Recursos y costes
-7. **Mano de Obra Recursos/Perfiles** — Gauges horas planificadas vs imputables
+6. **Mano de Obra** — Coste Resource por proyecto×recurso × mes ✅ (`bi_v_mano_obra`)
+7. **Mano de Obra Recursos/Perfiles** — Horas/coste por recurso, probabilidad y perfiles ✅  
+   (`bi_v_mano_obra_recursos_*`; filtros página PBI: `tipoProyecto=Operational`, `typeLine=Resource`; excl. Billable y `job` PP*)
 
 ## Filtros globales (slicers)
 
