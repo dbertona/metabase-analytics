@@ -77,7 +77,7 @@
           400
         ],
         "parameters": {
-          "jsCode": "const year = Number($json.year);\nconst companyName = $json.companyName;\nconst companyId = $json.companyId;\nconst env = (($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || 'Production');\nconst base = 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/'\n  + env + '/api/Power_Solution/PS_API/v2.0/companies(' + companyId + ')';\n\n// Solo entidades 1:1 con sync (NO bruto planificacionMes: PBI/Superset usan v_se P+R)\nconst movUrl = base + \"/movimientosProyectosMes\"\n  + \"?$select=invoice,year,descripcionCA,job\"\n  + \"&$filter=year%20eq%20'\" + year + \"'%20and%20descripcionCA%20eq%20'Ingresos'\";\n\nconst cerradosUrl = base + \"/mesesCerrados\"\n  + \"?$select=job,fecha\";\n\nreturn [{ json: {\n  year, companyName, companyId, slug: $json.slug,\n  movUrl, cerradosUrl,\n  emailTo: $json.emailTo || 'dbertona@powersolution.es',\n}}];\n"
+          "jsCode": "const year = Number($json.year);\nconst companyName = $json.companyName;\nconst companyId = $json.companyId;\nconst env = (($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || 'Production');\nconst base = 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/'\n  + env + '/api/Power_Solution/PS_API/v2.0/companies(' + companyId + ')';\n\n// Tipo R cerrado: movimientosProyectosMes Ingresos (year texto)\nconst movUrl = base + \"/movimientosProyectosMes\"\n  + \"?$select=invoice,year,descripcionCA,job\"\n  + \"&$filter=year%20eq%20'\" + year + \"'%20and%20descripcionCA%20eq%20'Ingresos'\";\n\n// Tipo R abierto (cert): movimientosProyectos Ingresos + tieneCertificacion (igual path 004)\nconst certUrl = base + \"/movimientosProyectos\"\n  + \"?$select=jobNo,year,month,totalPrice,descripcion,tieneCertificacion,documentNo,no\"\n  + \"&$filter=year%20eq%20'\" + year + \"'%20and%20descripcion%20eq%20'Ingresos'%20and%20tieneCertificacion%20eq%20true\";\n\n// Tipo P sync: planificacionMes bruto (year entero). SUM sin Distinct (2026-08-07).\nconst planifUrl = base + \"/planificacionMes\"\n  + \"?$select=job,year,month,invoice,cost,nr,estado,budgetDateYear,budgetDateMonth,descripcionCA\"\n  + \"&$filter=year%20eq%20\" + year;\n\nconst cerradosUrl = base + \"/mesesCerrados\"\n  + \"?$select=job,fecha\";\n\nreturn [{ json: {\n  year, companyName, companyId, slug: $json.slug,\n  movUrl, certUrl, planifUrl, cerradosUrl,\n  emailTo: $json.emailTo || 'dbertona@powersolution.es',\n}}];\n"
         },
         "typeVersion": 2
       },
@@ -127,6 +127,51 @@
         "typeVersion": 2
       },
       {
+        "id": "http-planif-021",
+        "name": "BC Planificacion",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          1440,
+          400
+        ],
+        "parameters": {
+          "url": "={{ $json.planifUrl }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "options": {
+            "pagination": {
+              "pagination": {
+                "nextURL": "={{ $response.body['@odata.nextLink'] }}",
+                "paginationMode": "responseContainsNextURL",
+                "completeExpression": "={{ !$response.body['@odata.nextLink'] }}",
+                "paginationCompleteWhen": "other"
+              }
+            }
+          }
+        },
+        "typeVersion": 4.2,
+        "credentials": {
+          "oAuth2Api": {
+            "id": "5caHilW1m87Snw87",
+            "name": "Business Central"
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "id": "sum-planif-021",
+        "name": "Sum Planificacion BC",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          1680,
+          400
+        ],
+        "parameters": {
+          "jsCode": "const input = $input.all();\nconst meta = $('Sum Movimientos BC').first().json;\nconst allowed = new Set(['Planning', 'Quote', 'Open', 'Completed', 'Lost']);\nconst toNum = (v) => {\n  const n = Number(v);\n  return Number.isFinite(n) ? n : 0;\n};\nlet sum = 0;\nlet count = 0;\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  if (raw.error || raw.statusCode >= 400) continue;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const job = String(r.job ?? '').trim();\n    if (!job || job.startsWith('PP') || job.startsWith('PY')) continue;\n    const status = String(r.estado ?? r.status ?? '').trim();\n    if (!allowed.has(status)) continue;\n    const year = Number(r.year ?? 0) || 0;\n    const month = Number(r.month ?? 0) || 0;\n    if (!year || !month) continue;\n    const budgetYear = toNum(r.budgetDateYear);\n    const budgetMonth = toNum(r.budgetDateMonth);\n    // Misma regla Transform 004: si hay budgetDate, exigir year==budgetYear y month>=budgetMonth\n    if (budgetYear !== 0 && (year !== budgetYear || month < budgetMonth)) continue;\n    const inv = toNum(r.invoice);\n    sum += inv;\n    count += 1;\n  }\n}\nreturn [{ json: {\n  ...meta,\n  bc_p_planif_sum: Number(sum.toFixed(2)),\n  bc_p_planif_count: count,\n}}];\n"
+        },
+        "typeVersion": 2
+      },
+      {
         "id": "http-cer-005",
         "name": "BC MesesCerrados",
         "type": "n8n-nodes-base.httpRequest",
@@ -167,7 +212,52 @@
           400
         ],
         "parameters": {
-          "jsCode": "const input = $input.all();\nconst meta = $('Sum Movimientos BC').first().json;\nlet count = 0;\nconst skip = (j) => {\n  const s = String(j || '').trim();\n  return s.startsWith('PP') || s.startsWith('PY');\n};\nconst seen = new Set();\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  if (raw.error || raw.statusCode >= 400) continue;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const job = String(r.job ?? '').trim();\n    const fecha = String(r.fecha ?? '').trim();\n    if (!job || !fecha || skip(job) || fecha.startsWith('0001')) continue;\n    const key = job + '|' + fecha;\n    if (seen.has(key)) continue;\n    seen.add(key);\n    count += 1;\n  }\n}\nreturn [{ json: { ...meta, bc_cerrados_count: count } }];\n"
+          "jsCode": "const input = $input.all();\nconst meta = $('Sum Planificacion BC').first().json;\nlet count = 0;\nconst skip = (j) => {\n  const s = String(j || '').trim();\n  return s.startsWith('PP') || s.startsWith('PY');\n};\nconst seen = new Set();\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  if (raw.error || raw.statusCode >= 400) continue;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const job = String(r.job ?? '').trim();\n    const fecha = String(r.fecha ?? '').trim();\n    if (!job || !fecha || skip(job) || fecha.startsWith('0001')) continue;\n    const key = job + '|' + fecha;\n    if (seen.has(key)) continue;\n    seen.add(key);\n    count += 1;\n  }\n}\nreturn [{ json: { ...meta, bc_cerrados_count: count } }];\n"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "http-cert-021",
+        "name": "BC Cert Open",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          2280,
+          400
+        ],
+        "parameters": {
+          "url": "={{ $json.certUrl }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "options": {
+            "pagination": {
+              "pagination": {
+                "nextURL": "={{ $response.body['@odata.nextLink'] }}",
+                "paginationMode": "responseContainsNextURL",
+                "completeExpression": "={{ !$response.body['@odata.nextLink'] }}",
+                "paginationCompleteWhen": "other"
+              }
+            }
+          }
+        },
+        "typeVersion": 4.2,
+        "credentials": {
+          "oAuth2Api": {
+            "id": "5caHilW1m87Snw87",
+            "name": "Business Central"
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "id": "sum-cert-021",
+        "name": "Sum Cert Open BC",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          2520,
+          400
+        ],
+        "parameters": {
+          "jsCode": "const input = $input.all();\nconst meta = $('Sum MesesCerrados BC').first().json;\nconst year = Number(meta.year) || 0;\nconst toNum = (v) => {\n  const n = Number(v);\n  return Number.isFinite(n) ? n : 0;\n};\n\n// Meses cerrados BC → set job|year|month (misma exclusión que Upsert Cert Open 004)\nconst closed = new Set();\ntry {\n  for (const it of ($items('BC MesesCerrados') || [])) {\n    const raw = it?.json ?? {};\n    if (raw.error || raw.statusCode >= 400) continue;\n    const src = raw?.body ?? raw;\n    const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n    for (const r of chunk) {\n      const job = String(r.job ?? '').trim();\n      const fecha = String(r.fecha ?? '').trim();\n      if (!job || !fecha || fecha.startsWith('0001')) continue;\n      if (job.startsWith('PP') || job.startsWith('PY')) continue;\n      const d = new Date(fecha.includes('T') ? fecha : fecha + 'T00:00:00Z');\n      if (Number.isNaN(d.getTime())) continue;\n      const y = d.getUTCFullYear();\n      const m = d.getUTCMonth() + 1;\n      if (y === year) closed.add(job + '|' + y + '|' + m);\n    }\n  }\n} catch (e) {}\n\n// Certificaciones en meses ABIERTOS (provisional R). totalPrice negativo → ABS.\nlet certSum = 0;\nlet certCount = 0;\nlet certSkippedClosed = 0;\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  if (raw.error || raw.statusCode >= 400) continue;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const job = String(r.jobNo ?? r.JobNo ?? r.job ?? '').trim();\n    if (!job || job.startsWith('PP') || job.startsWith('PY')) continue;\n    const y = Number(r.year ?? 0) || 0;\n    const m = Number(r.month ?? 0) || 0;\n    if (y !== year || !m) continue;\n    const concepto = String(r.descripcion ?? r.Descripcion ?? '').trim();\n    if (concepto && concepto !== 'Ingresos') continue;\n    const key = job + '|' + y + '|' + m;\n    if (closed.has(key)) { certSkippedClosed += 1; continue; }\n    // Mismo signo que Transform Cert Open: totalPrice * -1\n    const inv = toNum(r.totalPrice ?? r.TotalPrice) * -1;\n    certSum += inv;\n    certCount += 1;\n  }\n}\n\nconst movSum = toNum(meta.bc_r_sum); // ya ABS desde Sum Movimientos\nconst bc_r_total = Number((movSum + Math.abs(certSum)).toFixed(2));\n\nreturn [{ json: {\n  ...meta,\n  bc_r_mov_sum: movSum,\n  bc_r_cert_open_sum: Number(Math.abs(certSum).toFixed(2)),\n  bc_r_cert_open_count: certCount,\n  bc_r_cert_skipped_closed: certSkippedClosed,\n  bc_r_sum: bc_r_total, // total alineado con Analytics ledger Ingresos\n}}];\n"
         },
         "typeVersion": 2
       },
@@ -176,12 +266,12 @@
         "name": "Query Analytics",
         "type": "n8n-nodes-base.postgres",
         "position": [
-          2400,
+          2760,
           400
         ],
         "parameters": {
           "operation": "executeQuery",
-          "query": "SELECT\n  COALESCE((SELECT SUM(invoice) FROM bc_job_ledger_entry_month\n    WHERE company_name = $1 AND year = $2::int\n      AND concepto_analitico_descripcion = 'Ingresos'), 0) AS r_sum,\n  COALESCE((SELECT COUNT(*) FROM bc_meses_cerrados\n    WHERE company_name = $1\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'), 0) AS cerrados_count,\n  COALESCE((SELECT COUNT(*) FROM bc_job_planning_line\n    WHERE company_name = $1 AND year = $2::int\n      AND budget_date_year = 0 AND COALESCE(invoice,0) <> 0\n      AND status IN ('Open','Planning')\n      AND make_date(year, month, 1) < date_trunc('month', CURRENT_DATE)), 0) AS budget0_past_count,\n  (SELECT MAX(last_sync_at) FROM sync_state\n    WHERE company_name = $1\n      AND entity IN ('bc_job_planning_line','bc_job_ledger_entry_month','bc_meses_cerrados')) AS last_sync_at,\n  COALESCE((SELECT SUM(facturado) FROM v_se_facturacion\n    WHERE empresa = $1 AND year = $2::int AND tipo IN ('P','R')), 0) AS planificacion_actual\n",
+          "query": "SELECT\n  COALESCE((SELECT SUM(invoice) FROM bc_job_ledger_entry_month\n    WHERE company_name = $1 AND year = $2::int\n      AND concepto_analitico_descripcion = 'Ingresos'), 0) AS r_sum,\n  COALESCE((SELECT SUM(invoice) FROM bc_job_planning_line\n    WHERE company_name = $1 AND year = $2::int\n      AND status IN ('Planning','Quote','Open','Completed','Lost')\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'\n      AND (\n        COALESCE(budget_date_year, 0) = 0\n        OR (budget_date_year = year AND month >= budget_date_month)\n      )), 0) AS p_planif_sum,\n  COALESCE((SELECT COUNT(*) FROM bc_meses_cerrados\n    WHERE company_name = $1\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'), 0) AS cerrados_count,\n  COALESCE((SELECT COUNT(*) FROM bc_job_planning_line\n    WHERE company_name = $1 AND year = $2::int\n      AND budget_date_year = 0 AND COALESCE(invoice,0) <> 0\n      AND status IN ('Open','Planning')\n      AND make_date(year, month, 1) < date_trunc('month', CURRENT_DATE)), 0) AS budget0_past_count,\n  (SELECT MAX(last_sync_at) FROM sync_state\n    WHERE company_name = $1\n      AND entity IN ('bc_job_planning_line','bc_job_ledger_entry_month','bc_meses_cerrados')) AS last_sync_at,\n  COALESCE((SELECT SUM(facturado) FROM v_se_facturacion\n    WHERE empresa = $1 AND year = $2::int AND tipo IN ('P','R')), 0) AS planificacion_actual\n",
           "options": {
             "queryReplacement": "={{ $json.companyName }}\n={{ $json.year }}"
           }
@@ -199,11 +289,11 @@
         "name": "Compare",
         "type": "n8n-nodes-base.code",
         "position": [
-          2640,
+          3000,
           400
         ],
         "parameters": {
-          "jsCode": "const meta = $('Sum MesesCerrados BC').first().json;\nconst rows = $input.all().map(i => i.json);\nconst a = rows[0] || {};\n\nconst num = (v) => {\n  const n = Number(v);\n  return Number.isFinite(n) ? n : 0;\n};\n\nconst an_r = Math.abs(num(a.r_sum));\nconst an_cerrados = num(a.cerrados_count);\nconst an_budget0 = num(a.budget0_past_count);\nconst planif_actual = Math.abs(num(a.planificacion_actual));\nconst lastSync = a.last_sync_at ? new Date(a.last_sync_at) : null;\nconst hoursSinceSync = lastSync ? (Date.now() - lastSync.getTime()) / 3600000 : 999;\n\nconst checks = [];\nconst push = (check_name, bc, an, tol, kind='abs') => {\n  const delta = Number((bc - an).toFixed(2));\n  let status = 'ok';\n  if (kind === 'count' && Math.abs(delta) > tol) status = 'fail';\n  if (kind === 'abs' && Math.abs(delta) > tol) status = 'fail';\n  if (kind === 'signal' && an > tol) status = 'fail';\n  if (kind === 'fresh' && an > tol) status = 'warn';\n  // meses_cerrados: warn si delta relativo > 2% (paginacion/PP residual), fail si > 5%\n  if (kind === 'cerrados') {\n    const base = Math.max(Math.abs(bc), Math.abs(an), 1);\n    const pct = Math.abs(delta) / base;\n    if (pct > 0.05) status = 'fail';\n    else if (Math.abs(delta) > tol) status = 'warn';\n  }\n  if (kind === 'info') status = 'ok';\n  checks.push({\n    company_name: meta.companyName,\n    year: meta.year,\n    check_name,\n    bc_value: bc,\n    analytics_value: an,\n    delta,\n    status,\n    details: { slug: meta.slug, kind },\n  });\n};\n\n// Paridad real BC ↔ Analytics (misma base que PBI Tipo R)\npush('tipo_r_sum', Number(meta.bc_r_sum.toFixed(2)), Number(an_r.toFixed(2)), 0.5, 'abs');\n\n// Sync meses cerrados (tolerancia relativa)\npush('meses_cerrados_count', meta.bc_cerrados_count, an_cerrados, 50, 'cerrados');\n\n// Senal de datos: plan sin versionar en meses pasados\npush('budget0_past_with_invoice', 0, an_budget0, 0, 'signal');\n\n// Freshness\npush('sync_freshness_hours', 26, Number(hoursSinceSync.toFixed(1)), 26, 'fresh');\n\n// Contexto KPI (Superset/PBI Planificacion Actual = P+R). Sin BC bruto: evita falsos fail.\npush('planificacion_actual_p_plus_r', planif_actual, planif_actual, 0, 'info');\n\nconst hasFail = checks.some(c => c.status === 'fail');\nconst hasWarn = checks.some(c => c.status === 'warn');\nconst overall = hasFail ? 'fail' : (hasWarn ? 'warn' : 'ok');\n\nreturn [{ json: {\n  companyName: meta.companyName,\n  year: meta.year,\n  emailTo: meta.emailTo,\n  overall,\n  checks,\n  hasDiff: hasFail || hasWarn,\n}}];\n"
+          "jsCode": "const meta = $('Sum Cert Open BC').first().json;\nconst rows = $input.all().map(i => i.json);\nconst a = rows[0] || {};\n\nconst num = (v) => {\n  const n = Number(v);\n  return Number.isFinite(n) ? n : 0;\n};\n\nconst an_r = Math.abs(num(a.r_sum));\nconst an_p_planif = num(a.p_planif_sum);\nconst an_cerrados = num(a.cerrados_count);\nconst an_budget0 = num(a.budget0_past_count);\nconst planif_actual = Math.abs(num(a.planificacion_actual));\nconst lastSync = a.last_sync_at ? new Date(a.last_sync_at) : null;\nconst hoursSinceSync = lastSync ? (Date.now() - lastSync.getTime()) / 3600000 : 999;\n\nconst checks = [];\nconst push = (check_name, bc, an, tol, kind='abs', detailsExtra={}) => {\n  const delta = Number((bc - an).toFixed(2));\n  let status = 'ok';\n  if (kind === 'count' && Math.abs(delta) > tol) status = 'fail';\n  if (kind === 'abs' && Math.abs(delta) > tol) status = 'fail';\n  if (kind === 'signal' && an > tol) status = 'fail';\n  if (kind === 'fresh' && an > tol) status = 'warn';\n  if (kind === 'cerrados') {\n    const base = Math.max(Math.abs(bc), Math.abs(an), 1);\n    const pct = Math.abs(delta) / base;\n    if (pct > 0.05) status = 'fail';\n    else if (Math.abs(delta) > tol) status = 'warn';\n  }\n  if (kind === 'info') status = 'ok';\n  checks.push({\n    company_name: meta.companyName,\n    year: meta.year,\n    check_name,\n    bc_value: bc,\n    analytics_value: an,\n    delta,\n    status,\n    details: { slug: meta.slug, kind, ...detailsExtra },\n  });\n};\n\n// Tipo R = MovimientosMes (cerrados) + Cert Open (abiertos). Misma composición que Analytics ledger.\npush(\n  'tipo_r_sum',\n  Number(num(meta.bc_r_sum).toFixed(2)),\n  Number(an_r.toFixed(2)),\n  0.5,\n  'abs',\n  {\n    bc_r_mov_sum: meta.bc_r_mov_sum,\n    bc_r_cert_open_sum: meta.bc_r_cert_open_sum,\n  }\n);\n\npush(\n  'tipo_p_planif_sum',\n  Number(num(meta.bc_p_planif_sum).toFixed(2)),\n  Number(an_p_planif.toFixed(2)),\n  0.5,\n  'abs'\n);\n\npush('meses_cerrados_count', meta.bc_cerrados_count, an_cerrados, 50, 'cerrados');\npush('budget0_past_with_invoice', 0, an_budget0, 0, 'signal');\npush('sync_freshness_hours', 26, Number(hoursSinceSync.toFixed(1)), 26, 'fresh');\npush('planificacion_actual_p_plus_r', planif_actual, planif_actual, 0, 'info');\n\nconst hasFail = checks.some(c => c.status === 'fail');\nconst hasWarn = checks.some(c => c.status === 'warn');\nconst overall = hasFail ? 'fail' : (hasWarn ? 'warn' : 'ok');\n\nreturn [{ json: {\n  companyName: meta.companyName,\n  year: meta.year,\n  emailTo: meta.emailTo,\n  overall,\n  checks,\n  hasDiff: hasFail || hasWarn,\n}}];\n"
         },
         "typeVersion": 2
       },
@@ -212,7 +302,7 @@
         "name": "Expand checks for insert",
         "type": "n8n-nodes-base.code",
         "position": [
-          2880,
+          3240,
           400
         ],
         "parameters": {
@@ -225,7 +315,7 @@
         "name": "Insert health log",
         "type": "n8n-nodes-base.postgres",
         "position": [
-          3120,
+          3480,
           400
         ],
         "parameters": {
@@ -249,7 +339,7 @@
         "name": "Restore company result",
         "type": "n8n-nodes-base.code",
         "position": [
-          3360,
+          3720,
           400
         ],
         "parameters": {
@@ -279,7 +369,7 @@
           80
         ],
         "parameters": {
-          "jsCode": "const rows = $input.all().map(i => i.json).filter(r => r && r.check_name);\nif (!rows.length) return [];\n\nconst esc = (s) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\nconst fmt = (n) => {\n  if (n === null || n === undefined || n === '') return '';\n  const x = Number(n);\n  return Number.isFinite(x) ? x.toLocaleString('es-ES', { maximumFractionDigits: 2 }) : String(n);\n};\n\nlet body = '';\nfor (const c of rows) {\n  body += `<tr>\n    <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.company_name)}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.check_name)}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.bc_value))}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.analytics_value))}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.delta))}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.status)}</td>\n  </tr>`;\n}\n\nconst when = new Date().toISOString().slice(0,10);\nconst html = `<!DOCTYPE html><html><body style=\"font-family:Segoe UI,sans-serif;color:#333;\">\n<p style=\"margin:0 0 16px;font-size:13px;color:#c0392b;font-weight:600;\">Alerta Health Check Analytics vs BC (workflow 021)</p>\n<p>Se detectaron discrepancias CRÍTICAS el <strong>${esc(when)}</strong> (${rows.length} checks).</p>\n<table style=\"border-collapse:collapse;width:100%;max-width:900px;\">\n<thead><tr style=\"background:#f0f0f0;\">\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Empresa</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Check</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">BC</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">Analytics</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">Delta</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Status</th>\n</tr></thead>\n<tbody>${body}</tbody></table>\n<p style=\"font-size:12px;color:#888;margin-top:16px;\">\nSolo se alerta por fallos críticos (Real desalineado, plan sin versionar en meses cerrados, o >5% en meses cerrados). Diferencias menores (warn) quedan solo en <code>analytics_health_log</code> para revisión semanal. Acciones tipicas: webhook 004 (psi|pslab), revisar meses cerrados / budget_date_year.\n</p>\n</body></html>`;\n\nreturn [{ json: {\n  to: 'dbertona@powersolution.es',\n  subject: `[Analytics 021] Discrepancia BC vs Analytics — ${when}`,\n  html,\n}}];\n"
+          "jsCode": "const rows = $input.all().map(i => i.json).filter(r => r && r.check_name);\nif (!rows.length) return [];\n\nconst esc = (s) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\nconst fmt = (n) => {\n  if (n === null || n === undefined || n === '') return '';\n  const x = Number(n);\n  return Number.isFinite(x) ? x.toLocaleString('es-ES', { maximumFractionDigits: 2 }) : String(n);\n};\n\nlet body = '';\nfor (const c of rows) {\n  body += `<tr>\n    <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.company_name)}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.check_name)}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.bc_value))}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.analytics_value))}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.delta))}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.status)}</td>\n  </tr>`;\n}\n\nconst when = new Date().toISOString().slice(0,10);\nconst html = `<!DOCTYPE html><html><body style=\"font-family:Segoe UI,sans-serif;color:#333;\">\n<p style=\"margin:0 0 16px;font-size:13px;color:#c0392b;font-weight:600;\">Alerta Health Check Analytics vs BC (workflow 021)</p>\n<p>Se detectaron discrepancias CRÍTICAS el <strong>${esc(when)}</strong> (${rows.length} checks).</p>\n<table style=\"border-collapse:collapse;width:100%;max-width:900px;\">\n<thead><tr style=\"background:#f0f0f0;\">\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Empresa</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Check</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">BC</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">Analytics</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">Delta</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Status</th>\n</tr></thead>\n<tbody>${body}</tbody></table>\n<p style=\"font-size:12px;color:#888;margin-top:16px;\">\nSolo se alerta por fallos críticos (Real/Planificación sync desalineados, plan sin versionar en meses cerrados, o >5% en meses cerrados). Diferencias menores (warn) quedan solo en <code>analytics_health_log</code> para revisión semanal. Acciones tipicas: webhook 004 (psi|pslab), revisar meses cerrados / budget_date_year.\n</p>\n</body></html>`;\n\nreturn [{ json: {\n  to: 'dbertona@powersolution.es',\n  subject: `[Analytics 021] Discrepancia BC vs Analytics — ${when}`,\n  html,\n}}];\n"
         },
         "typeVersion": 2
       },
@@ -408,7 +498,7 @@
         "main": [
           [
             {
-              "node": "BC MesesCerrados",
+              "node": "BC Planificacion",
               "type": "main",
               "index": 0
             }
@@ -430,7 +520,7 @@
         "main": [
           [
             {
-              "node": "Query Analytics",
+              "node": "BC Cert Open",
               "type": "main",
               "index": 0
             }
@@ -519,6 +609,50 @@
           [
             {
               "node": "Prepare Alert Email",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BC Planificacion": {
+        "main": [
+          [
+            {
+              "node": "Sum Planificacion BC",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sum Planificacion BC": {
+        "main": [
+          [
+            {
+              "node": "BC MesesCerrados",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BC Cert Open": {
+        "main": [
+          [
+            {
+              "node": "Sum Cert Open BC",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sum Cert Open BC": {
+        "main": [
+          [
+            {
+              "node": "Query Analytics",
               "type": "main",
               "index": 0
             }
