@@ -81,6 +81,7 @@ Todas prefijadas con `bc_` desde migración `20260627120001_rename_bc_tables_ana
 | `bc_meses_cerrados` | MesesCerrados | 50217 | Full | Meses cerrados por proyecto |
 | `bc_objectives_by_department` | ObjectivesByDepartaments | 50218 | Full | Objetivos anuales por dpto |
 | `bc_historico_planificacion_mes` | HistoricoPlanificacionMes | 50221 | Full | Histórico planificación cerrada |
+| `bc_historico_mano_obra_mes` | `jobPlanningUnified` (script) / `HistoricoManoObraMes` 50236 | — | Script | Plan Resource MdO al cierre (Apps `bi_v_mano_obra` P) |
 | `bc_dias_imputacion` | DiasdeImputacion | 50212 | Full | Calendario imputable |
 | `bc_job_ledger_entry` | *(legacy)* | — | — | **Vacía** — el sync usa `bc_job_ledger_entry_month` |
 

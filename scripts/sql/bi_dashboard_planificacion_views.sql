@@ -495,11 +495,65 @@ COMMENT ON MATERIALIZED VIEW bi_mv_gastos IS
 -- m0N_closed: mes cerrado por proyecto (bc_meses_cerrados × empresa+job+year+month).
 -- -----------------------------------------------------------------------------
 CREATE MATERIALIZED VIEW bi_mv_mano_obra AS
-WITH base AS (
+WITH live_mdo AS (
+    -- Plan abierto (v_se_coste P) + Real (R). Meses cerrados: P vacío por diseño SE.
     SELECT
         c.empresa,
         c.year,
+        c.month,
         c.departamento AS department_code,
+        c.tipo,
+        c.tipo_proyecto,
+        c.estado,
+        c.job,
+        c.descripcion,
+        c.nr,
+        c.coste
+    FROM v_se_coste c
+    WHERE c.tipo IN ('P','R')
+      AND c.tipo_proyecto = 'Operational'
+      AND COALESCE(c.estado,'') IN ('Completed','Open','Planning')
+      AND COALESCE(c.type_line,'') = 'Resource'
+      AND (COALESCE(TRIM(c.descripcion_ca),'') = '' OR c.descripcion_ca LIKE 'Mano de Obra%')
+),
+hist_mdo AS (
+    -- Plan Resource congelado al cierre (PS_JobPlanningUnified → bc_historico_mano_obra_mes).
+    -- cost ya viene probabilizado. Solo meses con cierre en bc_meses_cerrados.
+    SELECT
+        h.company_name AS empresa,
+        h.year,
+        h.month,
+        COALESCE(NULLIF(btrim(j.departamento::text), ''), '') AS department_code,
+        'P'::text AS tipo,
+        COALESCE(j.tipo_proyecto, '') AS tipo_proyecto,
+        COALESCE(j.status, '') AS estado,
+        h.job_no AS job,
+        COALESCE(j.description, '') AS descripcion,
+        h.nr,
+        h.cost::numeric AS coste
+    FROM bc_historico_mano_obra_mes h
+    INNER JOIN bc_meses_cerrados mc
+        ON mc.company_name = h.company_name
+       AND mc.job_no = h.job_no
+       AND mc.year = h.year
+       AND mc.month = h.month
+    LEFT JOIN bc_job j
+        ON j.company_name = h.company_name AND j.no = h.job_no
+    WHERE COALESCE(j.tipo_proyecto, 'Operational') = 'Operational'
+      AND COALESCE(j.status, 'Open') IN ('Completed','Open','Planning')
+      AND COALESCE(h.type_line, 'Resource') = 'Resource'
+      AND ABS(COALESCE(h.cost, 0)) > 0.0001
+),
+mdo_rows AS (
+    SELECT * FROM live_mdo
+    UNION ALL
+    SELECT * FROM hist_mdo
+),
+base AS (
+    SELECT
+        c.empresa,
+        c.year,
+        c.department_code,
         d.department_name,
         c.tipo,
         CASE c.tipo WHEN 'P' THEN 'Planificado' WHEN 'R' THEN 'Real'
@@ -522,17 +576,12 @@ WITH base AS (
         SUM(c.coste) FILTER (WHERE c.month = 11) AS m11,
         SUM(c.coste) FILTER (WHERE c.month = 12) AS m12,
         SUM(c.coste) AS total
-    FROM v_se_coste c
+    FROM mdo_rows c
     LEFT JOIN mb_v_dim_departamento d
-        ON d.company_name = c.empresa AND d.department_code = c.departamento
+        ON d.company_name = c.empresa AND d.department_code = c.department_code
     LEFT JOIN bc_resource r
         ON r.code = c.nr AND r.company_name = c.empresa
-    WHERE c.tipo IN ('P','R')
-      AND c.tipo_proyecto = 'Operational'
-      AND COALESCE(c.estado,'') IN ('Completed','Open','Planning')
-      AND COALESCE(c.type_line,'') = 'Resource'
-      AND (COALESCE(TRIM(c.descripcion_ca),'') = '' OR c.descripcion_ca LIKE 'Mano de Obra%')
-    GROUP BY c.empresa, c.year, c.departamento, d.department_name,
+    GROUP BY c.empresa, c.year, c.department_code, d.department_name,
              c.tipo, c.tipo_proyecto, c.estado, c.job, c.descripcion, c.nr, r.name
     HAVING ABS(SUM(c.coste)) > 0.0001
 ),
@@ -597,9 +646,12 @@ CREATE INDEX IF NOT EXISTS bi_mv_mano_obra_idx3 ON bi_mv_mano_obra (proyecto);
 CREATE VIEW bi_v_mano_obra AS SELECT * FROM bi_mv_mano_obra;
 
 COMMENT ON VIEW bi_v_mano_obra IS
-  'Mano de Obra: filas planas proyecto+recurso (coste×mes) + m0N_closed desde bc_meses_cerrados. Jerarquía Proyecto→Recurso se agrupa en el consumidor (API/React), no en SQL.';
+  'Mano de Obra: filas planas proyecto+recurso (coste×mes) + m0N_closed. '
+  'Tipo P en meses cerrados: bc_historico_mano_obra_mes (Resource al cierre); '
+  'meses abiertos: v_se_coste. Jerarquía Proyecto→Recurso en el consumidor.';
 COMMENT ON MATERIALIZED VIEW bi_mv_mano_obra IS
-  'Snapshot bi_v_mano_obra (filas planas + flags mes cerrado); refrescar tras sync BC→Analytics.';
+  'Snapshot bi_v_mano_obra (+ plan Resource histórico en meses cerrados); '
+  'refrescar tras sync BC→Analytics / sync_historico_mano_obra.py.';
 
 -- KPI agregados por empresa/año (referencia / legacy; tarjetas usan bi_v_planificacion_kpi)
 CREATE OR REPLACE VIEW bi_v_kpi_anual_empresa AS

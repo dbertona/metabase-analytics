@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [2026-08-08] — Plan MdO meses cerrados desde Unified Resource
+
+### Added
+- Tabla `bc_historico_mano_obra_mes` + `scripts/sync_historico_mano_obra.py`
+  (OData `jobPlanningUnified`, Type=Resource, planningDate = mes de cierre).
+- `bi_mv_mano_obra` / `bi_v_mano_obra`: tipo P en meses cerrados desde ese
+  histórico (meses abiertos siguen `v_se_coste`).
+
+### Notes
+- PSI: huecos de snapshot Resource en ~2025.03–2026.03 (BC Unified).
+- Si el cierre pisó plan con real *antes* del snapshot, Plan≈Real en ese mes.
+
 ## [2026-08-07g] — Analytics: v_se_lineas_planificacion sin Distinct ON
 
 ### Fixed
