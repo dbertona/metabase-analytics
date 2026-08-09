@@ -7,8 +7,11 @@
   `Result` cuenta filas upsertadas (no páginas HTTP → evita `synced:1` falso);
   watermark avanza tras BC OK aunque el delta quede vacío (PP/PY filtrados);
   `alwaysOutputData` en Transform/Upsert para no cortar Compute/Result.
-- `meses_cerrados`: quitar `$orderby` (BC → `invalid syntax`); no avanzar
-  watermark si `error` es string; `Result` marca `status=error` en ese caso.
+- `meses_cerrados`: quitar `$orderby`; no avanzar watermark si `error` es string;
+  `Result` marca `status=error` en ese caso.
+- `BC API - MesesCerrados` / `ObjectivesByDepartaments`: URL inline (estilo
+  Departamentos). El bloque `const`/`return` en la expresión n8n fallaba en
+  ~7 ms con `invalid syntax` (sin llegar a BC); watermark atascado desde Jul-22.
 
 ## [2026-08-07g] — Analytics: v_se_lineas_planificacion sin Distinct ON
 

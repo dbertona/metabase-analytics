@@ -147,6 +147,13 @@ FROM bc_meses_cerrados WHERE company_name ILIKE '%Iberia%';
 Tras desplegar el JSON en n8n: re-lanzar **solo** el 004 (`meses_cerrados`) con
 autorización explícita — no scripts/OData bypass.
 
+### Variante: `error: "invalid syntax"` en ~7 ms
+
+Si `BC API - MesesCerrados` devuelve `{error:"invalid syntax"}` con
+`executionTime` de unos milisegundos, **no es OData**: falla la expresión URL
+de n8n (bloques `const`/`return`). Usar URL inline como `BC API - Departamentos`.
+La misma causa afectaba a `ObjectivesByDepartaments`.
+
 ---
 
 ## Referencias

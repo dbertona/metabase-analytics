@@ -2114,7 +2114,7 @@
           8064
         ],
         "parameters": {
-          "url": "={{ \n  const map = ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json);\n  const ls = map.syncStateByEntity['meses_cerrados'];\n  return 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/' + ((($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })())) + '/api/Power_Solution/PS_API/v2.0/companies('\n  + map.companyId\n  + ')/mesesCerrados?$select=job,fecha,estado,billablePriceTotal,costTotal,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20' + ls;\n}}",
+          "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/' + ((($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })())) + '/api/Power_Solution/PS_API/v2.0/companies('\n  + ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json).companyId\n  + ')/mesesCerrados?$select=job,fecha,estado,billablePriceTotal,costTotal,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json).syncStateByEntity['meses_cerrados']\n}}",
           "options": {
             "pagination": {
               "pagination": {
@@ -2259,7 +2259,7 @@
           8608
         ],
         "parameters": {
-          "url": "={{ \n  const map = ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json);\n  const ls = map.syncStateByEntity['objectives_by_department'];\n  return 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/' + ((($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })())) + '/api/Power_Solution/PS_API/v2.0/companies('\n  + map.companyId\n  + ')/ObjectivesByDepartaments?$select=departments,year,costTarget,billingTarget,marginTarget,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20' + ls;\n}}",
+          "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/' + ((($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })())) + '/api/Power_Solution/PS_API/v2.0/companies('\n  + ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json).companyId\n  + ')/ObjectivesByDepartaments?$select=departments,year,costTarget,billingTarget,marginTarget,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json).syncStateByEntity['objectives_by_department']\n}}",
           "options": {
             "pagination": {
               "pagination": {
