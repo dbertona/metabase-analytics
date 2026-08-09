@@ -121,6 +121,34 @@ Si el watermark avanzó sin datos (falso positivo): resetear a la última
 
 ---
 
+## Troubleshooting: `meses_cerrados` → `ok / synced:1` sin datos
+
+Síntoma: webhook OK, `meses_cerrados: {status:ok, synced:1}`, pero
+`sync_state.bc_meses_cerrados` no avanza y `MAX(updated_at)` en
+`bc_meses_cerrados` sigue antiguo.
+
+Causa (pre-fix 2026-08-09): `Result MesesCerrados` contaba la respuesta HTTP
+OData (1 ítem) en lugar de filas upsertadas; el watermark solo avanzaba si
+Upsert devolvía filas; la URL usaba `MesesCerrados` en vez de `mesesCerrados`.
+
+Fix: ver CHANGELOG `[Unreleased]` — métrica por `RETURNING`, watermark tras BC
+OK con delta vacío, OData `mesesCerrados`, `alwaysOutputData` en Transform/Upsert.
+
+Comprobar:
+
+```sql
+SELECT last_sync_at FROM sync_state
+WHERE company_name = 'Power Solution Iberia SL' AND entity = 'bc_meses_cerrados';
+
+SELECT MAX(updated_at), COUNT(*) FILTER (WHERE year=2026 AND month=6)
+FROM bc_meses_cerrados WHERE company_name ILIKE '%Iberia%';
+```
+
+Tras desplegar el JSON en n8n: re-lanzar **solo** el 004 (`meses_cerrados`) con
+autorización explícita — no scripts/OData bypass.
+
+---
+
 ## Referencias
 
 - `src/workflows/004_sync_bc_to_ps_analytics.json` — definición del workflow en este repo

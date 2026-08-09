@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+- Workflow 004 `meses_cerrados`: entidad OData `mesesCerrados` (no PascalCase);
+  `Result` cuenta filas upsertadas (no páginas HTTP → evita `synced:1` falso);
+  watermark avanza tras BC OK aunque el delta quede vacío (PP/PY filtrados);
+  `alwaysOutputData` en Transform/Upsert para no cortar Compute/Result.
+
 ## [2026-08-07g] — Analytics: v_se_lineas_planificacion sin Distinct ON
 
 ### Fixed
