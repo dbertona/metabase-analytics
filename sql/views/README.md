@@ -9,7 +9,7 @@ Snapshot de las vistas `v_se_*` y helpers `se_*` alineado con la **BD analytics 
 |-----|--------|
 | **Canónico (aplicar cambios)** | Este directorio: `sql/views/seguimiento_economico_views.sql` |
 | **Capa dashboard Superset `bi_v_*`** | `scripts/sql/bi_dashboard_planificacion_views.sql` |
-| **Documentación funcional** | `docs/GUIA_COMPLETA_ANALYTICS.md` |
+| **Documentación funcional** | `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md` |
 
 **No apliques cambios SQL sin validación previa en entorno** (DEV/PROD): las vistas
 `v_se_*` alimentan KPIs y dashboards críticos.

@@ -1,33 +1,25 @@
----
-description: Contexto de arquitectura de superset-analytics — leer PRIMERO en cada chat
-alwaysApply: true
----
-
-# Arquitectura — superset-analytics
+# Arquitectura — PS Analytics (capa datos)
 
 ## 🎯 ¿Para qué sirve este repo?
 
-Réplica de datos BC en **Apache Superset** para reporting financiero (Seguimiento Económico, Facturación P/R).
+Réplica de datos BC en **PostgreSQL Analytics** (VM 100) para Apps (Seguimiento Económico) y Power BI.
 Contiene el **workflow n8n 004** (sync BC → Analytics) en `src/workflows/`.
 NO contiene código de la app Timesheet/Gastos (eso está en `power-solution-apps`).
 
-**Doc maestra:** `docs/GUIA_COMPLETA_ANALYTICS.md`  
+> Nombre histórico del repo: `superset-analytics`. La UI Apache Superset está **retirada**.
+
+**Doc sync:** `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md`  
 **Troubleshooting P/R:** `docs/shared/analytics/ANALYTICS_FACTURACION_PBI_ALIGNMENT.md`  
-**Workflow 004 (sync):** `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md`  
-**Dashboard UI sync:** `.cursor/rules/superset-dashboard-ui-sync.mdc` ⭐ pull antes de regenerar
+**Actualizar 004:** `docs/ACTUALIZAR_WORKFLOW_004.md`
 
 ---
 
 ## 📍 Infraestructura
 
 | Componente | Ubicación | Acceso |
-|------------|-----------|--------|
-| **Superset (usuarios)** | VM 100 | **Solo DNS:** `https://apps.powersolution.es/analytics/` |
-| **Superset (scripts/API)** | VM 100 — `http://192.168.36.100:8088/analytics` | Solo ops (pull/setup/health); **no** navegador |
+|---|-----|-----|
 | **PostgreSQL Analytics** | VM 100 — `192.168.36.100:5433` | postgres / `SuperSecurePassword2025` |
-| **n8n prod (sync 004)** | VM 101 — `https://apps.powersolution.es/n8n/` | No usar n8n VM 100 (retirado) |
-
-> **⛔ Navegador / SSO:** no abrir `http://192.168.36.100:8088/…`. OAuth Azure solo funciona por DNS.
+| **n8n prod (sync 004)** | VM 101 — `https://apps.powersolution.es/n8n/` | Workflow 004 |
 
 ```bash
 # Conectar a analytics DB desde terminal
@@ -40,9 +32,9 @@ docker run --rm --network host postgres:15 \
 ## 📦 Responsabilidades por repo
 
 | Repo | Qué contiene | ¿Tocar desde aquí? |
-|------|-------------|-------------------|
-| **superset-analytics** (este) | Workflow 004, SQL vistas, scripts deploy, docs dashboards, spec PBI | ✅ Sí |
-| **power-solution-apps** | App Timesheet/Gastos (fuera de alcance en este workspace) | ❌ No (otro workspace) |
+|---|----|----|
+| **superset-analytics** (este) | Workflow 004, SQL vistas, scripts apply, docs SE/PBI | ✅ Sí |
+| **power-solution-apps** | App Timesheet/Gastos | ❌ No (otro workspace) |
 | **power-solution-docs** | Docs compartidas (`docs/shared/`) | Solo via submódulo |
 
 ---
@@ -52,7 +44,7 @@ docker run --rm --network host postgres:15 \
 Prefijo `bc_` — origen: workflow n8n 004 desde BC Production.
 
 | Tabla | Descripción |
-|-------|-------------|
+|----|----|
 | `bc_job_ledger_entry_month` | Movimientos reales agregados por mes (**Tipo R**) |
 | `bc_job_planning_line` / `bc_planificacion_mes` | Planificación por mes (**Tipo P**) |
 | `bc_expediente_mes` | Expedientes planificados (**Tipo P**) |
@@ -64,38 +56,22 @@ Prefijo `bc_` — origen: workflow n8n 004 desde BC Production.
 ## 📊 Vistas principales
 
 | Vista | Descripción |
-|-------|-------------|
-| `v_se_facturacion` | UNION ALL P+R — fuente principal de Superset (**facturación canónica**) |
-| `v_se_coste` | Capa Coste P/R (`SUM(coste)`); independiente de facturación |
-| `v_se_lineas_planificacion` | Tipo P (plan) con lógica vigente + Distinct PBI |
+|----|----|
+| `v_se_facturacion` | UNION ALL P+R — facturación canónica |
+| `v_se_coste` | Capa Coste P/R |
+| `v_se_lineas_planificacion` | Tipo P (plan) |
 | `v_se_lineas_expedientes` | Tipo P (expedientes) |
 | `v_se_lineas_movimientos` | Tipo R (movimientos reales) |
-| `bi_v_*` | Vistas BI específicas para dashboards Superset |
-
----
-
-## 🎯 KPIs de referencia (PSI 2026, jul 2026 — post-resync 004)
-
-| KPI | Valor Analytics | PBI | Estado |
-|-----|----------------|-----|--------|
-| Facturación P (Plan+Expedientes) | 3.695.962 € | ~3.696k € | ✅ alineado |
-| Facturación R (Real) | 2.688.861 € | 2.688.861 € | ✅ paridad exacta |
-| Coste R (Real) | 2.513.515 € | 2.381.218 € | ⚠️ diferencia por diseño (ver nota) |
-
-> **Nota Coste R:** gap ~132k causado por `PSI-AR-26-1200` y `PSI-CO-26-7000` sin `departamento`
-> en BC. PBI excluye entradas sin departamento; Analytics las incluye. Solución: asignar
-> departamento en BC. Documentado en `ANALYTICS_FACTURACION_PBI_ALIGNMENT.md` §8.
+| `bi_v_*` | Vistas BI para Apps / reporting |
 
 ---
 
 ## 🔴 REGLAS CRÍTICAS
 
-- **Workflow 004** → el JSON canónico está en `src/workflows/004_sync_bc_to_ps_analytics.json` **en este repo**; se despliega con `scripts/update-n8n-workflow-004.sh` contra n8n VM 101
-- **SQL Analytics (`v_se_*`, `bi_v_*`, helpers)** → fuente de verdad en `sql/views/seguimiento_economico_views.sql`; aplicar en DB con `scripts/apply-bi-views.sh`
-- **Migraciones SQL** → crearlas en `power-solution-apps/supabase/migrations/` con prefijo `ANALYTICS DB ONLY`, NO aquí
+- **Workflow 004** → JSON canónico en `src/workflows/004_sync_bc_to_ps_analytics.json`; deploy con scripts documentados en `docs/ACTUALIZAR_WORKFLOW_004.md`
+- **SQL Analytics** → fuente de verdad en `sql/views/seguimiento_economico_views.sql`; aplicar con `scripts/apply-bi-views.sh`
 - **Commits**: siempre rama `feat/` o `fix/` — nunca en `main` directamente
 - **Push**: siempre `gitea`, nunca `origin` (GitHub es solo mirror)
-- **Submodulo `docs/shared`**: actualizar con `git pull gitea main` desde `docs/shared/` y commitear el puntero en el padre
 
 ---
 
@@ -103,30 +79,10 @@ Prefijo `bc_` — origen: workflow n8n 004 desde BC Production.
 
 ```text
 superset-analytics/
-  src/
-    workflows/
-      004_sync_bc_to_ps_analytics.json  ← workflow n8n 004 (CANÓNICO AQUÍ)
-  sql/
-    views/                              ← DDL de vistas SQL (seguimiento_economico_views.sql)
-  scripts/
-    update-n8n-workflow-004.sh          ← aplica workflow en n8n prod (VM 101)
-    update-n8n-workflow-004-api.sh      ← aplica vía API n8n
-    download-workflow-004.sh            ← descarga estado actual de prod
-    apply-bi-views.sh                   ← aplica vistas SQL en analytics DB
-    setup-superset-planificacion.py     ← regenera dashboard Resumen (fuente de verdad UI)
-    pull-superset-dashboard.py          ← snapshot UI ANTES de regenerar (obligatorio)
-  exports/superset-dashboard/           ← latest/previous (gitignored) + README
-  docker/                               ← config Superset Docker
-  docs/
-    GUIA_COMPLETA_ANALYTICS.md          ← referencia principal
-    FILTROS_DASHBOARD_PLANIFICACION.md  ← filtros + aviso regeneración
-    ACTUALIZAR_WORKFLOW_004.md          ← cómo actualizar el sync
-    seguimiento-economico/README.md     ← especificación de dashboards
-    shared/                             ← submódulo power-solution-docs
-      analytics/
-        004_SYNC_BC_ANALYTICS.md        ← arquitectura workflow 004
-        ANALYTICS_FACTURACION_PBI_ALIGNMENT.md ← troubleshooting P/R
+  src/workflows/004_sync_bc_to_ps_analytics.json
+  sql/views/
+  scripts/apply-bi-views.sh
+  docs/ACTUALIZAR_WORKFLOW_004.md
+  docs/seguimiento-economico/
+  docs/shared/analytics/
 ```
-
-**Regla agentes — dashboard:** `.cursor/rules/superset-dashboard-ui-sync.mdc`  
-Pull UI obligatorio antes de `setup-superset-planificacion.py` (edits en UI se pisan al regenerar).
