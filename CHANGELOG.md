@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2026-08-10] — Planificado: Budget no cuenta ventas
+
 ### Fixed
 - `v_se_lineas_planificacion`: `line_type = Budget` → `invoice`/`facturado` = 0
   (presupuesto no cuenta ventas; Billable sí). Corrige malas cargas Budget+invoice
