@@ -2,7 +2,7 @@
 
 Informe origen: Power BI `Seguimiento Económico PS.pbix` (dataset en la nube, fuente **BC Production**).
 
-> **Documentación maestra:** [GUIA_COMPLETA_ANALYTICS.md](../GUIA_COMPLETA_ANALYTICS.md) — arquitectura, tablas, vistas, sync 004, KPIs y operaciones.
+> **Documentación maestra:** [GUIA_COMPLETA_ANALYTICS.md](../shared/analytics/004_SYNC_BC_ANALYTICS.md) — sync 004, vistas Analytics, paridad PBI y operaciones de datos.
 
 ## Objetivo
 
@@ -71,7 +71,6 @@ GROUP BY tipo;
 | **4** | En curso | Resto de páginas PBI — **Unidad** ✅ · **Facturación** ✅ · **Gastos** ✅ |
 
 **Dashboard Fase 3:** https://apps.powersolution.es/analytics/superset/dashboard/planificacion-ps-analytics/  
-Regenerar (API LAN): `SKIP_APPLY_BI_VIEWS=1 SUPERSET_URL=http://192.168.36.100:8088/analytics python3 scripts/setup-superset-planificacion.py`
 
 ## Páginas del informe PBI
 
@@ -97,7 +96,7 @@ Superset consulta **solo** vistas `v_se_*` y `bi_v_*` (ver guía completa §4.2)
 
 ## Documentación relacionada
 
-- [GUIA_COMPLETA_ANALYTICS.md](../GUIA_COMPLETA_ANALYTICS.md)
+- [GUIA_COMPLETA_ANALYTICS.md](../shared/analytics/004_SYNC_BC_ANALYTICS.md)
 - [ACTUALIZAR_WORKFLOW_004.md](../ACTUALIZAR_WORKFLOW_004.md)
 - [pbix-model-spec.md](./pbix-model-spec.md)
 - [phase-2-sync-004.md](./phase-2-sync-004.md)

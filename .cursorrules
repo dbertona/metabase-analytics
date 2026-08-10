@@ -27,7 +27,7 @@
 | Arquitectura general | `.cursor/rules/architecture-context.mdc` |
 | Workflow 004 (sync BC→Analytics) | `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md` |
 | Troubleshooting Tipo P/R vs PBI | `docs/shared/analytics/ANALYTICS_FACTURACION_PBI_ALIGNMENT.md` |
-| Guía dashboards Superset | `docs/GUIA_COMPLETA_ANALYTICS.md` |
+| Docs sync / PBI (Analytics) | `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md` |
 | Índice de docs | `.cursor/DOCUMENTATION_INDEX.md` |
 | Git / commits / ramas | `git-workflow-automatic.mdc` |
 

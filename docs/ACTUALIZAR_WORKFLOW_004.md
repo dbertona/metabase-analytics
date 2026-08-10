@@ -1,6 +1,6 @@
 # Workflow 004 — Sync BC → Analytics
 
-> **Guía completa:** [superset-analytics/docs/GUIA_COMPLETA_ANALYTICS.md](../../../superset-analytics/docs/GUIA_COMPLETA_ANALYTICS.md)
+> **Guía completa:** [004_SYNC_BC_ANALYTICS.md](../shared/analytics/004_SYNC_BC_ANALYTICS.md)
 
 ## Arquitectura (2026-07)
 
@@ -86,7 +86,7 @@ SELECT * FROM v_se_kpi_cards WHERE empresa = 'Power Solution Iberia SL' AND ano 
 
 Esperado plan PSI 2026: **4.193.215 €** (`v_se_kpi_cards`, incluye tipo P + objetivos).
 
-> Desglose solo tipo P en `v_se_facturacion`: **3.712.450 €** — ver `docs/GUIA_COMPLETA_ANALYTICS.md` §6.2.
+> Desglose solo tipo P en `v_se_facturacion`: **3.712.450 €** — ver `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md` §6.2.
 
 ---
 
@@ -124,5 +124,5 @@ Si el watermark avanzó sin datos (falso positivo): resetear a la última
 ## Referencias
 
 - `src/workflows/004_sync_bc_to_ps_analytics.json` — definición del workflow en este repo
-- `docs/GUIA_COMPLETA_ANALYTICS.md` — arquitectura y operación Analytics/Superset
+- `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md` — arquitectura y operación Analytics (DB + sync 004)
 - `docs/shared/n8n/N8N_GUIDE.md`
