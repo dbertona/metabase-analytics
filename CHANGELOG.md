@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+- Dashboard Seguimiento Económico: KPIs Plan/Real/Desviación (€ y %) y ranking
+  Top Desviaciones en pestañas **Gastos** y **Mano de Obra**
+  (`setup-superset-planificacion.py`; datasets `bi_v_gastos` / `bi_v_mano_obra`).
+
 ## [2026-08-10] — Planificado: Budget no cuenta ventas
 
 ### Fixed

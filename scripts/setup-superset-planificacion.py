@@ -734,6 +734,110 @@ def facturacion_matriz_params() -> dict[str, Any]:
     )
 
 
+def _coste_plan_real_metrics() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Métricas Plan / Real / Desviación € / % sobre columna total + tipo_label."""
+    plan = metric_sql(
+        "SUM(CASE WHEN tipo_label = 'Planificado' THEN total ELSE 0 END)",
+        "Planificado",
+    )
+    real = metric_sql(
+        "SUM(CASE WHEN tipo_label = 'Real' THEN total ELSE 0 END)",
+        "Real",
+    )
+    desv_eur = metric_sql(
+        "SUM(CASE WHEN tipo_label = 'Real' THEN total ELSE 0 END)"
+        " - SUM(CASE WHEN tipo_label = 'Planificado' THEN total ELSE 0 END)",
+        "Desviación €",
+    )
+    desv_pct = metric_sql(
+        "(SUM(CASE WHEN tipo_label = 'Real' THEN total ELSE 0 END)"
+        " - SUM(CASE WHEN tipo_label = 'Planificado' THEN total ELSE 0 END))"
+        " / NULLIF(SUM(CASE WHEN tipo_label = 'Planificado' THEN total ELSE 0 END), 0)",
+        "Desviación %",
+    )
+    return plan, real, desv_eur, desv_pct
+
+
+def ranking_desviacion_params(*, with_recurso: bool = False) -> dict[str, Any]:
+    """Top desviaciones Plan vs Real (AG Grid). Excluir del filtro tipo_label nativo."""
+    plan, real, desv_eur, desv_pct = _coste_plan_real_metrics()
+    groupby = ["proyecto", "recurso"] if with_recurso else ["proyecto"]
+    column_config: dict[str, Any] = {
+        "proyecto": {
+            "customColumnName": "Proyecto",
+            "truncateLongCells": True,
+            "columnWidth": 280,
+        },
+        "Planificado": {
+            "d3NumberFormat": ",.0f",
+            "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
+            "showCellBars": False,
+            "truncateLongCells": True,
+            "columnWidth": 110,
+        },
+        "Real": {
+            "d3NumberFormat": ",.0f",
+            "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
+            "showCellBars": False,
+            "truncateLongCells": True,
+            "columnWidth": 110,
+        },
+        "Desviación €": {
+            "d3NumberFormat": ",.0f",
+            "currencyFormat": {"symbol": "EUR", "symbolPosition": "suffix"},
+            "showCellBars": False,
+            "truncateLongCells": True,
+            "columnWidth": 120,
+        },
+        "Desviación %": {
+            "d3NumberFormat": ".1%",
+            "showCellBars": False,
+            "truncateLongCells": True,
+            "columnWidth": 100,
+        },
+    }
+    if with_recurso:
+        column_config["recurso"] = {
+            "customColumnName": "Recurso",
+            "truncateLongCells": True,
+            "columnWidth": 180,
+        }
+    return {
+        # tipo_label en adhoc solo para exponerlo; el CASE WHEN necesita ambas series
+        "adhoc_filters": dim_adhoc_filters("tipo_label", "proyecto"),
+        "query_mode": "aggregate",
+        "groupby": groupby,
+        "metrics": [plan, real, desv_eur, desv_pct],
+        "percent_metrics": [],
+        "order_by_cols": [
+            json.dumps(
+                [
+                    {
+                        "expressionType": "SQL",
+                        "sqlExpression": (
+                            "SUM(CASE WHEN tipo_label = 'Real' THEN total ELSE 0 END)"
+                            " - SUM(CASE WHEN tipo_label = 'Planificado' THEN total ELSE 0 END)"
+                        ),
+                        "label": "orden_desviacion",
+                    },
+                    False,
+                ],
+                ensure_ascii=False,
+            ),
+        ],
+        "order_desc": True,
+        "row_limit": 15,
+        "server_pagination": False,
+        "show_totals": False,
+        "include_search": True,
+        "show_cell_bars": False,
+        "color_pn": True,
+        "align_pn": False,
+        "table_timestamp_format": "smart_date",
+        "column_config": column_config,
+    }
+
+
 def big_number_params(
     metric: dict[str, Any],
     fmt: str,
@@ -812,6 +916,28 @@ def persist_dashboard_config(
     gastos_id = by_name.get("Gastos")
     mano_obra_id = by_name.get("Mano de Obra")
     facturacion_id = by_name.get("Facturación")
+    gastos_kpi_ids = [
+        by_name[n]
+        for n in (
+            "Gastos · Planificado",
+            "Gastos · Real",
+            "Gastos · Desviación €",
+            "Gastos · Desviación %",
+        )
+        if n in by_name
+    ]
+    mano_obra_kpi_ids = [
+        by_name[n]
+        for n in (
+            "Mano de Obra · Planificado",
+            "Mano de Obra · Real",
+            "Mano de Obra · Desviación €",
+            "Mano de Obra · Desviación %",
+        )
+        if n in by_name
+    ]
+    gastos_ranking_id = by_name.get("Top Desviaciones Gastos")
+    mano_obra_ranking_id = by_name.get("Top Desviaciones Mano de Obra")
     prob_chart_ids = (
         [by_name["Facturación por Probabilidad"]]
         if "Facturación por Probabilidad" in by_name
@@ -822,7 +948,7 @@ def persist_dashboard_config(
         for n in ("Evolución mensual", "Margen acumulado")
         if n in by_name
     ]
-    # Filtro proyecto: tablas/gráficos con columna proyecto (no KPIs ni Unidad).
+    # Filtro proyecto: tablas/gráficos con columna proyecto (no KPIs Obj/Plan ni Unidad).
     project_filter_charts = (
         [table_id, projects_id]
         + evo_chart_ids
@@ -830,6 +956,10 @@ def persist_dashboard_config(
         + ([gastos_id] if gastos_id else [])
         + ([mano_obra_id] if mano_obra_id else [])
         + ([facturacion_id] if facturacion_id else [])
+        + ([gastos_ranking_id] if gastos_ranking_id else [])
+        + ([mano_obra_ranking_id] if mano_obra_ranking_id else [])
+        + gastos_kpi_ids
+        + mano_obra_kpi_ids
     )
     filter_scope_all = (
         kpi_chart_ids
@@ -840,6 +970,10 @@ def persist_dashboard_config(
         + ([facturacion_id] if facturacion_id else [])
         + evo_chart_ids
         + prob_chart_ids
+        + gastos_kpi_ids
+        + mano_obra_kpi_ids
+        + ([gastos_ranking_id] if gastos_ranking_id else [])
+        + ([mano_obra_ranking_id] if mano_obra_ranking_id else [])
     )
     # Orden UI: Resumen → Facturación → Unidad → Gastos → Mano de Obra → Gráficos
     tabs_all = [
@@ -879,6 +1013,8 @@ def persist_dashboard_config(
         "  --ps-dash-top: 126px;\n"
         "  --ps-tables-top: 522px;\n"
         "  --ps-unidad-top: 200px;\n"
+        "  /* Gastos/Mano de Obra: KPIs + ranking encima de la matriz */\n"
+        "  --ps-gastos-mo-top: 360px;\n"
         "  /* Techo de lectura ultrawide (~lienzo PBI); ≤ este valor = 100% */\n"
         "  --ps-dash-max-width: 1440px;\n"
         "}\n"
@@ -1026,15 +1162,28 @@ def persist_dashboard_config(
         " * [A],[B] .hijo (la coma aplica el hijo solo al último).\n"
         " * --ps-unidad-top = top del chart-slice → aire inferior ~8–9px.\n"
         " */\n"
-        ".grid-row:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']),\n"
-        ".dragdroppable-row:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) {\n"
+        ".grid-row:has([data-test-chart-name='Unidad'],[data-test-chart-name='Facturación']),\n"
+        ".dragdroppable-row:has([data-test-chart-name='Unidad'],[data-test-chart-name='Facturación']) {\n"
         "  height: calc(100dvh - var(--ps-unidad-top)) !important;\n"
         "  max-height: calc(100dvh - var(--ps-unidad-top)) !important;\n"
         "  min-height: 220px !important;\n"
         "}\n"
-        ".dashboard-component-chart-holder:has([data-test-chart-name='Unidad'],[data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra'],[data-test-chart-name='Facturación']) {\n"
+        ".grid-row:has([data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra']),\n"
+        ".dragdroppable-row:has([data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra']) {\n"
+        "  height: calc(100dvh - var(--ps-gastos-mo-top)) !important;\n"
+        "  max-height: calc(100dvh - var(--ps-gastos-mo-top)) !important;\n"
+        "  min-height: 220px !important;\n"
+        "}\n"
+        ".dashboard-component-chart-holder:has([data-test-chart-name='Unidad'],[data-test-chart-name='Facturación']) {\n"
         "  height: calc(100dvh - var(--ps-unidad-top)) !important;\n"
         "  max-height: calc(100dvh - var(--ps-unidad-top)) !important;\n"
+        "  min-height: 220px !important;\n"
+        "  display: flex !important;\n"
+        "  flex-direction: column !important;\n"
+        "}\n"
+        ".dashboard-component-chart-holder:has([data-test-chart-name='Gastos'],[data-test-chart-name='Mano de Obra']) {\n"
+        "  height: calc(100dvh - var(--ps-gastos-mo-top)) !important;\n"
+        "  max-height: calc(100dvh - var(--ps-gastos-mo-top)) !important;\n"
         "  min-height: 220px !important;\n"
         "  display: flex !important;\n"
         "  flex-direction: column !important;\n"
@@ -1738,11 +1887,13 @@ def persist_dashboard_config(
                 "controlValues": {"multiSelect": False, "enableEmptyFilter": False},
                 "cascadeParentIds": [],
                 "scope": {"rootPath": ["ROOT_ID"], "excluded": []},
+                # KPIs/rankings Gastos·M.O. usan CASE WHEN Plan+Real → fuera de este filtro
                 "chartsInScope": evo_chart_ids
                 + [table_id, projects_id]
                 + plan_kpi_chart_ids
                 + ([unidad_id] if unidad_id else [])
                 + ([gastos_id] if gastos_id else [])
+                + ([mano_obra_id] if mano_obra_id else [])
                 + ([facturacion_id] if facturacion_id else []),
                 "tabsInScope": tabs_all,
             },
@@ -1787,7 +1938,11 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
     table_keys = [c["key"] for c in charts if c["section"] == "table"]
     projects_keys = [c["key"] for c in charts if c["section"] == "projects"]
     unidad_keys = [c["key"] for c in charts if c["section"] == "unidad"]
+    gastos_kpi_keys = [c["key"] for c in charts if c["section"] == "gastos_kpi"]
+    gastos_ranking_keys = [c["key"] for c in charts if c["section"] == "gastos_ranking"]
     gastos_keys = [c["key"] for c in charts if c["section"] == "gastos"]
+    mano_obra_kpi_keys = [c["key"] for c in charts if c["section"] == "mano_obra_kpi"]
+    mano_obra_ranking_keys = [c["key"] for c in charts if c["section"] == "mano_obra_ranking"]
     mano_obra_keys = [c["key"] for c in charts if c["section"] == "mano_obra"]
     facturacion_keys = [c["key"] for c in charts if c["section"] == "facturacion"]
     prob_keys = [c["key"] for c in charts if c["section"] == "prob"]
@@ -1850,14 +2005,14 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         "TAB-GASTOS": {
             "type": "TAB",
             "id": "TAB-GASTOS",
-            "children": ["ROW-GASTOS"],
+            "children": ["ROW-GASTOS-KPI", "ROW-GASTOS-RANKING", "ROW-GASTOS"],
             "parents": ["ROOT_ID", "GRID_ID", "TABS-MAIN"],
             "meta": {"text": "Gastos", "defaultText": "Gastos"},
         },
         "TAB-MANO-OBRA": {
             "type": "TAB",
             "id": "TAB-MANO-OBRA",
-            "children": ["ROW-MANO-OBRA"],
+            "children": ["ROW-MANO-OBRA-KPI", "ROW-MANO-OBRA-RANKING", "ROW-MANO-OBRA"],
             "parents": ["ROOT_ID", "GRID_ID", "TABS-MAIN"],
             "meta": {"text": "Mano de Obra", "defaultText": "Mano de Obra"},
         },
@@ -1942,10 +2097,34 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
             "parents": list(tab_unidad),
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
+        "ROW-GASTOS-KPI": {
+            "type": "ROW", "id": "ROW-GASTOS-KPI",
+            "children": gastos_kpi_keys,
+            "parents": list(tab_gastos),
+            "meta": {"background": "BACKGROUND_TRANSPARENT"},
+        },
+        "ROW-GASTOS-RANKING": {
+            "type": "ROW", "id": "ROW-GASTOS-RANKING",
+            "children": gastos_ranking_keys,
+            "parents": list(tab_gastos),
+            "meta": {"background": "BACKGROUND_TRANSPARENT"},
+        },
         "ROW-GASTOS": {
             "type": "ROW", "id": "ROW-GASTOS",
             "children": gastos_keys,
             "parents": list(tab_gastos),
+            "meta": {"background": "BACKGROUND_TRANSPARENT"},
+        },
+        "ROW-MANO-OBRA-KPI": {
+            "type": "ROW", "id": "ROW-MANO-OBRA-KPI",
+            "children": mano_obra_kpi_keys,
+            "parents": list(tab_mano_obra),
+            "meta": {"background": "BACKGROUND_TRANSPARENT"},
+        },
+        "ROW-MANO-OBRA-RANKING": {
+            "type": "ROW", "id": "ROW-MANO-OBRA-RANKING",
+            "children": mano_obra_ranking_keys,
+            "parents": list(tab_mano_obra),
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         },
         "ROW-MANO-OBRA": {
@@ -1971,14 +2150,24 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         # Altura layout alta: el CSS :has fija calc(100dvh-210px) al activar tab;
         # este valor evita que el grid React pinte un card enano el primer frame.
         "unidad": (12, 78),
-        "gastos": (12, 78),
-        "mano_obra": (12, 78),
+        "gastos_kpi": (1, 8),
+        "gastos_ranking": (12, 22),
+        "gastos": (12, 50),
+        "mano_obra_kpi": (1, 8),
+        "mano_obra_ranking": (12, 22),
+        "mano_obra": (12, 50),
         "facturacion": (12, 78),
         "prob": (6, 26),
         "chart": (6, 36),
     }
     # Importes grandes (euros) más anchos; % compactos
     kpi_widths = {"Facturación": 2, "Margen": 1, "Δ %": 1, "Crecimiento": 1, "Beneficio": 2}
+    coste_kpi_widths = {
+        "Planificado": 2,
+        "Real": 2,
+        "Desviación €": 2,
+        "Desviación %": 1,
+    }
     for c in charts:
         w, h = sizes[c["section"]]
         display_name = c["name"].split("· ")[-1]
@@ -1999,9 +2188,21 @@ def build_layout(charts: list[dict[str, Any]]) -> dict[str, Any]:
         elif c["section"] == "unidad":
             display_name = "Unidad"
             parents = tab_unidad + ["ROW-UNIDAD"]
+        elif c["section"] == "gastos_kpi":
+            parents = tab_gastos + ["ROW-GASTOS-KPI"]
+            w = coste_kpi_widths.get(display_name, 2)
+        elif c["section"] == "gastos_ranking":
+            display_name = "Top Desviaciones"
+            parents = tab_gastos + ["ROW-GASTOS-RANKING"]
         elif c["section"] == "gastos":
             display_name = "Gastos"
             parents = tab_gastos + ["ROW-GASTOS"]
+        elif c["section"] == "mano_obra_kpi":
+            parents = tab_mano_obra + ["ROW-MANO-OBRA-KPI"]
+            w = coste_kpi_widths.get(display_name, 2)
+        elif c["section"] == "mano_obra_ranking":
+            display_name = "Top Desviaciones"
+            parents = tab_mano_obra + ["ROW-MANO-OBRA-RANKING"]
         elif c["section"] == "mano_obra":
             display_name = "Mano de Obra"
             parents = tab_mano_obra + ["ROW-MANO-OBRA"]
@@ -2059,6 +2260,12 @@ def main() -> int:
         "Evolución mensual", "Margen acumulado",
         "Facturación por Probabilidad",
         "Margen", "Crecimiento", "Beneficio", "Δ %",
+        "Gastos · Planificado", "Gastos · Real",
+        "Gastos · Desviación €", "Gastos · Desviación %",
+        "Top Desviaciones Gastos",
+        "Mano de Obra · Planificado", "Mano de Obra · Real",
+        "Mano de Obra · Desviación €", "Mano de Obra · Desviación %",
+        "Top Desviaciones Mano de Obra",
     }
     for name in stale_names:
         if name.startswith(("Obj", "Plan")) or "Planificación" in name:
@@ -2115,12 +2322,42 @@ def main() -> int:
         ("Proyectos", "projects", proy_ds, "ag-grid-table", resumen_proyectos_params()),
         # PBI Unidad: coste por concepto×mes (Structure fijo en bi_v_unidad)
         ("Unidad", "unidad", unidad_ds, "ag-grid-table", gastos_unidad_params()),
+    ]
+    plan_m, real_m, desv_eur_m, desv_pct_m = _coste_plan_real_metrics()
+    chart_specs.extend(
+        [
+        # KPIs Gastos (Plan vs Real; fuera del filtro nativo tipo_label)
+        ("Gastos · Planificado", "gastos_kpi", gastos_ds, "big_number_total",
+         big_number_params(plan_m, ",.0f", currency=True, extra_filter_cols=("tipo_label",))),
+        ("Gastos · Real", "gastos_kpi", gastos_ds, "big_number_total",
+         big_number_params(real_m, ",.0f", currency=True, extra_filter_cols=("tipo_label",))),
+        ("Gastos · Desviación €", "gastos_kpi", gastos_ds, "big_number_total",
+         big_number_params(desv_eur_m, ",.0f", currency=True, extra_filter_cols=("tipo_label",))),
+        ("Gastos · Desviación %", "gastos_kpi", gastos_ds, "big_number_total",
+         big_number_params(desv_pct_m, ".2%", extra_filter_cols=("tipo_label",))),
+        ("Top Desviaciones Gastos", "gastos_ranking", gastos_ds, "ag-grid-table",
+         ranking_desviacion_params()),
         # PBI Gastos: coste por encabezado×mes (Operational + estados; total>0)
         ("Gastos", "gastos", gastos_ds, "ag-grid-table", gastos_matriz_params()),
+        # KPIs Mano de Obra (Plan vs Real)
+        ("Mano de Obra · Planificado", "mano_obra_kpi", mano_obra_ds, "big_number_total",
+         big_number_params(plan_m, ",.0f", currency=True, extra_filter_cols=("tipo_label",))),
+        ("Mano de Obra · Real", "mano_obra_kpi", mano_obra_ds, "big_number_total",
+         big_number_params(real_m, ",.0f", currency=True, extra_filter_cols=("tipo_label",))),
+        ("Mano de Obra · Desviación €", "mano_obra_kpi", mano_obra_ds, "big_number_total",
+         big_number_params(desv_eur_m, ",.0f", currency=True, extra_filter_cols=("tipo_label",))),
+        ("Mano de Obra · Desviación %", "mano_obra_kpi", mano_obra_ds, "big_number_total",
+         big_number_params(desv_pct_m, ".2%", extra_filter_cols=("tipo_label",))),
+        ("Top Desviaciones Mano de Obra", "mano_obra_ranking", mano_obra_ds, "ag-grid-table",
+         ranking_desviacion_params(with_recurso=True)),
         # PBI Mano de Obra: coste Resource por proyecto×mes (Operational + estados)
         ("Mano de Obra", "mano_obra", mano_obra_ds, "ag-grid-table", mano_obra_matriz_params()),
         # PBI Facturación: facturado por encabezado×mes (Operational + estados)
         ("Facturación", "facturacion", fact_ds, "ag-grid-table", facturacion_matriz_params()),
+        ]
+    )
+    chart_specs.extend(
+        [
         ("Facturación por Probabilidad", "prob", prob_ds, "echarts_timeseries_bar",
          probabilidad_bar_params()),
         ("Evolución mensual", "chart", evo_ds, "echarts_timeseries_line",
@@ -2137,7 +2374,8 @@ def main() -> int:
               )
           ],
           "row_limit": 1000}),
-    ]
+        ]
+    )
 
     charts: list[dict[str, Any]] = []
     for idx, (name, section, ds_id, viz, params) in enumerate(chart_specs, start=1):
