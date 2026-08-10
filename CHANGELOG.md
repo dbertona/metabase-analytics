@@ -3,6 +3,15 @@
 ## [Unreleased]
 
 ### Added
+- **Plan Gastos meses cerrados:** tabla `bc_historico_gastos_mes` +
+  `scripts/sync_historico_gastos.py` (Unified M−1, Type ≠ Resource) y
+  `bi_mv_gastos` = live ∪ hist + `m0N_closed` (paridad `bi_mv_mano_obra`).
+- **Plan Unidad meses cerrados:** tabla `bc_historico_unidad_mes` (backfill puntual
+  desde `bc_job_planning_line` vivo, agregado por `concepto_analitico_descripcion`,
+  filtrado por `bc_meses_cerrados` + `tipo_proyecto = Structure`) y `bi_mv_unidad`
+  = live (`v_se_coste`) ∪ hist. Limitación conocida: meses cuya línea viva ya se
+  perdió en BC antes del backfill (p. ej. jun-2026 en varios proyectos ya
+  cerrados) no pueden recuperarse sin cambios en BC (fuera de alcance).
 - Dashboard Seguimiento Económico: KPIs Plan/Real/Desviación (€ y %) y ranking
   Top Desviaciones en pestañas **Gastos** y **Mano de Obra**
   (`setup-superset-planificacion.py`; datasets `bi_v_gastos` / `bi_v_mano_obra`).
