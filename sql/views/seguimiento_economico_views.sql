@@ -152,7 +152,12 @@ CREATE OR REPLACE VIEW public.v_se_lineas_planificacion AS
     s.job,
     s.year,
     s.month,
-    s.invoice,
+    -- Resource: invoice/facturado = 0 (como v_se_lineas_movimientos). Coste sigue en cost.
+    -- Necesario en invoice porque v_se_facturacion recalcula facturado desde invoice.
+    CASE
+      WHEN s.type_line::text = 'Resource'::text THEN 0::numeric(15,5)
+      ELSE COALESCE(s.invoice, 0::numeric)::numeric(15,5)
+    END AS invoice,
     s.cost,
     s.nr,
     s.type_line,
@@ -168,7 +173,13 @@ CREATE OR REPLACE VIEW public.v_se_lineas_planificacion AS
     s.status1,
     s.descripcion_ca,
     'P'::text AS tipo,
-    se_weight_amount(s.probability, s.invoice) AS facturado,
+    se_weight_amount(
+      s.probability,
+      CASE
+        WHEN s.type_line::text = 'Resource'::text THEN 0::numeric
+        ELSE COALESCE(s.invoice, 0::numeric)
+      END
+    ) AS facturado,
     se_prob_pct(s.probability) AS prob_pct,
     se_weight_amount(s.probability, s.cost) AS coste,
     se_weight_amount(s.probability, s.quantity) AS cantidad,
@@ -177,7 +188,7 @@ CREATE OR REPLACE VIEW public.v_se_lineas_planificacion AS
     (s.empresa || ':'::text) || s.year::text AS empresa_ano,
     (s.empresa || ':'::text) || COALESCE(s.nr, ''::character varying)::text AS empresa_recurso
    FROM src s;
-COMMENT ON VIEW public.v_se_lineas_planificacion IS 'PBI Lineas Planificacion: híbrido — pasados: MAX(budget_date_month)<=month (fallback Structure); futuros: todas las versiones. Excluye bc_meses_cerrados y meses con Ingresos reales. Sin Distinct por importe (2026-08-07, paridad Excel/BC/PSI-OT-26-2001). Open/Planning.';
+COMMENT ON VIEW public.v_se_lineas_planificacion IS 'PBI Lineas Planificacion: híbrido — pasados: MAX(budget_date_month)<=month (fallback Structure); futuros: todas las versiones. Excluye bc_meses_cerrados y meses con Ingresos reales. facturado: Resource=0 (2026-08-10, PSI-OT-23-2002). Open/Planning.';
 
 -- ---------------------------------------------------------------------------
 -- View: v_se_lineas_movimientos

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed
+- `v_se_lineas_planificacion.facturado`: `type_line = Resource` → 0 (misma regla
+  que movimientos). PSI-OT-23-2002 dic Planificado = **1.810,06 €** (ingresos
+  unidades 04.01+04.02); elimina +200 € residual MO. No toca Gastos ni expedientes.
+
 ## [2026-08-07g] — Analytics: v_se_lineas_planificacion sin Distinct ON
 
 ### Fixed
