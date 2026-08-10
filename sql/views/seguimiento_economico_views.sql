@@ -152,10 +152,10 @@ CREATE OR REPLACE VIEW public.v_se_lineas_planificacion AS
     s.job,
     s.year,
     s.month,
-    -- Resource: invoice/facturado = 0 (como v_se_lineas_movimientos). Coste sigue en cost.
+    -- Budget: no cuenta ventas (invoice/facturado = 0). Billable sí. Coste intacto.
     -- Necesario en invoice porque v_se_facturacion recalcula facturado desde invoice.
     CASE
-      WHEN s.type_line::text = 'Resource'::text THEN 0::numeric(15,5)
+      WHEN s.line_type::text = 'Budget'::text THEN 0::numeric(15,5)
       ELSE COALESCE(s.invoice, 0::numeric)::numeric(15,5)
     END AS invoice,
     s.cost,
@@ -176,7 +176,7 @@ CREATE OR REPLACE VIEW public.v_se_lineas_planificacion AS
     se_weight_amount(
       s.probability,
       CASE
-        WHEN s.type_line::text = 'Resource'::text THEN 0::numeric
+        WHEN s.line_type::text = 'Budget'::text THEN 0::numeric
         ELSE COALESCE(s.invoice, 0::numeric)
       END
     ) AS facturado,
@@ -188,7 +188,7 @@ CREATE OR REPLACE VIEW public.v_se_lineas_planificacion AS
     (s.empresa || ':'::text) || s.year::text AS empresa_ano,
     (s.empresa || ':'::text) || COALESCE(s.nr, ''::character varying)::text AS empresa_recurso
    FROM src s;
-COMMENT ON VIEW public.v_se_lineas_planificacion IS 'PBI Lineas Planificacion: híbrido — pasados: MAX(budget_date_month)<=month (fallback Structure); futuros: todas las versiones. Excluye bc_meses_cerrados y meses con Ingresos reales. facturado: Resource=0 (2026-08-10, PSI-OT-23-2002). Open/Planning.';
+COMMENT ON VIEW public.v_se_lineas_planificacion IS 'PBI Lineas Planificacion: híbrido — pasados: MAX(budget_date_month)<=month (fallback Structure); futuros: todas las versiones. Excluye bc_meses_cerrados y meses con Ingresos reales. facturado: line_type Budget=0 (ventas solo Billable; 2026-08-10). Open/Planning.';
 
 -- ---------------------------------------------------------------------------
 -- View: v_se_lineas_movimientos
