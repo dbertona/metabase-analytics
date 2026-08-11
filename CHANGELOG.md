@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Unidad SE — `bi_mv_unidad` solo live:** documentar y reaplicar definición sin
+  `bc_historico_unidad_mes`. Una aplicación puntual (rama no mergeada) había
+  mezclado Plan fantasma en meses cerrados (jun-2026 OT 1-02 ≈ +514 k€ P).
+  Grilla: cerrados = Real; abiertos = Plan. Chart Apps: P vs R por tipo.
+
 ## [2026-08-10] — Planificado: Budget no cuenta ventas
 
 ### Fixed

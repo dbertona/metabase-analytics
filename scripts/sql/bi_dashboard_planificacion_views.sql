@@ -302,6 +302,9 @@ COMMENT ON MATERIALIZED VIEW bi_mv_resumen_proyectos IS
 
 -- -----------------------------------------------------------------------------
 -- bi_v_unidad  ←  wrapper sobre bi_mv_unidad
+-- Solo live (v_se_coste Structure). NO unir bc_historico_unidad_mes: el Plan
+-- histórico inflaba meses cerrados (jun-2026 OT 1-02). Cerrados = R, abiertos = P.
+-- Chart Apps Plan vs Real = filas tipo P y R por separado.
 -- -----------------------------------------------------------------------------
 CREATE MATERIALIZED VIEW bi_mv_unidad AS
 SELECT
@@ -354,9 +357,9 @@ CREATE INDEX IF NOT EXISTS bi_mv_unidad_idx3 ON bi_mv_unidad (concepto_analitico
 CREATE VIEW bi_v_unidad AS SELECT * FROM bi_mv_unidad;
 
 COMMENT ON VIEW bi_v_unidad IS
-  'Unidad/Gastos PBI: coste por concepto×mes; tipo_proyecto=Structure fijo. (materializada: bi_mv_unidad; REFRESH tras sync 004).';
+  'Unidad SE: coste Structure por concepto×mes (solo live v_se_coste). Sin histórico. (bi_mv_unidad; REFRESH tras sync 004).';
 COMMENT ON MATERIALIZED VIEW bi_mv_unidad IS
-  'Snapshot de bi_v_unidad; refrescar tras sync BC→Analytics.';
+  'Snapshot live-only de bi_v_unidad; refrescar tras sync BC→Analytics. No bc_historico_unidad_mes.';
 
 -- -----------------------------------------------------------------------------
 -- bi_v_facturacion  ←  wrapper sobre bi_mv_facturacion
