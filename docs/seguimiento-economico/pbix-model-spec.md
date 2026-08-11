@@ -25,7 +25,7 @@ Facturacion = Table.Combine({
 | `EmpresaAño` | `Empresa & ":" & year` |
 | `EmpresaRecurso` | `Empresa & ":" & nr` |
 | `FachaCalculada` | `date(1, month, year)` |
-| `Encabezado` | `job & " --- " & left(descripcion, 36)` |
+| `Encabezado` | `job & " --- " & left(bc_job.description, 36)` (fallback línea; Analytics) |
 | `Facturacion_NoCero` | `IF Facturado <> 0 THEN Facturado` |
 | `MesTex` | `FORMAT(month, "00")` |
 | `AñoMes` | `MesTex & "/" & year` |

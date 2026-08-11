@@ -559,7 +559,9 @@ CREATE OR REPLACE VIEW public.v_se_facturacion AS
     make_date(o.year, o.month, 1) AS fecha_calculada,
     (o.empresa || ':'::text) || o.year::text AS empresa_ano,
     (o.empresa || ':'::text) || COALESCE(o.nr, ''::character varying)::text AS empresa_recurso,
-    (o.job::text || ' --- '::text) || "left"(COALESCE(o.descripcion, ''::character varying)::text, 36) AS encabezado,
+    -- Encabezado = job + descripción del proyecto (bc_job), no de la línea.
+    -- Evita partir el mismo OT en varias filas Apps (Cert Open / ledger vs cerrados).
+    (o.job::text || ' --- '::text) || "left"(COALESCE(j.description, o.descripcion, ''::character varying)::text, 36) AS encabezado,
     lpad(o.month::text, 2, '0'::text) AS mes_tex,
     (lpad(o.month::text, 2, '0'::text) || '/'::text) || o.year::text AS ano_mes,
         CASE
@@ -571,8 +573,12 @@ CREATE OR REPLACE VIEW public.v_se_facturacion AS
             WHEN COALESCE(se_weight_amount(COALESCE(o.probability, 0::numeric), COALESCE(o.quantity, 0::numeric)), 0::numeric) <> 0::numeric THEN se_weight_amount(COALESCE(o.probability, 0::numeric), COALESCE(o.cost, 0::numeric)) / se_weight_amount(COALESCE(o.probability, 0::numeric), COALESCE(o.quantity, 0::numeric))
             ELSE NULL::numeric
         END AS coste_medio
-   FROM origen o;
-COMMENT ON VIEW public.v_se_facturacion IS 'Replica de la tabla interna Facturacion de PBI combinando 4 fuentes y ponderando por probabilidad.';
+   FROM origen o
+   LEFT JOIN bc_job j
+     ON j.company_name = o.empresa
+    AND j.no::text = o.job::text;
+COMMENT ON VIEW public.v_se_facturacion IS
+  'Replica Facturacion PBI (4 fuentes, ponderada). encabezado = job --- LEFT(bc_job.description, 36).';
 
 -- ---------------------------------------------------------------------------
 -- View: v_se_facturacion_recursos
