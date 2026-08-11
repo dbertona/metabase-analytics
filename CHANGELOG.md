@@ -7,6 +7,10 @@
   `bc_historico_unidad_mes`. Una aplicación puntual (rama no mergeada) había
   mezclado Plan fantasma en meses cerrados (jun-2026 OT 1-02 ≈ +514 k€ P).
   Grilla: cerrados = Real; abiertos = Plan. Chart Apps: P vs R por tipo.
+- **Gastos — restaurar `m0N_closed` + hist en `bi_mv_gastos`:** el apply-bi-views
+  del fix Unidad recreó Gastos desde `main` sin columnas `m01_closed`… (Apps
+  fallaba). Se reincorpora live∪`bc_historico_gastos_mes` + flags de cierre
+  (paridad MdO). Unidad sigue live-only.
 
 ## [2026-08-10] — Planificado: Budget no cuenta ventas
 
