@@ -264,7 +264,7 @@ Ver spec completo en [`pbix-model-spec.md`](./pbix-model-spec.md).
 | `AñoMes` | `"07/2026"` (MesTex + "/" + year) |
 | `FachaCalculada` | `date(1, month, year)` |
 | `job` | Código proyecto BC |
-| `Encabezado` | `"JOB --- descripcion (36 chars)"` |
+| `Encabezado` | `"JOB --- " + left(descripcion proyecto bc_job, 36)` |
 | `CodigoUnicoDepartamento` | `"Empresa:DeptCode"` |
 | `Facturado` | Importe facturado ajustado por probabilidad |
 | `Coste` | Coste ajustado por probabilidad |

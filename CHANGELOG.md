@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Facturación — un solo encabezado por OT:** `v_se_facturacion.encabezado`
+  usa `bc_job.description` (fallback línea), no la descripción del ledger/cert.
+  Evita filas duplicadas en Apps (p. ej. PSI-OT-23-2002 INGESAN vs Disponibilidad).
+  Aplicar: `CREATE OR REPLACE` vista + `REFRESH` `bi_mv_facturacion` /
+  `bi_mv_facturacion_probabilidad`.
+
 ## [2026-08-10] — Planificado: Budget no cuenta ventas
 
 ### Fixed
