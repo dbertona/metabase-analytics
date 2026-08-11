@@ -41,4 +41,4 @@ docker run --rm --network host postgres:15 \
 
 ## Nota
 
-Docker Compose / scripts legacy de Superset pueden seguir en el árbol; no están documentados ni operativos tras el retiro de la UI.
+Stack Docker Compose / scripts UI Superset (`setup-superset*`, `start*.sh`, `config/superset_*`) eliminados del repo.
