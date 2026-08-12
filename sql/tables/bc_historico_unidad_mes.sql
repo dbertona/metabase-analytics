@@ -1,6 +1,7 @@
 -- Plan Unidad (Structure) congelado por concepto en meses cerrados.
 -- Fuente: bc_historico_planificacion_mes (Unified vía 004), grano
--- closing_month_code = YYYY.MM del propio mes de planificación.
+-- closing_month_code = YYYY.MM del mes anterior (M-1), para comparar
+-- Plan (cierre M-1) vs Real (cierre M) en meses cerrados.
 -- Usado por bi_mv_unidad (tipo P en meses cerrados).
 --
 -- Nota: HistoricoPlanificacionMes aún no expone analiticConcept en Prod;

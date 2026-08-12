@@ -1,4 +1,4 @@
--- Reload Plan Structure congelado (mismo mes de cierre) desde
+-- Reload Plan Structure congelado (cierre M-1) desde
 -- bc_historico_planificacion_mes (canal 004). Sin OData bypass.
 -- concepto: description de Job (CA aún no en Histórico/Prod API).
 
@@ -36,7 +36,7 @@ SELECT
 FROM public.bc_historico_planificacion_mes h
 WHERE h.tipo_proyecto ILIKE 'Structure'
   AND NULLIF(BTRIM(h.closing_month_code::text), '') IS NOT NULL
-  AND h.closing_month_code = (h.year::text || '.' || lpad(h.month::text, 2, '0'))
+  AND h.closing_month_code = to_char((make_date(h.year, h.month, 1) - interval '1 month'), 'YYYY.MM')
   AND ABS(COALESCE(h.cost, 0)) > 0.0001
 GROUP BY
     h.company_name,

@@ -9,6 +9,21 @@
   Aplicar: `CREATE OR REPLACE` vista + `REFRESH` `bi_mv_facturacion` /
   `bi_mv_facturacion_probabilidad`.
 
+## [2026-08-12] — Unidad: Plan histórico meses cerrados
+
+### Added
+- Plan Unidad (tipo P) en meses cerrados vía `bc_historico_unidad_mes`
+  (Unified Structure al cierre M-1) + `bi_mv_unidad` / `bi_mv_mano_obra`.
+
+### Fixed
+- **Workflow 004 — histórico Unidad deflactado por colisión de PK:**
+  `Transform HistoricoPlanificacionMes` deja de usar claves fijas (`nr/type_line/line_type`)
+  y agrega por grano real de BC. Desplegado en prod; purge/re-sync 2026
+  `bc_historico_planificacion_mes` (PSI + PSLAB); rebuild
+  `bc_historico_unidad_mes` (M-1) + `REFRESH bi_mv_unidad`.
+  Validación (depto `1-02`, mar-2026, tipo P): PSI **39.440,46** /
+  PSLAB **9.468,22** (= BC Pruebas_PS).
+
 ## [2026-08-10] — Planificado: Budget no cuenta ventas
 
 ### Fixed
