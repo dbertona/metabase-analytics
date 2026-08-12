@@ -121,6 +121,164 @@ Si el watermark avanzó sin datos (falso positivo): resetear a la última
 
 ---
 
+## Incidente 2026-08-12: Plan histórico de Unidad "demasiado bajo"
+
+### Síntoma observado
+
+- En `Unidad` (depto `1-02`, marzo 2026), el `Planificado` quedaba muy por debajo de BC.
+- Referencia BC `Pruebas_PS`:
+  - `Power Solution Iberia` (`closingMonthCode=2026.02`): **39,440.46**
+  - `Power Lab Iberia` (`closingMonthCode=2026.02`): **9,468.22**
+
+### Causa raíz (confirmada)
+
+1. En `Transform HistoricoPlanificacionMes` se usaban claves casi fijas para PK:
+   - `nr=''`, `type_line='P'`, `line_type=''`
+2. El upsert en `bc_historico_planificacion_mes` usa PK:
+   - `(company_name, job_no, year, month, closing_month_code, nr, type_line, line_type)`
+3. Resultado: filas distintas de BC colisionaban y se sobrescribían en Analytics.
+4. Además coexistían filas históricas antiguas (clave `P`) con nuevas, mezclando resultados.
+
+### Corrección aplicada en producción
+
+1. **Workflow 004 (prod) actualizado** en nodo `Transform HistoricoPlanificacionMes`:
+   - Agregación por grano real de API:
+     `job,year,month,closingMonthCode,departamento,descripcion,estado,tipoProyecto,probability,status1`
+   - Suma de `invoice/cost/quantity`.
+   - Generación de `nr` estable (hash), `type_line='HPM'`, `line_type='HIST'`.
+2. **Limpieza controlada 2026** en `bc_historico_planificacion_mes` (PSI + PSLAB).
+3. Reset de watermark (`sync_state`) y relanzado de 004 solo para:
+   - `historico_planificacion_mes`
+   - `sinceYear=2026`, `untilYear=2026`
+4. Rebuild de `bc_historico_unidad_mes` con lógica M-1 y `REFRESH` de `bi_mv_unidad`.
+
+### Comandos de verificación (post-fix)
+
+```sql
+-- Fuente histórica (estructura) por cierre, marzo 2026, depto 1-02
+SELECT company_name, closing_month_code, ROUND(SUM(cost)::numeric,2) AS cost
+FROM bc_historico_planificacion_mes
+WHERE year=2026 AND month=3
+  AND departamento='1-02'
+  AND tipo_proyecto='Structure'
+GROUP BY company_name, closing_month_code
+ORDER BY company_name, closing_month_code;
+
+-- Validación final en vista de Unidad (tipo P)
+SELECT empresa, tipo, ROUND(SUM(COALESCE(m03,0))::numeric,2) AS mar_2026
+FROM bi_v_unidad
+WHERE year=2026
+  AND department_code='1-02'
+  AND empresa IN ('Power Solution Iberia SL','PS LAB CONSULTING SL')
+GROUP BY empresa,tipo
+ORDER BY empresa,tipo;
+```
+
+### Resultado final validado
+
+- `Unidad` marzo 2026 (`tipo='P'`, depto `1-02`):
+  - `Power Solution Iberia SL`: **39,440.46**
+  - `PS LAB CONSULTING SL`: **9,468.22**
+- Coincide con BC `Pruebas_PS` para `closingMonthCode=2026.02` (cierre M-1).
+
+### Lección operativa
+
+- Nunca usar claves "placeholder" en transform si forman parte de la PK de destino.
+- Para histórico de BC con riesgo de colisión, primero definir grano de negocio y luego la PK técnica.
+- Si hubo cambios de grano/PK, limpiar rango afectado antes de re-sync para evitar mezcla de versiones.
+
+### Runbook corto de emergencia (10 pasos)
+
+> Objetivo: recuperar rápidamente `historico_planificacion_mes` y `Unidad` cuando el plan histórico quede deflactado.
+> Entorno: producción (`n8n-prod` VM 101 + analytics VM 100).
+
+1. **Verificar síntoma en Analytics (depto/mes afectado)**
+   ```sql
+   SELECT empresa, tipo, ROUND(SUM(COALESCE(m03,0))::numeric,2) AS mar_2026
+   FROM bi_v_unidad
+   WHERE year=2026 AND department_code='1-02'
+   GROUP BY empresa,tipo
+   ORDER BY empresa,tipo;
+   ```
+
+2. **Verificar referencia en BC (`Pruebas_PS`)**
+   - Comparar `historicoPlanificacionMes` por `closingMonthCode` (M-1 esperado para Plan de mes cerrado).
+
+3. **Confirmar que 004 en prod tiene el transform correcto**
+   - Nodo: `Transform HistoricoPlanificacionMes`
+   - Debe agregar por grano real y no usar `nr/type_line/line_type` fijos.
+
+4. **(Si aplica) desplegar workflow 004 en prod**
+   ```bash
+   export DEPLOY_HOST_IP='192.168.36.101' DEPLOY_SSH_USER='ps_admin' DEPLOY_SSH_PASSWORD='PsAdmin2025'
+   export N8N_APP_CONTAINER='n8n-prod' N8N_PG_CONTAINER='supabase-db'
+   /Users/marcelodanielbertona/POWER-SOLUTION-PROJECTS/power-solution-apps/scripts/update-n8n-workflow-postgres-remote.sh \
+     d1f7647e114a486e \
+     /Users/marcelodanielbertona/POWER-SOLUTION-PROJECTS/superset-analytics/superset-analytics/src/workflows/004_sync_bc_to_ps_analytics.json
+   ```
+
+5. **Purgar el año afectado en `bc_historico_planificacion_mes`**
+   ```sql
+   DELETE FROM public.bc_historico_planificacion_mes
+   WHERE company_name IN ('Power Solution Iberia SL','PS LAB CONSULTING SL')
+     AND year=2026;
+   ```
+
+6. **Resetear watermark de histórico**
+   ```sql
+   UPDATE public.sync_state
+   SET last_sync_at='1900-01-01T00:00:00Z'
+   WHERE entity='bc_historico_planificacion_mes'
+     AND company_name IN ('Power Solution Iberia SL','PS LAB CONSULTING SL');
+   ```
+
+7. **Lanzar 004 solo para histórico, año objetivo**
+   ```bash
+   curl -sS -X POST "http://192.168.36.101:5678/webhook/sync-bc-to-analytics?company=psi" \
+     -H "Content-Type: application/json" \
+     -d '{"entities":["historico_planificacion_mes"],"sinceYear":2026,"untilYear":2026,"reason":"runbook-fix-psi"}'
+
+   curl -sS -X POST "http://192.168.36.101:5678/webhook/sync-bc-to-analytics?company=pslab" \
+     -H "Content-Type: application/json" \
+     -d '{"entities":["historico_planificacion_mes"],"sinceYear":2026,"untilYear":2026,"reason":"runbook-fix-pslab"}'
+   ```
+
+8. **Rehidratar `bc_historico_unidad_mes` (lógica cierre M-1)**
+   ```sql
+   TRUNCATE TABLE public.bc_historico_unidad_mes;
+
+   INSERT INTO public.bc_historico_unidad_mes (
+     company_name, job_no, year, month, concepto_analitico_descripcion, cost, updated_at
+   )
+   SELECT
+     h.company_name,
+     h.job_no::text,
+     h.year,
+     h.month,
+     COALESCE(NULLIF(TRIM(h.description::text), ''), h.job_no::text),
+     SUM(COALESCE(h.cost, 0))::numeric(18,5),
+     now()
+   FROM public.bc_historico_planificacion_mes h
+   WHERE h.tipo_proyecto ILIKE 'Structure'
+     AND NULLIF(BTRIM(h.closing_month_code::text), '') IS NOT NULL
+     AND h.closing_month_code = to_char((make_date(h.year,h.month,1) - interval '1 month'),'YYYY.MM')
+     AND ABS(COALESCE(h.cost,0)) > 0.0001
+   GROUP BY h.company_name,h.job_no,h.year,h.month,COALESCE(NULLIF(TRIM(h.description::text), ''), h.job_no::text);
+   ```
+
+9. **Refrescar materializada de Unidad**
+   ```sql
+   REFRESH MATERIALIZED VIEW public.bi_mv_unidad;
+   ```
+
+10. **Validación final obligatoria**
+    - `bi_v_unidad` (`tipo='P'`) debe cuadrar con BC `Pruebas_PS` en `closingMonthCode = M-1`.
+    - Si no cuadra:
+      - revisar mezcla de filas antiguas en `bc_historico_planificacion_mes` (`type_line='P'` legacy),
+      - repetir pasos 5→10.
+
+---
+
 ## Referencias
 
 - `src/workflows/004_sync_bc_to_ps_analytics.json` — definición del workflow en este repo
