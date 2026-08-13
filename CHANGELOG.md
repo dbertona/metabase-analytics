@@ -3,6 +3,12 @@
 ## [Unreleased]
 
 ### Fixed
+- **Workflow 004 — Cert Open Ingresos sin watermark incremental:** el tramo
+  `job_ledger_cert_open` pide todas las líneas `Ingresos` + `tieneCertificacion`
+  (sin `lastModifiedDateTime ≥ watermark`). El UPSERT REPLACE sobre un lote
+  parcial pisaba el total del documento (021 `tipo_r_sum` PSI 2026-08-13:
+  docs `26700318` / `26700303`, Δ 7.904,35). Sigue sin tocar meses cerrados
+  (`NOT EXISTS bc_meses_cerrados`). No cambia Tipo P ni workflow 021.
 - **Facturación — un solo encabezado por OT:** `v_se_facturacion.encabezado`
   usa `bc_job.description` (fallback línea), no la descripción del ledger/cert.
   Evita filas duplicadas en Apps (p. ej. PSI-OT-23-2002 INGESAN vs Disponibilidad).
