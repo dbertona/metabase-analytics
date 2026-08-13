@@ -9,6 +9,17 @@
   Aplicar: `CREATE OR REPLACE` vista + `REFRESH` `bi_mv_facturacion` /
   `bi_mv_facturacion_probabilidad`.
 
+## [2026-08-13] — 004: snapshot completo cert-open
+
+### Fixed
+- **Workflow 004 — Cert Open Ingresos sin watermark incremental:** el tramo
+  `job_ledger_cert_open` pide todas las líneas `Ingresos` + `tieneCertificacion`
+  (sin `lastModifiedDateTime ≥ watermark`). El UPSERT REPLACE sobre un lote
+  parcial pisaba el total del documento (021 `tipo_r_sum` PSI 2026-08-13:
+  docs `26700318` / `26700303`, Δ 7.904,35). Sigue sin tocar meses cerrados
+  (`NOT EXISTS bc_meses_cerrados`). No cambia Tipo P ni workflow 021.
+  Aplicado en n8n prod; 021 `tipo_r_sum` PSI = **2.773.860,85** (ok).
+
 ## [2026-08-12] — Unidad: Plan histórico meses cerrados
 
 ### Added
