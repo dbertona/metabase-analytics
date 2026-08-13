@@ -415,6 +415,69 @@ COMMENT ON MATERIALIZED VIEW bi_mv_unidad IS
 -- bi_v_facturacion  ←  wrapper sobre bi_mv_facturacion
 -- -----------------------------------------------------------------------------
 CREATE MATERIALIZED VIEW bi_mv_facturacion AS
+WITH
+live_facturacion AS (
+    -- Real: sin cambios. Plan: solo meses abiertos (mes cerrado -> hist_facturacion).
+    SELECT
+        f.empresa,
+        f.year,
+        f.month,
+        f.tipo,
+        f.tipo_proyecto,
+        f.estado,
+        f.departamento,
+        f.job,
+        f.encabezado,
+        f.facturado
+    FROM v_se_facturacion f
+    WHERE f.tipo IN ('P', 'R')
+      AND f.tipo_proyecto = 'Operational'
+      AND COALESCE(f.estado, '') IN ('Completed', 'Open', 'Planning')
+      -- Plan en mes cerrado viene solo de hist (evita doble conteo si hay residual live)
+      AND NOT (
+          f.tipo = 'P'
+          AND EXISTS (
+              SELECT 1
+              FROM bc_meses_cerrados mc
+              WHERE mc.company_name = f.empresa
+                AND mc.job_no = f.job
+                AND mc.year = f.year
+                AND mc.month = f.month
+          )
+      )
+),
+hist_facturacion AS (
+    -- Plan de meses cerrados: snapshot M-1 (closing_month_code) de bc_historico_planificacion_mes,
+    -- mismo patron que hist_unidad / hist_mano_obra (bi_mv_unidad / bi_mv_mano_obra).
+    SELECT
+        h.company_name AS empresa,
+        h.year,
+        h.month,
+        'P'::text AS tipo,
+        'Operational'::character varying AS tipo_proyecto,
+        COALESCE(j.status, '') AS estado,
+        COALESCE(NULLIF(btrim(j.departamento::text), ''), '') AS departamento,
+        h.job_no AS job,
+        (h.job_no::text || ' --- '::text) || "left"(COALESCE(j.description, h.description, '')::text, 36) AS encabezado,
+        se_weight_amount(COALESCE(h.probability, 0::numeric), COALESCE(h.invoice, 0::numeric)) AS facturado
+    FROM bc_historico_planificacion_mes h
+    JOIN bc_meses_cerrados mc
+      ON mc.company_name = h.company_name
+     AND mc.job_no = h.job_no
+     AND mc.year = h.year
+     AND mc.month = h.month
+    LEFT JOIN bc_job j
+      ON j.company_name = h.company_name
+     AND j.no = h.job_no
+    WHERE h.closing_month_code = to_char((make_date(h.year, h.month, 1) - interval '1 month'), 'YYYY.MM')
+      AND j.tipo_proyecto = 'Operational'
+      AND COALESCE(j.status, '') IN ('Completed', 'Open', 'Planning')
+),
+facturacion_rows AS (
+    SELECT * FROM live_facturacion
+    UNION ALL
+    SELECT * FROM hist_facturacion
+)
 SELECT
     f.empresa,
     f.year,
@@ -443,13 +506,10 @@ SELECT
     SUM(f.facturado) FILTER (WHERE f.month = 11) AS m11,
     SUM(f.facturado) FILTER (WHERE f.month = 12) AS m12,
     SUM(f.facturado) AS total
-FROM v_se_facturacion f
+FROM facturacion_rows f
 LEFT JOIN mb_v_dim_departamento d
     ON d.company_name = f.empresa
    AND d.department_code = f.departamento
-WHERE f.tipo IN ('P', 'R')
-  AND f.tipo_proyecto = 'Operational'
-  AND COALESCE(f.estado, '') IN ('Completed', 'Open', 'Planning')
 GROUP BY
     f.empresa,
     f.year,
@@ -470,7 +530,7 @@ CREATE INDEX IF NOT EXISTS bi_mv_facturacion_idx3 ON bi_mv_facturacion (proyecto
 CREATE VIEW bi_v_facturacion AS SELECT * FROM bi_mv_facturacion;
 
 COMMENT ON VIEW bi_v_facturacion IS
-  'Facturación PBI: Operational + Completed/Open/Planning; pivot facturado×mes; total>0. (materializada: bi_mv_facturacion; REFRESH tras sync 004).';
+  'Facturación PBI: Operational + Completed/Open/Planning; pivot facturado×mes; total>0. Plan en mes cerrado = snapshot M-1 de bc_historico_planificacion_mes (evita huecos; ver hist_facturacion). (materializada: bi_mv_facturacion; REFRESH tras sync 004).';
 COMMENT ON MATERIALIZED VIEW bi_mv_facturacion IS
   'Snapshot de bi_v_facturacion; refrescar tras sync BC→Analytics.';
 
