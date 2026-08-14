@@ -36,10 +36,31 @@ curl -sS -m 900 -X POST \
 
 ## Actualizar workflow en n8n prod
 
-> **Jul 2026:** n8n prod usa **PostgreSQL** (no SQLite). Método correcto: `update_n8n_workflow_postgres.py`.
-> ⛔ SQLite obsoleto — solo backups `.bak-pre-postgres-*`. Ver `docs/shared/n8n/N8N_GUIDE.md`.
+**Canal obligatorio:** `./scripts/deploy-004-gated.sh`.
 
-### Método correcto — PostgreSQL (agente / hotfix)
+No aplicar el JSON a prod (ni por API, ni exportando prod y parcheando un nodo) sin pasar el gate.
+
+El gate:
+
+1. Seatbelt estático (Transform PlanificacionMes = SUM, sin `pbiKey` / Distinct).
+2. Copia Analytics **prod → testing** (escribe solo en VM 103).
+3. Aplica el JSON del repo a n8n **testing** (004 + 021). En testing el contenedor tiene `BC_ENVIRONMENT=Pruebas_PS`; el gate **pinnea Production solo en esos workflows** (no cambia el env del contenedor).
+4. Reset de watermarks en testing + canary 004 (`planificacion_mes`, `movimientos_proyectos`, `expediente_mes`, `meses_cerrados`) en psi y pslab.
+5. 021 en testing: `tipo_p_planif_sum`, `tipo_r_sum`, `tipo_p_expediente_sum` (tol 0,50 €). Si alguno falla → **no se toca prod**.
+6. Si cierran: aplica el **mismo JSON del repo** a n8n prod. **No lanza 004 en prod.**
+
+```bash
+cd superset-analytics
+./scripts/deploy-004-gated.sh --yes              # gate completo + JSON a prod
+./scripts/deploy-004-gated.sh --yes --no-prod    # solo veredicto testing
+./scripts/deploy-004-gated.sh --yes --skip-copy  # clon testing ya fresco
+```
+
+⛔ No exportar 004 de prod y parchear un nodo (reintroduce Distinct).  
+⛔ No lanzar 004 desde n8n DEV hasta aislar `Postgres PS_Analytics`.  
+`update-n8n-workflow-004-api.sh` ya no hace PUT a prod: redirige aquí.
+
+### Emergencia (solo con OK explícito, sin gate)
 
 ```bash
 # 1) Copiar script y JSON al servidor 101
@@ -56,15 +77,6 @@ python3 /tmp/update_n8n_workflow_postgres.py update \
   /tmp/004_sync_bc_to_ps_analytics.json
 REMOTE
 ```
-
-### Método alternativo — API REST (CI/CD)
-
-```bash
-cd superset-analytics
-./scripts/update-n8n-workflow-004-api.sh
-```
-
-Requiere `N8N_API_KEY` exportada. API key en tabla `user_api_keys` del Postgres n8n (`n8n` DB en `supabase-db` VM 101).
 
 ---
 

@@ -69,6 +69,8 @@ El 004 de testing falló el 2026-08-10 en `Try Acquire Mutex 004`: `company_name
 
 Canal BC → Analytics: solo 004 (salvo bypass explícito).
 
+**Publicar 004 a prod:** `./scripts/deploy-004-gated.sh` (copia prod→testing, canary 004+021, luego JSON a n8n prod). No aplicar el JSON a prod a ciegas. El clon testing del 2026-08-14 **predates** el restore SUM de PSI-OT-26-2001: el gate debe recopiar.
+
 ---
 
 ## Copia prod → testing (2026-08-14)
@@ -94,12 +96,12 @@ Sin alinear el PK, el `COPY` falla por duplicados.
 
 ### Limitaciones del script canónico
 
-`copy-analytics-production-to-env.sh` (dump `--data-only`):
+`copy-analytics-production-to-env.sh` (dump `--data-only`). El gate usa el modo **pipe** (no `--file` / `--direct`).
 
-1. `analytics_align_target_schema_from_source` trata **vistas** como tablas → `ALTER VIEW` y aborta.
+1. ~~`analytics_align_target_schema_from_source` trata vistas como tablas~~ — corregido: solo `BASE TABLE`. Crea tablas faltantes y alinea PKs tras truncate.
 2. `--file` + `pg_restore --disable-triggers` falla en la imagen Supabase (`RI_ConstraintTrigger` system).
 3. `--direct` exige `sshpass` en el destino; **103 no lo tiene**.
-4. El dump no actualiza definiciones de `v_se_*` / `bi_mv_*`. Tras el data copy hay que volcar DDL de vistas/matviews desde prod y `REFRESH` las `bi_mv_*`.
+4. Tras el data copy el script crea `bi_mv_*` / `v_se_*` si faltan y hace `REFRESH`.
 
 Procedimiento que funcionó: truncar destino → `pg_dump --data-only` + `SET session_replication_role = replica` (o restore tabla a tabla) → alinear PK/tablas faltantes → aplicar DDL de vistas desde prod → `REFRESH MATERIALIZED VIEW`.
 
