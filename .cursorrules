@@ -10,7 +10,7 @@
 | Verbos de acción ("corrige", "añade", "modifica", "crea", "haz"...) | Verificar rama → crear `feat/` o `fix/` si en `main` → `git-workflow-automatic.mdc` FASE 1 |
 | "migración", "CREATE TABLE", "ALTER TABLE" | ✅ Cambios SQL de Analytics se definen y mantienen en **superset-analytics** |
 | "analytics testing", "5435", "copia analytics" | Leer `docs/ANALYTICS_ENVIRONMENTS.md` |
-| "workflow 004", "n8n", "sync" | Leer `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md` + `src/workflows/004_sync_bc_to_ps_analytics.json` |
+| "workflow 004", "n8n", "sync" | Leer `analytics-figures-gate.mdc` + `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md`. Prod = solo `deploy-004-gated.sh` |
 | "power-solution-apps", "timesheet" | ❌ NO modificar desde este repo → `00-REPO-WORKSPACE-BOUNDARY.mdc` |
 | "BC", "Business Central", ".al" | ❌ NUNCA tocar BC desde aquí |
 | "prod" / "producción" / VM 101 | ❌ NUNCA sin aprobación explícita en ese mismo chat |

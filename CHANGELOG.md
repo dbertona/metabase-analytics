@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+- **Enforcement del gate:** merge ya no aplica 004/SQL a prod. El script
+  remoto de n8n rechaza el 004 hacia `n8n-prod` salvo `FIGURES_GATE_OK=1`.
+  Regla `analytics-figures-gate.mdc`.
+
 ### Added
 - **Gate de publicación de cifras:** `scripts/deploy-004-gated.sh` cubre el
   JSON 004 **y** SQL que mueve Apps/PBI (`v_se_*`, `bi_v_*`, `bi_mv_*`).
