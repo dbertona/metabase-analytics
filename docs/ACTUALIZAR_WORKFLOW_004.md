@@ -70,8 +70,10 @@ Requiere `N8N_API_KEY` exportada. API key en tabla `user_api_keys` del Postgres 
 
 ## Post-sync: materializadas BI (`bi_mv_*`)
 
-Tras un sync OK, el workflow refresca `bi_mv_*` (KPI, evolución, unidad, facturación, …).
-Los datasets Superset siguen en `bi_v_*` (wrappers). Si aplicas solo SQL a mano:
+Tras un sync OK, el nodo `Refresh BI Materialized Views` refresca **todas**
+las matviews de `public` (`pg_matviews`), no una lista fija. Así no se
+quedan atrás p. ej. `bi_mv_mano_obra_recursos_*` (Recursos/Perfiles).
+Los datasets Apps/`bi_v_*` son wrappers. Si aplicas solo SQL a mano:
 
 ```bash
 ./scripts/apply-bi-views.sh            # recrear MVs + wrappers

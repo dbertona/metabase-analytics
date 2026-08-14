@@ -3928,7 +3928,7 @@
           2560
         ],
         "parameters": {
-          "query": "REFRESH MATERIALIZED VIEW bi_mv_planificacion_kpi;\nREFRESH MATERIALIZED VIEW bi_mv_evolucion_mensual;\nREFRESH MATERIALIZED VIEW bi_mv_facturacion_probabilidad;\nREFRESH MATERIALIZED VIEW bi_mv_resumen_proyectos;\nREFRESH MATERIALIZED VIEW bi_mv_unidad;\nREFRESH MATERIALIZED VIEW bi_mv_facturacion;\nREFRESH MATERIALIZED VIEW bi_mv_gastos;\nREFRESH MATERIALIZED VIEW bi_mv_mano_obra;\nSELECT 1 AS bi_mvs_refreshed;",
+          "query": "DO $$\nDECLARE\n  r record;\nBEGIN\n  FOR r IN\n    SELECT schemaname, matviewname\n    FROM pg_matviews\n    WHERE schemaname = 'public'\n    ORDER BY matviewname\n  LOOP\n    EXECUTE format('REFRESH MATERIALIZED VIEW %I.%I', r.schemaname, r.matviewname);\n  END LOOP;\nEND\n$$;\nSELECT count(*) AS bi_mvs_refreshed FROM pg_matviews WHERE schemaname = 'public';",
           "options": {},
           "operation": "executeQuery"
         },

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+- **004 — refresh de todas las matviews `public`:** el nodo ya no usa una
+  lista fija de 8 `bi_mv_*` (omitía Recursos/Perfiles). Tras cada sync
+  refresca `pg_matviews` de `public`. Aplicado en Analytics prod 2026-08-14
+  (PSI-IO-26-3019 / REC0078: Plan Ago 1 h, no 7 h).
+
 ### Documentación
 - **Entornos Analytics (DEV / testing / prod):** `docs/ANALYTICS_ENVIRONMENTS.md`.
   Testing (VM 103 `:5435`) poblado desde prod el 2026-08-14; backend testing
