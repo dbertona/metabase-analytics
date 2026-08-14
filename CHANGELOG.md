@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **004 PlanificacionMes — meses huérfanos:** `Discover Partitions` une
+  `partition.forceMonths` del batch BC y hace overwrite aunque el discovery
+  por watermark esté vacío (borrado de línea / mes sin filas OData).
+- **021:** check `planif_orphan_grain` (Analytics `job|recurso|año|mes` vs
+  `PlanificacionMes`). Si falla el HTTP de BC, el check es `info` (no fail).
+
 ### Changed
 - **Enforcement del gate:** merge ya no aplica 004/SQL a prod. El script
   remoto de n8n rechaza el 004 hacia `n8n-prod` salvo `FIGURES_GATE_OK=1`.
