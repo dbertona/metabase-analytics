@@ -1,19 +1,25 @@
 #!/usr/bin/env bash
-# Gate de publicación 004 → n8n prod.
+# Gate de publicación de cifras Analytics (004 y/o vistas/MVs) → prod.
 #
-# 1) Seatbelt estático (Distinct / pbiKey en Transform PlanificacionMes)
+# 1) Seatbelt estático 004 (si el alcance incluye 004)
 # 2) Copia Analytics prod → testing (solo 103)
-# 3) Aplica JSON repo a n8n testing (004 + 021), pin BC=Production
-# 4) Reset watermarks en testing + canary 004 (psi + pslab)
-# 5) 021 en testing: tipo_p_planif_sum / tipo_r_sum / tipo_p_expediente_sum
-# 6) Si cierran (tol 0,50 €) → aplica el MISMO JSON repo a n8n prod
+# 3) Snapshot cifras publicadas (v_se / 1-02)
+# 4) Si SQL: aplica v_se_* + bi_* solo en testing; compara vs snapshot
+# 5) Si 004: JSON repo a n8n testing (004+021), pin BC=Production,
+#    reset watermarks + canary 004 (psi + pslab)
+# 6) 021 en testing: tipo_p_planif_sum / tipo_r_sum / tipo_p_expediente_sum
+# 7) Cifras publicadas: bi_mv == v_se; v_se R == 021 tipo_r BC
+# 8) Si cierran → mismo JSON a n8n prod y/o mismo SQL a Analytics prod
 #
 # NO lanza 004 en prod. NO cambia BC_ENVIRONMENT del contenedor testing.
 #
 # Uso:
 #   ./scripts/deploy-004-gated.sh --yes
+#   ./scripts/deploy-004-gated.sh --yes --sql-only
+#   ./scripts/deploy-004-gated.sh --yes --004-only
 #   ./scripts/deploy-004-gated.sh --yes --no-prod
 #   ./scripts/deploy-004-gated.sh --yes --skip-copy
+#   ./scripts/deploy-004-gated.sh --yes --sql-only --allow-figure-change
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -24,6 +30,7 @@ fi
 
 WF_004="$ROOT/src/workflows/004_sync_bc_to_ps_analytics.json"
 WF_021="$ROOT/src/workflows/021_health_check_analytics_bc.json"
+APPLY_BI="$ROOT/scripts/apply-bi-views.sh"
 
 SSH_USER="${SSH_USER:-ps_admin}"
 SSH_PASS="${SSH_PASS:-PsAdmin2025}"
@@ -43,26 +50,36 @@ N8N_PROD_APP="${N8N_PROD_APP:-n8n-prod}"
 N8N_PROD_PG="${N8N_PROD_PG:-supabase-db}"
 WF_004_PROD="${WF_004_PROD:-d1f7647e114a486e}"
 
+ANALYTICS_TESTING_DSN="${ANALYTICS_TESTING_DSN:-postgresql://postgres:analytics_testing_2025@192.168.36.103:5435/postgres}"
+ANALYTICS_PROD_DSN="${ANALYTICS_PROD_DSN:-postgresql://postgres:SuperSecurePassword2025@192.168.36.100:5433/postgres}"
+
 YEAR="${YEAR:-2026}"
 ASSUME_YES=0
 APPLY_PROD=1
 SKIP_COPY=0
+SCOPE="all"
+ALLOW_FIGURE_CHANGE=0
 CANARY_TIMEOUT_SEC="${CANARY_TIMEOUT_SEC:-2700}"
 HEALTH_TIMEOUT_SEC="${HEALTH_TIMEOUT_SEC:-1200}"
+FIGURES_TOL="${FIGURES_TOL:-0.50}"
 
-MONEY_CHECKS=(tipo_p_planif_sum tipo_r_sum tipo_p_expediente_sum)
 COMPANIES_SQL="'Power Solution Iberia SL','PS LAB CONSULTING SL'"
 
 usage() {
   cat <<'EOF'
-Gate 004: clona Analytics prod→testing, canary 004+021, publica JSON a n8n prod.
+Gate de cifras: clona Analytics prod→testing, valida 004 y/o SQL, publica a prod.
 
   ./scripts/deploy-004-gated.sh --yes
+  ./scripts/deploy-004-gated.sh --yes --sql-only
+  ./scripts/deploy-004-gated.sh --yes --004-only
   ./scripts/deploy-004-gated.sh --yes --no-prod
   ./scripts/deploy-004-gated.sh --yes --skip-copy
+  ./scripts/deploy-004-gated.sh --yes --sql-only --allow-figure-change
   ./scripts/deploy-004-gated.sh --yes --year 2026
 
 No lanza 004 en prod. No cambia BC_ENVIRONMENT del contenedor testing.
+--allow-figure-change: permite que v_se P/R / 1-02 se muevan vs el clon
+(solo si el cambio de vista DEBE mover cifras).
 EOF
   exit "${1:-0}"
 }
@@ -73,12 +90,18 @@ while [[ $# -gt 0 ]]; do
     --no-prod) APPLY_PROD=0 ;;
     --apply-prod) APPLY_PROD=1 ;;
     --skip-copy) SKIP_COPY=1 ;;
+    --sql-only) SCOPE="sql" ;;
+    --004-only) SCOPE="004" ;;
+    --allow-figure-change) ALLOW_FIGURE_CHANGE=1 ;;
     --year) YEAR="$2"; shift ;;
     -h|--help) usage 0 ;;
     *) echo "❌ Flag desconocido: $1" >&2; usage 1 ;;
   esac
   shift
 done
+
+scope_has_004() { [[ "$SCOPE" == "all" || "$SCOPE" == "004" ]]; }
+scope_has_sql() { [[ "$SCOPE" == "all" || "$SCOPE" == "sql" ]]; }
 
 ssh_testing() { sshpass -p "$SSH_PASS" ssh "${SSH_OPTS[@]}" "$SSH_USER@$N8N_TESTING_HOST" "$@"; }
 
@@ -387,6 +410,205 @@ copy_prod_to_testing() {
     "$APPS_ROOT/scripts/copy-analytics-production-to-env.sh" --target testing --yes --backup
 }
 
+apply_sql_testing() {
+  echo "🧮 Aplicando v_se_* + bi_* en Analytics testing ..."
+  ANALYTICS_DSN="$ANALYTICS_TESTING_DSN" "$APPLY_BI" --with-se
+}
+
+apply_sql_prod() {
+  echo ""
+  echo "════════════════════════════════════════════════════════════"
+  echo " HARD STOP prod: aplicar v_se_* + bi_* a Analytics VM 100"
+  echo " Impacto: cambia fórmulas publicadas (Apps/PBI)."
+  echo " Rollback: reaplicar el SQL anterior / restore del clone."
+  echo "════════════════════════════════════════════════════════════"
+  FIGURES_GATE_OK=1 ANALYTICS_DSN="$ANALYTICS_PROD_DSN" "$APPLY_BI" --with-se
+}
+
+dump_published_figures() {
+  ssh_testing "docker exec $ANALYTICS_TESTING_CONTAINER psql -U postgres -d postgres -At -F $'\t' -v ON_ERROR_STOP=1 -c \"
+SELECT 'all', empresa, tipo, ROUND(SUM(facturado)::numeric, 2)
+FROM v_se_facturacion
+WHERE year = ${YEAR}
+  AND empresa IN ($COMPANIES_SQL)
+  AND tipo IN ('P','R')
+GROUP BY empresa, tipo
+UNION ALL
+SELECT '1-02', empresa, tipo, ROUND(SUM(facturado)::numeric, 2)
+FROM v_se_facturacion
+WHERE year = ${YEAR}
+  AND empresa IN ($COMPANIES_SQL)
+  AND tipo IN ('P','R')
+  AND departamento = '1-02'
+GROUP BY empresa, tipo
+ORDER BY 1, 2, 3;
+\""
+}
+
+snapshot_published_figures() {
+  local dest="$1"
+  echo "📸 Snapshot cifras publicadas → ${dest}"
+  dump_published_figures > "$dest"
+  if [[ ! -s "$dest" ]]; then
+    echo "❌ Snapshot vacío (¿falta v_se_facturacion en testing?)" >&2
+    return 1
+  fi
+  column -t -s $'\t' "$dest" || cat "$dest"
+}
+
+compare_figure_files() {
+  local before="$1" after="$2"
+  python3 - "$before" "$after" "$FIGURES_TOL" "$ALLOW_FIGURE_CHANGE" <<'PY'
+import sys
+from decimal import Decimal, ROUND_HALF_UP
+
+before_p, after_p, tol_s, allow_s = sys.argv[1:5]
+tol = Decimal(tol_s)
+allow = allow_s == "1"
+
+def load(path):
+    out = {}
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            scope, empresa, tipo, val = line.split("\t")
+            out[(scope, empresa, tipo)] = Decimal(val)
+    return out
+
+before = load(before_p)
+after = load(after_p)
+keys = sorted(set(before) | set(after))
+if not keys:
+    raise SystemExit("Sin filas para comparar cifras")
+
+failed = []
+print("scope  empresa  tipo  antes  despues  delta")
+for key in keys:
+    a = before.get(key, Decimal("0"))
+    b = after.get(key, Decimal("0"))
+    delta = (b - a).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    scope, empresa, tipo = key
+    print(f"{scope}  {empresa}  {tipo}  {a}  {b}  {delta}")
+    if abs(delta) > tol:
+        failed.append((key, a, b, delta))
+
+if failed and not allow:
+    print("❌ Las cifras publicadas se movieron vs el clon (tol "
+          f"{tol} €). Si el cambio de vista DEBE moverlas, relanza "
+          "con --allow-figure-change.", file=sys.stderr)
+    raise SystemExit(1)
+if failed and allow:
+    print(f"⚠️  --allow-figure-change: {len(failed)} delta(s) > {tol} € aceptados")
+else:
+    print(f"✅ Cifras publicadas = clon (tol {tol} €)")
+PY
+}
+
+check_published_vs_021() {
+  local started="$1"
+  echo "📊 Cifras publicadas vs 021 / MV ..."
+  ssh_testing "docker exec $ANALYTICS_TESTING_CONTAINER psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c \"
+WITH v AS (
+  SELECT empresa,
+         ROUND(SUM(facturado) FILTER (WHERE tipo = 'P')::numeric, 2) AS v_p,
+         ROUND(SUM(facturado) FILTER (WHERE tipo = 'R')::numeric, 2) AS v_r
+  FROM v_se_facturacion
+  WHERE year = ${YEAR}
+    AND empresa IN ($COMPANIES_SQL)
+    AND tipo IN ('P','R')
+  GROUP BY empresa
+),
+k AS (
+  SELECT empresa,
+         ROUND(SUM(plan_facturacion) FILTER (WHERE tipo = 'P')::numeric, 2) AS k_p,
+         ROUND(SUM(plan_facturacion) FILTER (WHERE tipo = 'R')::numeric, 2) AS k_r
+  FROM bi_mv_planificacion_kpi
+  WHERE year = ${YEAR}
+    AND empresa IN ($COMPANIES_SQL)
+    AND tipo IN ('P','R')
+  GROUP BY empresa
+),
+h AS (
+  SELECT company_name AS empresa,
+         MAX(bc_value) FILTER (WHERE check_name = 'tipo_r_sum') AS bc_r
+  FROM analytics_health_log
+  WHERE checked_at >= TIMESTAMPTZ '${started}'
+    AND year = ${YEAR}
+    AND check_name = 'tipo_r_sum'
+    AND company_name IN ($COMPANIES_SQL)
+  GROUP BY company_name
+)
+SELECT v.empresa,
+       v.v_p, k.k_p, ABS(v.v_p - k.k_p) AS d_mv_p,
+       v.v_r, k.k_r, ABS(v.v_r - k.k_r) AS d_mv_r,
+       h.bc_r, ABS(v.v_r - h.bc_r) AS d_r_bc
+FROM v
+LEFT JOIN k USING (empresa)
+LEFT JOIN h USING (empresa)
+ORDER BY 1;
+\""
+  local fails
+  fails="$(ssh_testing "docker exec $ANALYTICS_TESTING_CONTAINER psql -U postgres -d postgres -tAc \"
+WITH v AS (
+  SELECT empresa,
+         ROUND(SUM(facturado) FILTER (WHERE tipo = 'P')::numeric, 2) AS v_p,
+         ROUND(SUM(facturado) FILTER (WHERE tipo = 'R')::numeric, 2) AS v_r
+  FROM v_se_facturacion
+  WHERE year = ${YEAR}
+    AND empresa IN ($COMPANIES_SQL)
+    AND tipo IN ('P','R')
+  GROUP BY empresa
+),
+k AS (
+  SELECT empresa,
+         ROUND(SUM(plan_facturacion) FILTER (WHERE tipo = 'P')::numeric, 2) AS k_p,
+         ROUND(SUM(plan_facturacion) FILTER (WHERE tipo = 'R')::numeric, 2) AS k_r
+  FROM bi_mv_planificacion_kpi
+  WHERE year = ${YEAR}
+    AND empresa IN ($COMPANIES_SQL)
+    AND tipo IN ('P','R')
+  GROUP BY empresa
+),
+h AS (
+  SELECT company_name AS empresa,
+         MAX(bc_value) FILTER (WHERE check_name = 'tipo_r_sum') AS bc_r
+  FROM analytics_health_log
+  WHERE checked_at >= TIMESTAMPTZ '${started}'
+    AND year = ${YEAR}
+    AND check_name = 'tipo_r_sum'
+    AND company_name IN ($COMPANIES_SQL)
+  GROUP BY company_name
+)
+SELECT count(*) FROM v
+LEFT JOIN k USING (empresa)
+LEFT JOIN h USING (empresa)
+WHERE k.k_p IS NULL OR k.k_r IS NULL OR h.bc_r IS NULL
+   OR ABS(v.v_p - k.k_p) > ${FIGURES_TOL}
+   OR ABS(v.v_r - k.k_r) > ${FIGURES_TOL}
+   OR ABS(v.v_r - h.bc_r) > ${FIGURES_TOL}
+   OR v.v_p = 0 OR v.v_r = 0;
+\"" | tr -d '[:space:]')"
+  if [[ "${fails}" != "0" ]]; then
+    echo "❌ Gate cifras: ${fails} empresa(s) fallan (MV≠v_se, R≠021 BC, o P/R=0; tol ${FIGURES_TOL} €)" >&2
+    return 1
+  fi
+  echo "✅ Gate cifras: bi_mv == v_se y v_se R == 021 tipo_r BC (tol ${FIGURES_TOL} €)"
+}
+
+restart_n8n_testing() {
+  echo "🔄 Restart n8n testing (registrar webhooks 004/021) ..."
+  ssh_testing "docker restart $N8N_TESTING_APP"
+  for _i in 1 2 3 4 5 6 7 8 9 10; do
+    if curl -sf -m 5 "http://${N8N_TESTING_HOST}:5678/healthz" >/dev/null 2>&1 \
+       || curl -sf -m 5 "http://${N8N_TESTING_HOST}:5678/" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 3
+  done
+}
+
 confirm_or_die() {
   if [[ "$ASSUME_YES" -eq 1 ]]; then
     return 0
@@ -394,8 +616,14 @@ confirm_or_die() {
   echo ""
   echo "Esto va a:"
   [[ "$SKIP_COPY" -eq 0 ]] && echo "  • Sobrescribir Analytics TESTING desde prod"
-  echo "  • Aplicar 004/021 en n8n testing y lanzar canary 004 + 021"
-  [[ "$APPLY_PROD" -eq 1 ]] && echo "  • Si 021 cierra: aplicar JSON 004 a n8n PROD (sin lanzar 004)"
+  scope_has_sql && echo "  • Aplicar v_se_* + bi_* en testing y comparar cifras vs clon"
+  scope_has_004 && echo "  • Aplicar 004/021 en n8n testing y lanzar canary 004 + 021"
+  scope_has_sql && ! scope_has_004 && echo "  • Lanzar 021 en testing (sin canary 004)"
+  if [[ "$APPLY_PROD" -eq 1 ]]; then
+    scope_has_004 && echo "  • Si cierra: aplicar JSON 004 a n8n PROD (sin lanzar 004)"
+    scope_has_sql && echo "  • Si cierra: aplicar v_se_* + bi_* a Analytics PROD"
+  fi
+  [[ "$ALLOW_FIGURE_CHANGE" -eq 1 ]] && echo "  • Permitir que las cifras publicadas se muevan vs el clon"
   read -r -p "¿Confirmas? Escribe yes: " ans
   [[ "$ans" == "yes" ]] || { echo "Cancelado."; exit 0; }
 }
@@ -403,17 +631,18 @@ confirm_or_die() {
 # ── main ──────────────────────────────────────────────────────────
 [[ -f "$WF_004" ]] || { echo "❌ Falta $WF_004"; exit 1; }
 [[ -f "$WF_021" ]] || { echo "❌ Falta $WF_021"; exit 1; }
+[[ -x "$APPLY_BI" ]] || chmod +x "$APPLY_BI"
 [[ -x "$APPS_ROOT/scripts/update-n8n-workflow-postgres-remote.sh" ]] || {
   echo "❌ No encuentro update-n8n-workflow-postgres-remote.sh en $APPS_ROOT"; exit 1;
 }
 
 echo "════════════════════════════════════════════════════════════"
-echo " Gate 004 (testing → prod JSON)"
-echo " year=${YEAR} copy=$([[ $SKIP_COPY -eq 1 ]] && echo skip || echo yes) apply_prod=${APPLY_PROD}"
+echo " Gate cifras (testing → prod)"
+echo " scope=${SCOPE} year=${YEAR} copy=$([[ $SKIP_COPY -eq 1 ]] && echo skip || echo yes) apply_prod=${APPLY_PROD}"
 echo "════════════════════════════════════════════════════════════"
 
 confirm_or_die
-seatbelt_004
+scope_has_004 && seatbelt_004
 
 if [[ "$SKIP_COPY" -eq 0 ]]; then
   copy_prod_to_testing
@@ -423,52 +652,63 @@ fi
 
 TMPDIR_GATE="$(mktemp -d /tmp/gate-004.XXXXXX)"
 trap 'rm -rf "$TMPDIR_GATE"' EXIT
-pin_bc_production "$WF_004" "$TMPDIR_GATE/004.testing.json"
+
+if scope_has_sql; then
+  snapshot_published_figures "$TMPDIR_GATE/figures.before.tsv"
+  apply_sql_testing
+  snapshot_published_figures "$TMPDIR_GATE/figures.after.tsv"
+  compare_figure_files "$TMPDIR_GATE/figures.before.tsv" "$TMPDIR_GATE/figures.after.tsv"
+fi
+
 pin_bc_production "$WF_021" "$TMPDIR_GATE/021.testing.json"
-
-apply_n8n_postgres "$N8N_TESTING_HOST" "$N8N_TESTING_APP" "$N8N_TESTING_PG" \
-  "$WF_004_TESTING" "$TMPDIR_GATE/004.testing.json"
+if scope_has_004; then
+  pin_bc_production "$WF_004" "$TMPDIR_GATE/004.testing.json"
+  apply_n8n_postgres "$N8N_TESTING_HOST" "$N8N_TESTING_APP" "$N8N_TESTING_PG" \
+    "$WF_004_TESTING" "$TMPDIR_GATE/004.testing.json"
+fi
 ensure_021_testing "$TMPDIR_GATE/021.testing.json"
+restart_n8n_testing
 
-echo "🔄 Restart n8n testing (registrar webhooks 004/021) ..."
-ssh_testing "docker restart $N8N_TESTING_APP"
-for i in 1 2 3 4 5 6 7 8 9 10; do
-  if curl -sf -m 5 "http://${N8N_TESTING_HOST}:5678/healthz" >/dev/null 2>&1 \
-     || curl -sf -m 5 "http://${N8N_TESTING_HOST}:5678/" >/dev/null 2>&1; then
-    break
-  fi
-  sleep 3
-done
-
-reset_testing_watermarks
-GATE_004_START="$(date -u +"%Y-%m-%d %H:%M:%S+00:00")"
-fire_004_canary psi
-wait_004_company psi "$GATE_004_START"
-fire_004_canary pslab
-wait_004_company pslab "$GATE_004_START"
+if scope_has_004; then
+  reset_testing_watermarks
+  GATE_004_START="$(date -u +"%Y-%m-%d %H:%M:%S+00:00")"
+  fire_004_canary psi
+  wait_004_company psi "$GATE_004_START"
+  fire_004_canary pslab
+  wait_004_company pslab "$GATE_004_START"
+fi
 
 GATE_021_START="$(date -u +"%Y-%m-%d %H:%M:%S+00:00")"
 fire_021
 wait_021_money "$GATE_021_START"
+check_published_vs_021 "$GATE_021_START"
 
 if [[ "$APPLY_PROD" -eq 0 ]]; then
   echo ""
-  echo "✅ Gate testing OK. --no-prod: no se tocó n8n prod."
-  echo "   Para publicar JSON: $0 --yes --skip-copy --apply-prod"
+  echo "✅ Gate testing OK. --no-prod: no se tocó prod."
+  echo "   Para publicar: $0 --yes --skip-copy --apply-prod"
   exit 0
 fi
 
-echo ""
-echo "════════════════════════════════════════════════════════════"
-echo " HARD STOP prod: aplicar JSON repo a n8n-prod ${WF_004_PROD}"
-echo " Impacto: cambia el workflow 004 en VM 101. NO lanza sync."
-echo " Rollback: reaplicar el JSON anterior / activeVersionId previo."
-echo "════════════════════════════════════════════════════════════"
-apply_n8n_postgres "$N8N_PROD_HOST" "$N8N_PROD_APP" "$N8N_PROD_PG" \
-  "$WF_004_PROD" "$WF_004"
+if scope_has_004; then
+  echo ""
+  echo "════════════════════════════════════════════════════════════"
+  echo " HARD STOP prod: aplicar JSON repo a n8n-prod ${WF_004_PROD}"
+  echo " Impacto: cambia el workflow 004 en VM 101. NO lanza sync."
+  echo " Rollback: reaplicar el JSON anterior / activeVersionId previo."
+  echo "════════════════════════════════════════════════════════════"
+  apply_n8n_postgres "$N8N_PROD_HOST" "$N8N_PROD_APP" "$N8N_PROD_PG" \
+    "$WF_004_PROD" "$WF_004"
+fi
+
+if scope_has_sql; then
+  apply_sql_prod
+fi
 
 echo ""
-echo "✅ Gate completo."
-echo "   Testing: 004+021 aplicados, canary ${YEAR} ok, 021 dinero ok"
-echo "   Prod:    JSON 004 aplicado. NO se lanzó 004 en prod."
+echo "✅ Gate completo (scope=${SCOPE})."
+scope_has_004 && echo "   Testing: 004+021, canary ${YEAR} ok, 021 dinero ok"
+scope_has_sql && echo "   Testing: SQL aplicado, cifras vs clon + MV/R ok"
+scope_has_004 && [[ "$APPLY_PROD" -eq 1 ]] && echo "   Prod: JSON 004 aplicado. NO se lanzó 004."
+scope_has_sql && [[ "$APPLY_PROD" -eq 1 ]] && echo "   Prod: v_se_* + bi_* aplicados."
 echo "   Si hace falta resync prod: webhook sync-bc-to-analytics a mano."

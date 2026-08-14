@@ -69,7 +69,7 @@ El 004 de testing falló el 2026-08-10 en `Try Acquire Mutex 004`: `company_name
 
 Canal BC → Analytics: solo 004 (salvo bypass explícito).
 
-**Publicar 004 a prod:** `./scripts/deploy-004-gated.sh` (copia prod→testing, canary 004+021, luego JSON a n8n prod). No aplicar el JSON a prod a ciegas. El clon testing del 2026-08-14 **predates** el restore SUM de PSI-OT-26-2001: el gate debe recopiar.
+**Publicar 004 o vistas/MVs a prod:** `./scripts/deploy-004-gated.sh` (copia prod→testing, valida 021 + cifras publicadas, luego JSON y/o SQL a prod). `--sql-only` / `--004-only` si el cambio es de un solo lado. `apply-bi-views.sh` no escribe fórmulas en prod sin el gate. El clon testing del 2026-08-14 **predates** el restore SUM de PSI-OT-26-2001: el gate debe recopiar.
 
 ---
 

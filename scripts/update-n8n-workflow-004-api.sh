@@ -1,6 +1,6 @@
 #!/bin/bash
 # OBSOLETO como PUT directo a prod.
-# Publicar 004 a prod pasa por el gate testing (copia + canary 004 + 021).
+# Publicar 004 / vistas a prod pasa por el gate de cifras (testing).
 #
 # Uso: ./scripts/update-n8n-workflow-004-api.sh
 #      → exec ./scripts/deploy-004-gated.sh --yes
@@ -12,8 +12,10 @@ set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 if [[ "${ALLOW_DIRECT_004_PROD:-}" != "1" ]]; then
     echo "⛔ PUT directo a n8n prod está bloqueado."
-    echo "   Publicar 004: $ROOT/scripts/deploy-004-gated.sh --yes"
-    echo "   Solo testing: $ROOT/scripts/deploy-004-gated.sh --yes --no-prod"
+    echo "   Publicar cifras: $ROOT/scripts/deploy-004-gated.sh --yes"
+    echo "   Solo SQL:        $ROOT/scripts/deploy-004-gated.sh --yes --sql-only"
+    echo "   Solo 004:        $ROOT/scripts/deploy-004-gated.sh --yes --004-only"
+    echo "   Solo testing:    $ROOT/scripts/deploy-004-gated.sh --yes --no-prod"
     echo "   Emergencia (sin gate): ALLOW_DIRECT_004_PROD=1 $0"
     exit 1
 fi
