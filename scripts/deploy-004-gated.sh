@@ -146,6 +146,7 @@ PY
 
 apply_n8n_postgres() {
   local host="$1" app="$2" pg="$3" wf_id="$4" json_path="$5"
+  FIGURES_GATE_OK=1 \
   DEPLOY_HOST_IP="$host" \
   DEPLOY_SSH_PASSWORD="$SSH_PASS" \
   DEPLOY_SSH_USER="$SSH_USER" \

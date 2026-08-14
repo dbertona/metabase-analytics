@@ -35,8 +35,8 @@ PBI `RecursosHoras` usa campos de perfil desde API recursos. Verificar que `bc_r
 
 1. Migración SQL tabla(s) nueva(s) — cabecera `ANALYTICS DB ONLY`
 2. Actualizar 004 en este repo (`src/workflows/004_sync_bc_to_ps_analytics.json`)
-3. Aplicar en n8n prod con `./scripts/update-n8n-workflow-004-api.sh` (VM 101)
-4. Aplicar SQL canónico desde este repo (`sql/views/seguimiento_economico_views.sql`) en prod (VM 100) — luego DEV/testing si aplica
+3. Publicar 004 + SQL a prod **solo** con `./scripts/deploy-004-gated.sh --yes` (no API PUT ni `apply-bi-views` directo)
+4. El gate aplica el JSON del repo en n8n prod (VM 101) y el SQL canónico en Analytics prod (VM 100) si las cifras cierran
 5. Sync: `POST https://apps.powersolution.es/n8n/webhook/sync-bc-to-analytics?company=psi`
 6. Validar `v_se_kpi_cards` contra PBI
 

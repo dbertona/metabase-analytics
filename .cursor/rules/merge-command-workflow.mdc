@@ -65,9 +65,9 @@ Excepción rara: `KEEP_BRANCH=1 ./scripts/merge-safe.sh` (solo si el usuario lo 
 
 ### 5. Post-merge (runtime)
 
-Si la rama tocó `src/workflows/004_*.json` → actualizar n8n (DEV y/o prod según alcance) con `update_n8n_workflow_postgres.py` — ver `docs/ACTUALIZAR_WORKFLOW_004.md`.
-
-Si tocó `sql/views/` → aplicar vistas en analytics DB (`./scripts/apply-bi-views.sh` o procedimiento documentado).
+Si la rama tocó `src/workflows/004_*.json` o `sql/views/` (`v_se_*` / `bi_*`):
+**no** aplicar en prod desde el merge. Canal: `./scripts/deploy-004-gated.sh`
+(`analytics-figures-gate.mdc`). Testing: `--yes --no-prod` si hace falta veredicto.
 
 ### 6. Reportar
 

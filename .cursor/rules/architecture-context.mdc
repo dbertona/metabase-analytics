@@ -74,8 +74,8 @@ Prefijo `bc_` — origen: workflow n8n 004 desde BC Production.
 
 ## 🔴 REGLAS CRÍTICAS
 
-- **Workflow 004** → JSON canónico en `src/workflows/004_sync_bc_to_ps_analytics.json`; deploy con scripts documentados en `docs/ACTUALIZAR_WORKFLOW_004.md`
-- **SQL Analytics** → fuente de verdad en `sql/views/seguimiento_economico_views.sql`; aplicar con `scripts/apply-bi-views.sh`
+- **Workflow 004 / vistas `v_se_*` / `bi_*` a prod** → solo `scripts/deploy-004-gated.sh` (`analytics-figures-gate.mdc`). JSON canónico: `src/workflows/004_sync_bc_to_ps_analytics.json`. Doc: `docs/ACTUALIZAR_WORKFLOW_004.md`
+- **SQL Analytics** → fuente de verdad en `sql/views/seguimiento_economico_views.sql`. Prod: el gate. Testing/DEV: `scripts/apply-bi-views.sh` (prod bloqueado sin `FIGURES_GATE_OK`)
 - **Commits**: siempre rama `feat/` o `fix/` — nunca en `main` directamente
 - **Push**: siempre `gitea`, nunca `origin` (GitHub es solo mirror)
 
