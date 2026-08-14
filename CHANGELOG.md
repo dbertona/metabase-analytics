@@ -7,8 +7,13 @@
 - **004 PlanificacionMes — meses huérfanos:** `Discover Partitions` une
   `partition.forceMonths` del batch BC y hace overwrite aunque el discovery
   por watermark esté vacío (borrado de línea / mes sin filas OData).
+- **004 ExpedienteMes — meses huérfanos:** misma unión de `forceMonths` en
+  `Discover Partitions ExpedienteMes`. Snapshot vacío sigue emitiendo
+  overwrite (DELETE del mes). BC envía `Year`/`Month` de `PS_RevenuePlanLine`.
 - **021:** check `planif_orphan_grain` (Analytics `job|recurso|año|mes` vs
   `PlanificacionMes`). Si falla el HTTP de BC, el check es `info` (no fail).
+- **021:** check `expediente_orphan_grain` (Analytics
+  `job|unidad|año|mes` vs `ExpedienteMes`). Si falla el HTTP de BC, `info`.
 
 ### Changed
 - **Enforcement del gate:** merge ya no aplica 004/SQL a prod. El script
