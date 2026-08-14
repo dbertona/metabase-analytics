@@ -6,7 +6,7 @@ Informe origen: Power BI `Seguimiento Económico PS.pbix` (dataset en la nube, f
 
 ## Objetivo
 
-Mantener en **PostgreSQL Analytics** (VM 100) las vistas y tablas que alimentan:
+Mantener en **PostgreSQL Analytics** (prod VM 100; testing 103; DEV 102 — [entornos](../ANALYTICS_ENVIRONMENTS.md)) las vistas y tablas que alimentan:
 
 - **Apps** (Seguimiento Económico / planificación)
 - **Power BI** (paridad numérica documentada)
@@ -20,13 +20,16 @@ La UI Apache Superset está **retirada**.
 | **superset-analytics** (este) | Spec PBI, SQL canónico (`v_se_*`, `bi_v_*`), workflow 004, docs de sync |
 | **power-solution-apps** | Consumo Apps (fuera de alcance para cambios SQL/004 aquí) |
 
-## Infraestructura (prod)
+## Infraestructura
 
 | Componente | Ubicación |
 |--------------|-----------|
-| PostgreSQL Analytics | VM 100 — `192.168.36.100:5433` (`supabase-db`) |
-| n8n workflow 004 | VM 101 — `https://apps.powersolution.es/n8n/` |
+| PostgreSQL Analytics prod | VM 100 — `192.168.36.100:5433` (`supabase-db`) |
+| PostgreSQL Analytics testing | VM 103 — `192.168.36.103:5435` (`supabase-analytics-db-testing`) |
+| n8n workflow 004 (prod) | VM 101 — `https://apps.powersolution.es/n8n/` |
 | BC OData | Production (`BC_ENVIRONMENT=Production`) |
+
+Matriz completa y backend Apps: [ANALYTICS_ENVIRONMENTS.md](../ANALYTICS_ENVIRONMENTS.md).
 
 ## Sync
 

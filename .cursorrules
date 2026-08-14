@@ -9,6 +9,7 @@
 | --------- | ---------------- |
 | Verbos de acción ("corrige", "añade", "modifica", "crea", "haz"...) | Verificar rama → crear `feat/` o `fix/` si en `main` → `git-workflow-automatic.mdc` FASE 1 |
 | "migración", "CREATE TABLE", "ALTER TABLE" | ✅ Cambios SQL de Analytics se definen y mantienen en **superset-analytics** |
+| "analytics testing", "5435", "copia analytics" | Leer `docs/ANALYTICS_ENVIRONMENTS.md` |
 | "workflow 004", "n8n", "sync" | Leer `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md` + `src/workflows/004_sync_bc_to_ps_analytics.json` |
 | "power-solution-apps", "timesheet" | ❌ NO modificar desde este repo → `00-REPO-WORKSPACE-BOUNDARY.mdc` |
 | "BC", "Business Central", ".al" | ❌ NUNCA tocar BC desde aquí |
@@ -24,6 +25,7 @@
 
 | Área | Documento |
 |------|-----------|
+| Entornos Analytics (DEV/testing/prod) | `docs/ANALYTICS_ENVIRONMENTS.md` |
 | Arquitectura general | `.cursor/rules/architecture-context.mdc` |
 | Workflow 004 (sync BC→Analytics) | `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md` |
 | Troubleshooting Tipo P/R vs PBI | `docs/shared/analytics/ANALYTICS_FACTURACION_PBI_ALIGNMENT.md` |
@@ -36,9 +38,10 @@
 ## 🗄️ Conexión Analytics DB (referencia rápida)
 
 ```bash
-# Desde terminal local o VM 101
-docker run --rm --network host postgres:15 \
-  psql "postgresql://postgres:SuperSecurePassword2025@192.168.36.100:5433/postgres"
+# Prod
+psql "postgresql://postgres:SuperSecurePassword2025@192.168.36.100:5433/postgres"
+# Testing (backend testing apunta aquí)
+psql "postgresql://postgres:analytics_testing_2025@192.168.36.103:5435/postgres"
 
 # KPI rápido PSI 2026
 # SELECT tipo, ROUND(SUM(facturado::numeric),2) FROM v_se_facturacion

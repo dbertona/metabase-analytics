@@ -1,6 +1,6 @@
 # PS Analytics (capa datos)
 
-Réplica de datos Business Central en **PostgreSQL Analytics** (VM 100) y sync **n8n workflow 004**.
+Réplica de datos Business Central en **PostgreSQL Analytics** (prod VM 100; testing VM 103; DEV VM 102) y sync **n8n workflow 004**.
 
 > Nombre histórico del repo: `superset-analytics`. La UI Apache Superset está **retirada**. Este repo mantiene SQL canónico (`v_se_*`, `bi_v_*`), scripts de apply y la definición del workflow 004.
 
@@ -28,16 +28,21 @@ Réplica de datos Business Central en **PostgreSQL Analytics** (VM 100) y sync *
 
 ## Conexión DB Analytics
 
+Matriz DEV / testing / prod y backend Apps: [`docs/ANALYTICS_ENVIRONMENTS.md`](docs/ANALYTICS_ENVIRONMENTS.md)
+
 ```bash
-docker run --rm --network host postgres:15 \
-  psql "postgresql://postgres:SuperSecurePassword2025@192.168.36.100:5433/postgres"
+# Prod
+psql "postgresql://postgres:SuperSecurePassword2025@192.168.36.100:5433/postgres"
+# Testing (SE Apps en testingapp apunta aquí)
+psql "postgresql://postgres:analytics_testing_2025@192.168.36.103:5435/postgres"
 ```
 
 ## Docs de entrada
 
-1. `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md`
-2. `docs/shared/analytics/ANALYTICS_FACTURACION_PBI_ALIGNMENT.md`
-3. `docs/ACTUALIZAR_WORKFLOW_004.md`
+1. `docs/ANALYTICS_ENVIRONMENTS.md` — entornos, backend, copia prod→testing
+2. `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md`
+3. `docs/shared/analytics/ANALYTICS_FACTURACION_PBI_ALIGNMENT.md`
+4. `docs/ACTUALIZAR_WORKFLOW_004.md`
 
 ## Nota
 

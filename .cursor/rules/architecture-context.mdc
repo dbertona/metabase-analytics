@@ -16,15 +16,21 @@ NO contiene código de la app Timesheet/Gastos (eso está en `power-solution-app
 
 ## 📍 Infraestructura
 
+Detalle operativo (DEV / testing / prod, backend, copia): [`docs/ANALYTICS_ENVIRONMENTS.md`](../../docs/ANALYTICS_ENVIRONMENTS.md)
+
 | Componente | Ubicación | Acceso |
 |---|-----|-----|
-| **PostgreSQL Analytics** | VM 100 — `192.168.36.100:5433` | postgres / `SuperSecurePassword2025` |
+| **PostgreSQL Analytics prod** | VM 100 — `192.168.36.100:5433` (`supabase-db`) | postgres / `SuperSecurePassword2025` |
+| **PostgreSQL Analytics testing** | VM 103 — `192.168.36.103:5435` (`supabase-analytics-db-testing`) | postgres / `analytics_testing_2025` |
+| **PostgreSQL Analytics DEV** | VM 102 — `192.168.36.102:5435` (`supabase-analytics-db-dev`) | postgres / `analytics_dev_2025` |
 | **n8n prod (sync 004)** | VM 101 — `https://apps.powersolution.es/n8n/` | Workflow 004 |
+| **Backend testing → Analytics** | `ANALYTICS_DB_*` en `/opt/langchain-agent-v2/.env` | apunta a **103:5435** (desde 2026-08-14) |
 
 ```bash
-# Conectar a analytics DB desde terminal
-docker run --rm --network host postgres:15 \
-  psql "postgresql://postgres:SuperSecurePassword2025@192.168.36.100:5433/postgres"
+# Prod
+psql "postgresql://postgres:SuperSecurePassword2025@192.168.36.100:5433/postgres"
+# Testing
+psql "postgresql://postgres:analytics_testing_2025@192.168.36.103:5435/postgres"
 ```
 
 ---

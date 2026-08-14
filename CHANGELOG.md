@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Documentación
+- **Entornos Analytics (DEV / testing / prod):** `docs/ANALYTICS_ENVIRONMENTS.md`.
+  Testing (VM 103 `:5435`) poblado desde prod el 2026-08-14; backend testing
+  (`ANALYTICS_DB_*`) apunta a esa instancia, no a VM 100.
+
 ### Fixed
 - **Facturación — un solo encabezado por OT:** `v_se_facturacion.encabezado`
   usa `bc_job.description` (fallback línea), no la descripción del ledger/cert.
