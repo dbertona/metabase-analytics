@@ -34,12 +34,39 @@ curl -sS -m 900 -X POST \
 
 ---
 
-## Actualizar workflow en n8n prod
+## Publicar 004 o vistas que mueven cifras
 
-> **Jul 2026:** n8n prod usa **PostgreSQL** (no SQLite). Método correcto: `update_n8n_workflow_postgres.py`.
-> ⛔ SQLite obsoleto — solo backups `.bak-pre-postgres-*`. Ver `docs/shared/n8n/N8N_GUIDE.md`.
+**Canal obligatorio:** `./scripts/deploy-004-gated.sh`.
 
-### Método correcto — PostgreSQL (agente / hotfix)
+Cubre el JSON 004 **y** SQL que alimenta Apps/PBI (`v_se_*`, `bi_v_*`, `bi_mv_*`).  
+No aplicar JSON a n8n prod ni `CREATE OR REPLACE` en Analytics prod sin pasar el gate.
+
+El gate:
+
+1. Seatbelt estático 004 (Transform PlanificacionMes = SUM, sin `pbiKey` / Distinct), si el alcance incluye 004.
+2. Copia Analytics **prod → testing** (escribe solo en VM 103).
+3. Si hay SQL: snapshot de `v_se_facturacion` (empresa + depto `1-02`) → aplica `v_se_*` + `bi_*` **solo en testing** → compara vs snapshot (tol 0,50 €). Un cambio que deba mover cifras exige `--allow-figure-change`.
+4. Si hay 004: JSON del repo a n8n **testing** (004 + 021). En testing el contenedor tiene `BC_ENVIRONMENT=Pruebas_PS`; el gate **pinnea Production solo en esos workflows**.
+5. Reset de watermarks + canary 004 (`planificacion_mes`, `movimientos_proyectos`, `expediente_mes`, `meses_cerrados`) en psi y pslab (solo alcance 004).
+6. 021 en testing: `tipo_p_planif_sum`, `tipo_r_sum`, `tipo_p_expediente_sum` (tol 0,50 €).
+7. Cifras publicadas: `bi_mv_planificacion_kpi` == `v_se_facturacion`; `v_se` tipo R == 021 `tipo_r_sum` BC. Si falla → **no se toca prod**.
+8. Si cierran: mismo JSON a n8n prod y/o mismo SQL a Analytics prod. **No lanza 004 en prod.**
+
+```bash
+cd superset-analytics
+./scripts/deploy-004-gated.sh --yes                 # 004 + SQL
+./scripts/deploy-004-gated.sh --yes --sql-only      # solo vistas/MVs
+./scripts/deploy-004-gated.sh --yes --004-only      # solo JSON 004
+./scripts/deploy-004-gated.sh --yes --no-prod       # solo veredicto testing
+./scripts/deploy-004-gated.sh --yes --skip-copy     # clon testing ya fresco
+```
+
+`apply-bi-views.sh` (sin `--refresh`) está bloqueado contra prod.  
+⛔ No exportar 004 de prod y parchear un nodo (reintroduce Distinct).  
+⛔ No lanzar 004 desde n8n DEV hasta aislar `Postgres PS_Analytics`.  
+`update-n8n-workflow-004-api.sh` ya no hace PUT a prod: redirige aquí.
+
+### Emergencia (solo con OK explícito, sin gate)
 
 ```bash
 # 1) Copiar script y JSON al servidor 101
@@ -57,15 +84,6 @@ python3 /tmp/update_n8n_workflow_postgres.py update \
 REMOTE
 ```
 
-### Método alternativo — API REST (CI/CD)
-
-```bash
-cd superset-analytics
-./scripts/update-n8n-workflow-004-api.sh
-```
-
-Requiere `N8N_API_KEY` exportada. API key en tabla `user_api_keys` del Postgres n8n (`n8n` DB en `supabase-db` VM 101).
-
 ---
 
 ## Post-sync: materializadas BI (`bi_mv_*`)
@@ -73,11 +91,17 @@ Requiere `N8N_API_KEY` exportada. API key en tabla `user_api_keys` del Postgres 
 Tras un sync OK, el nodo `Refresh BI Materialized Views` refresca **todas**
 las matviews de `public` (`pg_matviews`), no una lista fija. Así no se
 quedan atrás p. ej. `bi_mv_mano_obra_recursos_*` (Recursos/Perfiles).
-Los datasets Apps/`bi_v_*` son wrappers. Si aplicas solo SQL a mano:
+Los datasets Apps/`bi_v_*` son wrappers. Publicar SQL a prod:
 
 ```bash
-./scripts/apply-bi-views.sh            # recrear MVs + wrappers
-./scripts/apply-bi-views.sh --refresh  # solo REFRESH
+./scripts/deploy-004-gated.sh --yes --sql-only
+```
+
+`--refresh` (no cambia fórmulas) sigue permitido a mano:
+
+```bash
+ANALYTICS_DSN='postgresql://postgres:analytics_testing_2025@192.168.36.103:5435/postgres' \
+  ./scripts/apply-bi-views.sh --refresh
 ```
 
 ## Verificar sync

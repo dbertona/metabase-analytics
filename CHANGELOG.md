@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+- **Gate de publicación de cifras:** `scripts/deploy-004-gated.sh` cubre el
+  JSON 004 **y** SQL que mueve Apps/PBI (`v_se_*`, `bi_v_*`, `bi_mv_*`).
+  Clona Analytics prod→testing; si hay SQL, compara `v_se_facturacion`
+  (empresa + 1-02) vs el clon; canary 004+021 si hay JSON; exige
+  `bi_mv_planificacion_kpi` == `v_se` y `v_se` R == 021 `tipo_r` BC
+  (tol 0,50 €). Solo entonces publica JSON a n8n prod y/o SQL a Analytics
+  prod. No lanza 004 en prod. `--sql-only` / `--004-only` /
+  `--allow-figure-change`. `apply-bi-views.sh` bloquea fórmulas en prod.
+  `update-n8n-workflow-004-api.sh` ya no hace PUT directo.
+
 ### Fixed
 - **004 — refresh de todas las matviews `public`:** el nodo ya no usa una
   lista fija de 8 `bi_mv_*` (omitía Recursos/Perfiles). Tras cada sync

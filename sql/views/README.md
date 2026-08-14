@@ -11,26 +11,31 @@ Snapshot de las vistas `v_se_*` y helpers `se_*` alineado con la **BD analytics 
 | **Capa dashboard Superset `bi_v_*`** | `scripts/sql/bi_dashboard_planificacion_views.sql` |
 | **Documentación funcional** | `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md` |
 
-**No apliques cambios SQL sin validación previa en entorno** (DEV/PROD): las vistas
-`v_se_*` alimentan KPIs y dashboards críticos.
+**No apliques cambios SQL en prod a ciegas:** las vistas `v_se_*` alimentan KPIs
+de Apps/PBI. Canal: `./scripts/deploy-004-gated.sh --yes --sql-only`.
 
 ## Aplicar cambios reales
 
-Desde este repo, aplicando SQL directamente sobre la BD Analytics:
-
 ```bash
-psql "postgresql://postgres:SuperSecurePassword2025@192.168.36.100:5433/postgres" \
-  -f sql/views/seguimiento_economico_views.sql
+# Gate (testing → prod). También cubre bi_mv_* / bi_v_*.
+./scripts/deploy-004-gated.sh --yes --sql-only
+
+# Solo testing, sin tocar prod
+ANALYTICS_DSN='postgresql://postgres:analytics_testing_2025@192.168.36.103:5435/postgres' \
+  ./scripts/apply-bi-views.sh --with-se
 ```
+
+`apply-bi-views.sh` (sin `--refresh`) está bloqueado contra Analytics prod.
 
 ## Actualizar fuente canónica
 
 Cuando cambie la lógica de negocio PBI/Superset:
 
 1. Editar `sql/views/seguimiento_economico_views.sql`.
-2. Probar en DB Analytics (`psql ... -f`).
-3. Validar KPIs (`v_se_facturacion`, `v_se_kpi_cards`) contra Power BI.
-4. Actualizar `CHANGELOG.md` y documentación relacionada.
+2. Gate en testing: `./scripts/deploy-004-gated.sh --yes --sql-only --no-prod`.
+3. Si el cambio debe mover cifras: `--allow-figure-change` y validar vs PBI/BC.
+4. Publicar: `./scripts/deploy-004-gated.sh --yes --sql-only --skip-copy`.
+5. Actualizar `CHANGELOG.md` y documentación relacionada.
 
 ## Contenido vigente (resumen)
 

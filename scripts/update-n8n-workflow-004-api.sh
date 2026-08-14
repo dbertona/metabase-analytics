@@ -1,14 +1,26 @@
 #!/bin/bash
-# Script para actualizar el workflow 004_sync_bc_to_ps_analytics en n8n
-# Usa la API REST de n8n (método recomendado para servidores en la nube)
+# OBSOLETO como PUT directo a prod.
+# Publicar 004 / vistas a prod pasa por el gate de cifras (testing).
 #
 # Uso: ./scripts/update-n8n-workflow-004-api.sh
+#      → exec ./scripts/deploy-004-gated.sh --yes
 #
-# Requisitos:
-# - El archivo src/workflows/004_sync_bc_to_ps_analytics.json debe existir
-# - Variable de entorno N8N_API_KEY configurada (opcional, puede pedir autenticación)
+# Bypass (solo emergencia + OK explícito): ALLOW_DIRECT_004_PROD=1
 
 set -e
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+if [[ "${ALLOW_DIRECT_004_PROD:-}" != "1" ]]; then
+    echo "⛔ PUT directo a n8n prod está bloqueado."
+    echo "   Publicar cifras: $ROOT/scripts/deploy-004-gated.sh --yes"
+    echo "   Solo SQL:        $ROOT/scripts/deploy-004-gated.sh --yes --sql-only"
+    echo "   Solo 004:        $ROOT/scripts/deploy-004-gated.sh --yes --004-only"
+    echo "   Solo testing:    $ROOT/scripts/deploy-004-gated.sh --yes --no-prod"
+    echo "   Emergencia (sin gate): ALLOW_DIRECT_004_PROD=1 $0"
+    exit 1
+fi
+
+echo "⚠️  ALLOW_DIRECT_004_PROD=1 — PUT a prod sin gate"
 
 WORKFLOW_FILE="src/workflows/004_sync_bc_to_ps_analytics.json"
 WORKFLOW_NAME="004_sync_bc_to_ps_analytics"
