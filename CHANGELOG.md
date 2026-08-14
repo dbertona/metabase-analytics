@@ -44,6 +44,15 @@
   Aplicar: `CREATE OR REPLACE` vista + `REFRESH` `bi_mv_facturacion` /
   `bi_mv_facturacion_probabilidad`.
 
+## [2026-08-14] — ExpedienteMes: forceMonths + 021 orphan grain
+
+### Fixed
+- **004 ExpedienteMes — meses huérfanos:** `Discover Partitions ExpedienteMes`
+  une `partition.forceMonths` del batch BC. Snapshot vacío sigue emitiendo
+  overwrite (DELETE del mes). BC envía `Year`/`Month` de `PS_RevenuePlanLine`.
+- **021:** check `expediente_orphan_grain` (Analytics
+  `job|unidad|año|mes` vs `ExpedienteMes`). Si falla el HTTP de BC, `info`.
+
 ## [2026-08-13] — 004: snapshot completo cert-open
 
 ### Fixed
