@@ -5,11 +5,13 @@
 # 2) Copia Analytics prod → testing (solo 103)
 # 3) Snapshot cifras publicadas (v_se / 1-02)
 # 4) Si SQL: aplica v_se_* + bi_* solo en testing; compara vs snapshot
-# 5) Si 004: JSON repo a n8n testing (004+021), pin BC=Production,
-#    reset watermarks + canary 004 (psi + pslab)
-# 6) 021 en testing: tipo_p_planif_sum / tipo_r_sum / tipo_p_expediente_sum
+# 5) Si 004: JSON repo a n8n testing (004+021), pin BC=Production SOLO
+#    para el canary, 021 testing SIN cron (solo webhook), reset + canary 004
+# 6) 021 en testing (bajo demanda): tipo_p_planif_sum / tipo_r_sum / tipo_p_expediente_sum
 # 7) Cifras publicadas: bi_mv == v_se; v_se R == 021 tipo_r BC
-# 8) Si cierran → mismo JSON a n8n prod y/o mismo SQL a Analytics prod
+# 8) Restaura 004/021 testing a $env.BC_ENVIRONMENT (Pruebas_PS). El pin
+#    no se queda de residente. 021 sigue sin cron.
+# 9) Si cierran → mismo JSON a n8n prod y/o mismo SQL a Analytics prod
 #
 # NO lanza 004 en prod. NO cambia BC_ENVIRONMENT del contenedor testing.
 #
@@ -141,6 +143,55 @@ text = text.replace(
 )
 open(dest, "w", encoding="utf-8").write(text)
 print(f"pin BC=Production year={year} → {dest}")
+PY
+}
+
+# Inverso quirúrgico de pin_bc_production: solo el artefacto
+# ('Production' && String('Production').trim()) → $env.BC_ENVIRONMENT.
+# No toca el fallback || 'Production' ni captions.
+unpin_bc_environment() {
+  local src="$1" dest="$2"
+  python3 - "$src" "$dest" <<'PY'
+import json, sys
+src, dest = sys.argv[1:3]
+text = open(src, encoding="utf-8").read()
+pinned = "('Production' && String('Production').trim())"
+canon = "($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim())"
+n = text.count(pinned)
+if n == 0:
+    if "$env.BC_ENVIRONMENT" in text:
+        open(dest, "w", encoding="utf-8").write(text)
+        print(f"unpin: ya usaba $env → {dest}")
+        raise SystemExit(0)
+    raise SystemExit("unpin: no hay pin Production ni $env.BC_ENVIRONMENT")
+text = text.replace(pinned, canon)
+if "('Production' && String('Production').trim())" in text:
+    raise SystemExit("unpin: quedó pin residual")
+if "$env.BC_ENVIRONMENT" not in text:
+    raise SystemExit("unpin: no se restauró $env.BC_ENVIRONMENT")
+open(dest, "w", encoding="utf-8").write(text)
+print(f"unpin {n} env pin(s) → {dest}")
+PY
+}
+
+# Testing permanente: 021/004 leen $env (Pruebas_PS). El pin a Production
+# es solo el canary post-clon; al terminar se restaura. Cron solo en prod.
+disable_021_schedule() {
+  local src="$1" dest="$2"
+  python3 - "$src" "$dest" <<'PY'
+import json, sys
+src, dest = sys.argv[1:3]
+wf = json.load(open(src, encoding="utf-8"))
+root = wf[0] if isinstance(wf, list) else wf
+n = 0
+for node in root.get("nodes", []):
+    if node.get("type") == "n8n-nodes-base.scheduleTrigger":
+        node["disabled"] = True
+        n += 1
+if n == 0:
+    raise SystemExit("021: no hay scheduleTrigger que desactivar")
+json.dump(wf, open(dest, "w", encoding="utf-8"), ensure_ascii=False)
+print(f"021 testing: disabled {n} schedule trigger(s) → {dest}")
 PY
 }
 
@@ -598,6 +649,18 @@ WHERE k.k_p IS NULL OR k.k_r IS NULL OR h.bc_r IS NULL
   echo "✅ Gate cifras: bi_mv == v_se y v_se R == 021 tipo_r BC (tol ${FIGURES_TOL} €)"
 }
 
+restore_testing_workflows_to_env() {
+  echo "♻️  Restaurando 021/004 testing a \$env (Pruebas_PS). Pin solo era el canary."
+  if scope_has_004 && [[ -f "$TMPDIR_GATE/004.testing.json" ]]; then
+    unpin_bc_environment "$TMPDIR_GATE/004.testing.json" "$TMPDIR_GATE/004.env.json"
+    apply_n8n_postgres "$N8N_TESTING_HOST" "$N8N_TESTING_APP" "$N8N_TESTING_PG" \
+      "$WF_004_TESTING" "$TMPDIR_GATE/004.env.json"
+  fi
+  unpin_bc_environment "$TMPDIR_GATE/021.testing.json" "$TMPDIR_GATE/021.env.json"
+  ensure_021_testing "$TMPDIR_GATE/021.env.json"
+  restart_n8n_testing
+}
+
 restart_n8n_testing() {
   echo "🔄 Restart n8n testing (registrar webhooks 004/021) ..."
   ssh_testing "docker restart $N8N_TESTING_APP"
@@ -661,7 +724,8 @@ if scope_has_sql; then
   compare_figure_files "$TMPDIR_GATE/figures.before.tsv" "$TMPDIR_GATE/figures.after.tsv"
 fi
 
-pin_bc_production "$WF_021" "$TMPDIR_GATE/021.testing.json"
+pin_bc_production "$WF_021" "$TMPDIR_GATE/021.pinned.json"
+disable_021_schedule "$TMPDIR_GATE/021.pinned.json" "$TMPDIR_GATE/021.testing.json"
 if scope_has_004; then
   pin_bc_production "$WF_004" "$TMPDIR_GATE/004.testing.json"
   apply_n8n_postgres "$N8N_TESTING_HOST" "$N8N_TESTING_APP" "$N8N_TESTING_PG" \
@@ -684,9 +748,12 @@ fire_021
 wait_021_money "$GATE_021_START"
 check_published_vs_021 "$GATE_021_START"
 
+restore_testing_workflows_to_env
+
 if [[ "$APPLY_PROD" -eq 0 ]]; then
   echo ""
   echo "✅ Gate testing OK. --no-prod: no se tocó prod."
+  echo "   Testing: 004/021 de vuelta a \$env (Pruebas_PS); 021 sin cron."
   echo "   Para publicar: $0 --yes --skip-copy --apply-prod"
   exit 0
 fi
@@ -708,7 +775,7 @@ fi
 
 echo ""
 echo "✅ Gate completo (scope=${SCOPE})."
-scope_has_004 && echo "   Testing: 004+021, canary ${YEAR} ok, 021 dinero ok"
+scope_has_004 && echo "   Testing: canary ${YEAR} ok, 021 dinero ok; 004/021 restaurados a \$env; 021 sin cron"
 scope_has_sql && echo "   Testing: SQL aplicado, cifras vs clon + MV/R ok"
 scope_has_004 && [[ "$APPLY_PROD" -eq 1 ]] && echo "   Prod: JSON 004 aplicado. NO se lanzó 004."
 scope_has_sql && [[ "$APPLY_PROD" -eq 1 ]] && echo "   Prod: v_se_* + bi_* aplicados."

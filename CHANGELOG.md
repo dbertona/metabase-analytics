@@ -44,6 +44,14 @@
   Aplicar: `CREATE OR REPLACE` vista + `REFRESH` `bi_mv_facturacion` /
   `bi_mv_facturacion_probabilidad`.
 
+## [2026-08-17] — 021/004 testing: $env + sin cron
+
+### Changed
+- **021/004 en n8n testing:** el stack permanente usa `$env.BC_ENVIRONMENT`
+  (Pruebas_PS). El gate pinnea Production solo durante el canary post-clon
+  y restaura `$env` al terminar. El 021 de testing no tiene cron (solo
+  webhook). El cron L–V corre solo en n8n prod.
+
 ## [2026-08-14] — ExpedienteMes: forceMonths + 021 orphan grain
 
 ### Fixed
