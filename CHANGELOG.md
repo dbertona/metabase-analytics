@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+- **021 en n8n testing:** el gate desactiva el `scheduleTrigger` al publicar
+  el 021 pinneado a Production. El cron L–V solo corre en n8n prod. Testing
+  queda con webhook (gate / manual) para no comparar BC prod vivo contra el
+  clon parado.
+
 ### Fixed
 
 - **004 PlanificacionMes — meses huérfanos:** `Discover Partitions` une

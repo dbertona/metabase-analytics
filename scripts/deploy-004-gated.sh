@@ -6,8 +6,8 @@
 # 3) Snapshot cifras publicadas (v_se / 1-02)
 # 4) Si SQL: aplica v_se_* + bi_* solo en testing; compara vs snapshot
 # 5) Si 004: JSON repo a n8n testing (004+021), pin BC=Production,
-#    reset watermarks + canary 004 (psi + pslab)
-# 6) 021 en testing: tipo_p_planif_sum / tipo_r_sum / tipo_p_expediente_sum
+#    021 testing SIN cron (solo webhook), reset watermarks + canary 004
+# 6) 021 en testing (bajo demanda): tipo_p_planif_sum / tipo_r_sum / tipo_p_expediente_sum
 # 7) Cifras publicadas: bi_mv == v_se; v_se R == 021 tipo_r BC
 # 8) Si cierran → mismo JSON a n8n prod y/o mismo SQL a Analytics prod
 #
@@ -141,6 +141,28 @@ text = text.replace(
 )
 open(dest, "w", encoding="utf-8").write(text)
 print(f"pin BC=Production year={year} → {dest}")
+PY
+}
+
+# Testing: el 021 pinneado a Production solo vale como canary post-clon.
+# El cron L–V compararía BC prod (vivo) contra el clon (parado) → falsos fails.
+# Se deja el webhook para el gate / disparo manual.
+disable_021_schedule() {
+  local src="$1" dest="$2"
+  python3 - "$src" "$dest" <<'PY'
+import json, sys
+src, dest = sys.argv[1:3]
+wf = json.load(open(src, encoding="utf-8"))
+root = wf[0] if isinstance(wf, list) else wf
+n = 0
+for node in root.get("nodes", []):
+    if node.get("type") == "n8n-nodes-base.scheduleTrigger":
+        node["disabled"] = True
+        n += 1
+if n == 0:
+    raise SystemExit("021: no hay scheduleTrigger que desactivar")
+json.dump(wf, open(dest, "w", encoding="utf-8"), ensure_ascii=False)
+print(f"021 testing: disabled {n} schedule trigger(s) → {dest}")
 PY
 }
 
@@ -661,7 +683,8 @@ if scope_has_sql; then
   compare_figure_files "$TMPDIR_GATE/figures.before.tsv" "$TMPDIR_GATE/figures.after.tsv"
 fi
 
-pin_bc_production "$WF_021" "$TMPDIR_GATE/021.testing.json"
+pin_bc_production "$WF_021" "$TMPDIR_GATE/021.pinned.json"
+disable_021_schedule "$TMPDIR_GATE/021.pinned.json" "$TMPDIR_GATE/021.testing.json"
 if scope_has_004; then
   pin_bc_production "$WF_004" "$TMPDIR_GATE/004.testing.json"
   apply_n8n_postgres "$N8N_TESTING_HOST" "$N8N_TESTING_APP" "$N8N_TESTING_PG" \
@@ -708,7 +731,7 @@ fi
 
 echo ""
 echo "✅ Gate completo (scope=${SCOPE})."
-scope_has_004 && echo "   Testing: 004+021, canary ${YEAR} ok, 021 dinero ok"
+scope_has_004 && echo "   Testing: 004+021 (021 sin cron, solo webhook), canary ${YEAR} ok, 021 dinero ok"
 scope_has_sql && echo "   Testing: SQL aplicado, cifras vs clon + MV/R ok"
 scope_has_004 && [[ "$APPLY_PROD" -eq 1 ]] && echo "   Prod: JSON 004 aplicado. NO se lanzó 004."
 scope_has_sql && [[ "$APPLY_PROD" -eq 1 ]] && echo "   Prod: v_se_* + bi_* aplicados."
