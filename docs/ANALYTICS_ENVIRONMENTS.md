@@ -71,7 +71,7 @@ Canal BC → Analytics: solo 004 (salvo bypass explícito).
 
 **Publicar 004 o vistas/MVs a prod:** `./scripts/deploy-004-gated.sh` (copia prod→testing, valida 021 + cifras publicadas, luego JSON y/o SQL a prod). `--sql-only` / `--004-only` si el cambio es de un solo lado. `apply-bi-views.sh` no escribe fórmulas en prod sin el gate.
 
-**021:** cron L–V solo en n8n **prod** (BC Production vs Analytics prod). En n8n testing el Schedule está desactivado; el webhook sirve al gate / disparo manual (canary post-clon). No tiene sentido un 021 automático BC prod vs clon testing.
+**021 / 004 permanentes en testing:** leen `$env.BC_ENVIRONMENT` (Pruebas_PS) y el Analytics de `:5435`. El 021 de testing **no tiene cron** (solo webhook). El gate pinnea Production **solo durante el canary** post-clon y **restaura `$env` al terminar**. Cron L–V solo en n8n **prod** (BC Production vs Analytics prod).
 
 ---
 

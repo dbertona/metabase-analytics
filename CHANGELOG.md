@@ -3,10 +3,10 @@
 ## [Unreleased]
 
 ### Changed
-- **021 en n8n testing:** el gate desactiva el `scheduleTrigger` al publicar
-  el 021 pinneado a Production. El cron L–V solo corre en n8n prod. Testing
-  queda con webhook (gate / manual) para no comparar BC prod vivo contra el
-  clon parado.
+- **021/004 en n8n testing:** el stack permanente usa `$env.BC_ENVIRONMENT`
+  (Pruebas_PS). El gate pinnea Production solo durante el canary post-clon
+  y restaura `$env` al terminar. El 021 de testing no tiene cron (solo
+  webhook). El cron L–V corre solo en n8n prod.
 
 ### Fixed
 
