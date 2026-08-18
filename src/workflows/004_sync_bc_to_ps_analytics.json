@@ -681,7 +681,7 @@
           3456
         ],
         "parameters": {
-          "jsCode": "const batch = $('Resolve Company').first()?.json?.batch || { syncAll: true, enabledEntities: [] };\nconst syncAll = batch.syncAll !== false && (!Array.isArray(batch.enabledEntities) || batch.enabledEntities.length === 0);\nconst enabledEntities = syncAll ? [] : (batch.enabledEntities || []);\nconst AGG = new Set(['job_planning_line','job_ledger_entry_month','expediente_mes','historico_planificacion_mes']);\nconst enabled = enabledEntities || [];\nconst needsJobFallback = !syncAll && enabled.includes('job') && enabled.some(k => AGG.has(k));\nconst rows = $input.all().flatMap(i => Array.isArray(i.json) ? i.json : [i.json]);\nconst entities = [\n  'resource','ps_year','job','job_team','job_task',\n  'centers_of_responsibility','user_configuration',\n  'technologies','typologies','departments',\n  'job_ledger_entry_month','job_ledger_cert_open','job_planning_line',\n  'expediente_mes','meses_cerrados','objectives_by_department',\n  'historico_planificacion_mes','dias_imputacion'\n];\nconst alias = {\n  bc_resource: 'resource',\n  bc_ps_year: 'ps_year',\n  bc_job: 'job',\n  bc_job_team: 'job_team',\n  bc_job_task: 'job_task',\n  bc_responsibility_center: 'centers_of_responsibility',\n  bc_user_configuration: 'user_configuration',\n  bc_technology: 'technologies',\n  bc_typology: 'typologies',\n  bc_department: 'departments',\n  bc_job_ledger_entry_month: 'job_ledger_entry_month',\n  bc_job_ledger_cert_open: 'job_ledger_cert_open',\n  bc_job_planning_line: 'job_planning_line',\n  bc_expediente_mes: 'expediente_mes',\n  bc_meses_cerrados: 'meses_cerrados',\n  bc_objectives_by_department: 'objectives_by_department',\n  bc_historico_planificacion_mes: 'historico_planificacion_mes',\n  bc_dias_imputacion: 'dias_imputacion',\n  resource: 'resource', ps_year: 'ps_year', job: 'job', job_team: 'job_team', job_task: 'job_task',\n  centers_of_responsibility: 'centers_of_responsibility', user_configuration: 'user_configuration',\n  technologies: 'technologies', typologies: 'typologies', departments: 'departments',\n  job_ledger_entry: 'job_ledger_entry_month', job_ledger_entry_month: 'job_ledger_entry_month',\n  job_ledger_cert_open: 'job_ledger_cert_open',\n  job_planning_line: 'job_planning_line'\n};\nconst byEntity = {};\nfor (const r of rows) {\n  const rawEntity = String(r.entity || '').trim();\n  const key = alias[rawEntity] || rawEntity.replace(/^bc_/, '');\n  const raw = String(r.last_sync_at || '').trim();\n  if (!key || !raw) continue;\n  const iso = new Date(raw.replace(' ', 'T')).toISOString();\n  if (!byEntity[key] || iso > byEntity[key]) byEntity[key] = iso;\n}\nconst defaultDate = '1900-01-01T00:00:00.000Z';\nfor (const entity of entities) if (!byEntity[entity]) byEntity[entity] = defaultDate;\n\nconst companyName = $('Resolve Company').first().json.companyName;\nconst companyId = $('Resolve Company').first().json.companyId;\n\nconst now = new Date();\nconst currentYear = now.getUTCFullYear();\nconst partition = batch.partition && typeof batch.partition === 'object' ? batch.partition : {};\nconst parsedSinceYear = Number(batch.sinceYear ?? partition.sinceYear);\nconst sinceYear = Number.isFinite(parsedSinceYear) && parsedSinceYear >= 2000\n  ? Math.floor(parsedSinceYear)\n  : currentYear - 2;\nconst parsedUntilYear = Number(batch.untilYear ?? partition.untilYear);\nconst untilYearRaw = Number.isFinite(parsedUntilYear) && parsedUntilYear >= 2000\n  ? Math.floor(parsedUntilYear)\n  : currentYear;\nconst untilYear = Math.max(untilYearRaw, sinceYear);\nconst parsedWindowDays = Number(batch.windowDays ?? partition.windowDays);\nconst windowDays = Number.isFinite(parsedWindowDays) && parsedWindowDays >= 1\n  ? Math.floor(parsedWindowDays)\n  : 21;\nconst parsedMaxWindows = Number(batch.maxWindows ?? partition.maxWindows);\nconst maxWindows = Number.isFinite(parsedMaxWindows) && parsedMaxWindows >= 1\n  ? Math.floor(parsedMaxWindows)\n  : 120;\n\nconst rawForce = Array.isArray(partition.forceMonths)\n  ? partition.forceMonths\n  : (Array.isArray(batch.forceMonths) ? batch.forceMonths : []);\nconst forceMonths = [];\nconst forceSeen = new Set();\nfor (const m of rawForce) {\n  const fy = Number(m?.year) || 0;\n  const fm = Number(m?.month) || 0;\n  if (fy < 2000 || fm < 1 || fm > 12) continue;\n  const fk = fy + '|' + fm;\n  if (forceSeen.has(fk)) continue;\n  forceSeen.add(fk);\n  forceMonths.push({ year: fy, month: fm });\n}\n\nreturn [{ json: {\n  syncStateByEntity: byEntity,\n  company: companyName,\n  companyId,\n  syncAll,\n  enabledEntities,\n  batchReason: batch.reason || null,\n  batchQueuedAt: batch.queued_at || null,\n  needsJobFallback,\n  modifiedJobNos: [],\n  partition: {\n    sinceYear,\n    untilYear,\n    windowDays,\n    maxWindows,\n    forceMonths,\n  },\n} }];\n"
+          "jsCode": "const batch = $('Resolve Company').first()?.json?.batch || { syncAll: true, enabledEntities: [] };\nconst syncAll = batch.syncAll !== false && (!Array.isArray(batch.enabledEntities) || batch.enabledEntities.length === 0);\nconst enabledEntities = syncAll ? [] : (batch.enabledEntities || []);\nconst AGG = new Set(['job_planning_line','job_ledger_entry_month','expediente_mes','historico_planificacion_mes']);\nconst enabled = enabledEntities || [];\nconst needsJobFallback = !syncAll && enabled.includes('job') && enabled.some(k => AGG.has(k));\nconst rows = $input.all().flatMap(i => Array.isArray(i.json) ? i.json : [i.json]);\nconst entities = [\n  'resource','ps_year','job','job_team','job_task',\n  'centers_of_responsibility','user_configuration',\n  'technologies','typologies','departments',\n  'job_ledger_entry_month','job_ledger_cert_open','job_planning_line',\n  'expediente_mes','meses_cerrados','objectives_by_department',\n  'historico_planificacion_mes','dias_imputacion','job_ledger_entry_line'\n];\nconst alias = {\n  bc_resource: 'resource',\n  bc_ps_year: 'ps_year',\n  bc_job: 'job',\n  bc_job_team: 'job_team',\n  bc_job_task: 'job_task',\n  bc_responsibility_center: 'centers_of_responsibility',\n  bc_user_configuration: 'user_configuration',\n  bc_technology: 'technologies',\n  bc_typology: 'typologies',\n  bc_department: 'departments',\n  bc_job_ledger_entry_month: 'job_ledger_entry_month',\n  bc_job_ledger_cert_open: 'job_ledger_cert_open',\n  bc_job_planning_line: 'job_planning_line',\n  bc_expediente_mes: 'expediente_mes',\n  bc_meses_cerrados: 'meses_cerrados',\n  bc_objectives_by_department: 'objectives_by_department',\n  bc_historico_planificacion_mes: 'historico_planificacion_mes',\n  bc_dias_imputacion: 'dias_imputacion',\n  bc_job_ledger_entry_line: 'job_ledger_entry_line',\n  resource: 'resource', ps_year: 'ps_year', job: 'job', job_team: 'job_team', job_task: 'job_task',\n  centers_of_responsibility: 'centers_of_responsibility', user_configuration: 'user_configuration',\n  technologies: 'technologies', typologies: 'typologies', departments: 'departments',\n  job_ledger_entry: 'job_ledger_entry_month', job_ledger_entry_month: 'job_ledger_entry_month',\n  job_ledger_cert_open: 'job_ledger_cert_open',\n  job_ledger_entry_line: 'job_ledger_entry_line',\n  mayor_analitico: 'job_ledger_entry_line',\n  job_planning_line: 'job_planning_line'\n};\nconst byEntity = {};\nfor (const r of rows) {\n  const rawEntity = String(r.entity || '').trim();\n  const key = alias[rawEntity] || rawEntity.replace(/^bc_/, '');\n  const raw = String(r.last_sync_at || '').trim();\n  if (!key || !raw) continue;\n  const iso = new Date(raw.replace(' ', 'T')).toISOString();\n  if (!byEntity[key] || iso > byEntity[key]) byEntity[key] = iso;\n}\nconst defaultDate = '1900-01-01T00:00:00.000Z';\nfor (const entity of entities) if (!byEntity[entity]) byEntity[entity] = defaultDate;\n\nconst companyName = $('Resolve Company').first().json.companyName;\nconst companyId = $('Resolve Company').first().json.companyId;\n\nconst now = new Date();\nconst currentYear = now.getUTCFullYear();\nconst partition = batch.partition && typeof batch.partition === 'object' ? batch.partition : {};\nconst parsedSinceYear = Number(batch.sinceYear ?? partition.sinceYear);\nconst sinceYear = Number.isFinite(parsedSinceYear) && parsedSinceYear >= 2000\n  ? Math.floor(parsedSinceYear)\n  : currentYear - 2;\nconst parsedUntilYear = Number(batch.untilYear ?? partition.untilYear);\nconst untilYearRaw = Number.isFinite(parsedUntilYear) && parsedUntilYear >= 2000\n  ? Math.floor(parsedUntilYear)\n  : currentYear;\nconst untilYear = Math.max(untilYearRaw, sinceYear);\nconst parsedWindowDays = Number(batch.windowDays ?? partition.windowDays);\nconst windowDays = Number.isFinite(parsedWindowDays) && parsedWindowDays >= 1\n  ? Math.floor(parsedWindowDays)\n  : 21;\nconst parsedMaxWindows = Number(batch.maxWindows ?? partition.maxWindows);\nconst maxWindows = Number.isFinite(parsedMaxWindows) && parsedMaxWindows >= 1\n  ? Math.floor(parsedMaxWindows)\n  : 120;\n\nconst rawForce = Array.isArray(partition.forceMonths)\n  ? partition.forceMonths\n  : (Array.isArray(batch.forceMonths) ? batch.forceMonths : []);\nconst forceMonths = [];\nconst forceSeen = new Set();\nfor (const m of rawForce) {\n  const fy = Number(m?.year) || 0;\n  const fm = Number(m?.month) || 0;\n  if (fy < 2000 || fm < 1 || fm > 12) continue;\n  const fk = fy + '|' + fm;\n  if (forceSeen.has(fk)) continue;\n  forceSeen.add(fk);\n  forceMonths.push({ year: fy, month: fm });\n}\n\nreturn [{ json: {\n  syncStateByEntity: byEntity,\n  company: companyName,\n  companyId,\n  syncAll,\n  enabledEntities,\n  batchReason: batch.reason || null,\n  batchQueuedAt: batch.queued_at || null,\n  needsJobFallback,\n  modifiedJobNos: [],\n  partition: {\n    sinceYear,\n    untilYear,\n    windowDays,\n    maxWindows,\n    forceMonths,\n  },\n} }];\n"
         },
         "typeVersion": 2
       },
@@ -2663,7 +2663,7 @@
           3568
         ],
         "parameters": {
-          "jsCode": "const body = $json.body ?? $json;\nconst rawEntities = Array.isArray(body.entities) ? body.entities : [];\nconst bcToInternal = {\n  recursos: 'resource', proyectos: 'job', equipo_proyectos: 'job_team',\n  proyectos_tareas: 'job_task', tareas: 'job_task',\n  centros_responsabilidad: 'centers_of_responsibility',\n  centros_de_responsabilidad: 'centers_of_responsibility',\n  configuracion_usuarios: 'user_configuration',\n  tecnologias: 'technologies', tipologias: 'typologies', departamentos: 'departments',\n  movimientos_proyectos: 'job_ledger_entry_month', planificacion_mes: 'job_planning_line',\n  historico_planificacion_mes: 'historico_planificacion_mes', expediente_mes: 'expediente_mes',\n  meses_cerrados: 'meses_cerrados', ps_year: 'ps_year', ps_years: 'ps_year',\n  objetivos_departamento: 'objectives_by_department', objetivos: 'objectives_by_department',\n  dias_imputacion: 'dias_imputacion',\n};\nconst enabled = [];\nfor (const raw of rawEntities) {\n  const k = String(raw || '').trim().toLowerCase();\n  const mapped = bcToInternal[k];\n  if (mapped && !enabled.includes(mapped)) enabled.push(mapped);\n}\nconst syncAll = enabled.length === 0;\nconst partition = body.partition && typeof body.partition === 'object' ? body.partition : {};\nreturn [{\n  json: {\n    ...$json,\n    batch: {\n      syncAll,\n      enabledEntities: syncAll ? [] : enabled,\n      bcEntities: rawEntities,\n      reason: body.reason || null,\n      queued_at: body.queued_at || null,\n      companyFromBody: body.company || null,\n      partition,\n      sinceYear: body.sinceYear ?? partition.sinceYear ?? null,\n      untilYear: body.untilYear ?? partition.untilYear ?? null,\n      windowDays: body.windowDays ?? partition.windowDays ?? null,\n      maxWindows: body.maxWindows ?? partition.maxWindows ?? null,\n    },\n  },\n}];\n"
+          "jsCode": "const body = $json.body ?? $json;\nconst rawEntities = Array.isArray(body.entities) ? body.entities : [];\nconst bcToInternal = {\n  recursos: 'resource', proyectos: 'job', equipo_proyectos: 'job_team',\n  proyectos_tareas: 'job_task', tareas: 'job_task',\n  centros_responsabilidad: 'centers_of_responsibility',\n  centros_de_responsabilidad: 'centers_of_responsibility',\n  configuracion_usuarios: 'user_configuration',\n  tecnologias: 'technologies', tipologias: 'typologies', departamentos: 'departments',\n  movimientos_proyectos: 'job_ledger_entry_month', planificacion_mes: 'job_planning_line',\n  historico_planificacion_mes: 'historico_planificacion_mes', expediente_mes: 'expediente_mes',\n  meses_cerrados: 'meses_cerrados', ps_year: 'ps_year', ps_years: 'ps_year',\n  objetivos_departamento: 'objectives_by_department', objetivos: 'objectives_by_department',\n  dias_imputacion: 'dias_imputacion',\n  mayor_analitico: 'job_ledger_entry_line',\n  movimientos_proyectos_line: 'job_ledger_entry_line',\n  job_ledger_entry_line: 'job_ledger_entry_line',\n};\nconst enabled = [];\nfor (const raw of rawEntities) {\n  const k = String(raw || '').trim().toLowerCase();\n  const mapped = bcToInternal[k];\n  if (mapped && !enabled.includes(mapped)) enabled.push(mapped);\n}\nconst syncAll = enabled.length === 0;\nconst partition = body.partition && typeof body.partition === 'object' ? body.partition : {};\nreturn [{\n  json: {\n    ...$json,\n    batch: {\n      syncAll,\n      enabledEntities: syncAll ? [] : enabled,\n      bcEntities: rawEntities,\n      reason: body.reason || null,\n      queued_at: body.queued_at || null,\n      companyFromBody: body.company || null,\n      partition,\n      sinceYear: body.sinceYear ?? partition.sinceYear ?? null,\n      untilYear: body.untilYear ?? partition.untilYear ?? null,\n      windowDays: body.windowDays ?? partition.windowDays ?? null,\n      maxWindows: body.maxWindows ?? partition.maxWindows ?? null,\n    },\n  },\n}];\n"
         },
         "typeVersion": 2
       },
@@ -4296,6 +4296,241 @@
         "parameters": {
           "jsCode": "const items = $input.all();\nlet failed = 0;\nlet firstErr = '';\nlet affected = 0;\nfor (const it of items) {\n  const j = it?.json || {};\n  if (j.skipped) {\n    return [{ json: { key: 'job_ledger_cert_open', status: 'ok', synced: 0, success: 0, skipped: true } }];\n  }\n  const statusCode = Number(j?.statusCode ?? j?.response?.statusCode ?? 0);\n  const bodyErr = j?.body?.error?.message || (typeof j?.body === 'string' ? j.body : null);\n  const msg = j?.error?.message || j?.message || j?.data?.error || bodyErr || null;\n  if (!firstErr && msg) firstErr = String(msg);\n  if (msg || statusCode >= 400) failed++;\n  const n = Number(j?.affected ?? 0);\n  if (Number.isFinite(n)) affected += n;\n}\nconst success = items.length - failed;\nconst synced = affected || success;\nconst res = { key: 'job_ledger_cert_open', causeNode: 'Upsert Cert Open Ingresos' };\nif (failed > 0) {\n  res.status = 'error';\n  res.synced = synced;\n  res.failed = failed;\n  res.message = firstErr || ('HTTP ' + (items[0]?.json?.statusCode || 'error'));\n} else {\n  res.status = 'ok';\n  res.synced = synced;\n  res.success = success;\n  res.affected = affected;\n}\nreturn [{ json: res }];\n"
         }
+      },
+      {
+        "id": "a11e0001-7c4a-4f01-9b11-ledgerline0001",
+        "name": "IF sync job_ledger_entry_line",
+        "type": "n8n-nodes-base.if",
+        "position": [
+          2464,
+          10080
+        ],
+        "parameters": {
+          "options": {},
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "strict"
+            },
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "b22e0002-7c4a-4f01-9b11-ledgerline0002",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                },
+                "leftValue": "={{ ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json).syncAll || (($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json).enabledEntities || []).includes('job_ledger_entry_line') }}",
+                "rightValue": ""
+              }
+            ]
+          }
+        },
+        "typeVersion": 2.2
+      },
+      {
+        "id": "c33e0003-7c4a-4f01-9b11-ledgerline0003",
+        "name": "Ensure sync_state (Ledger Line)",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          2688,
+          10160
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "WITH up AS (\n  INSERT INTO public.sync_state (company_name, entity, last_sync_at)\n  VALUES ($1, 'bc_job_ledger_entry_line', '1900-01-01'::timestamptz)\n  ON CONFLICT (company_name, entity) DO NOTHING\n  RETURNING company_name\n)\nSELECT COALESCE((SELECT company_name FROM up LIMIT 1), $1::text) AS company_name;",
+          "options": {
+            "queryReplacement": "={{ $('Build sync_state map').first().json.company }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "TTHI6C7o3V8eVzzr",
+            "name": "Postgres PS_Analytics"
+          }
+        },
+        "typeVersion": 2.4
+      },
+      {
+        "id": "d44e0004-7c4a-4f01-9b11-ledgerline0004",
+        "name": "Prepare Ledger Line",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          2912,
+          10160
+        ],
+        "parameters": {
+          "jsCode": "const map = ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json) || {};\nconst syncAll = map.syncAll !== false && (!Array.isArray(map.enabledEntities) || map.enabledEntities.length === 0);\nconst enabled = map.enabledEntities || [];\nif (!syncAll && !enabled.includes('job_ledger_entry_line')) {\n  return [{ json: { skipped: true, key: 'job_ledger_entry_line' } }];\n}\nconst companyId = map.companyId;\nconst env = (($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })());\nconst base = 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/'\n  + env + '/api/Power_Solution/PS_API/v2.0/companies(' + companyId + ')/movimientosProyectos';\nconst select = [\n  'entryNo','entryType','documentNo','jobNo','jobTaskNo','no','description',\n  'quantity','originalUnitCost','totalCost','unitPrice','totalPrice',\n  'globalDimension2Code','globalDimension1Code','timeSheetDate','documentDate',\n  'origen','linePrice','globalDimension5Code','globalDimension4Code',\n  'month','year','ca','descripcion','lastModifiedDateTime'\n].join(',');\nconst sinceYear = Number(map.partition?.sinceYear) || (new Date().getUTCFullYear() - 2);\nconst untilYear = Number(map.partition?.untilYear) || new Date().getUTCFullYear();\nconst years = [];\nfor (let y = sinceYear; y <= untilYear; y++) years.push(y);\nconst out = [];\nfor (const y of years) {\n  const filt = \"year eq '\" + y + \"'\";\n  out.push({\n    json: {\n      url: base + '?$filter=' + encodeURIComponent(filt) + '&$select=' + select,\n      entityKey: 'job_ledger_entry_line',\n      year: y,\n      years,\n    },\n  });\n}\nreturn out;\n"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "e55e0005-7c4a-4f01-9b11-ledgerline0005",
+        "name": "IF Ledger Line has request",
+        "type": "n8n-nodes-base.if",
+        "position": [
+          3136,
+          10160
+        ],
+        "parameters": {
+          "options": {},
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "strict"
+            },
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "f66e0006-7c4a-4f01-9b11-ledgerline0006",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                },
+                "leftValue": "={{ !$json.skipped && !!$json.url }}",
+                "rightValue": ""
+              }
+            ]
+          }
+        },
+        "typeVersion": 2.2
+      },
+      {
+        "id": "a77e0007-7c4a-4f01-9b11-ledgerline0007",
+        "name": "BC API - Ledger Line",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          3360,
+          10080
+        ],
+        "parameters": {
+          "url": "={{ $json.url }}",
+          "options": {
+            "pagination": {
+              "pagination": {
+                "nextURL": "={{ $response.body['@odata.nextLink'] }}",
+                "paginationMode": "responseContainsNextURL",
+                "completeExpression": "={{ !$response.body['@odata.nextLink'] }}",
+                "paginationCompleteWhen": "other"
+              }
+            }
+          },
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api"
+        },
+        "credentials": {
+          "oAuth2Api": {
+            "id": "5caHilW1m87Snw87",
+            "name": "Business Central"
+          }
+        },
+        "typeVersion": 4.2,
+        "continueOnFail": true
+      },
+      {
+        "id": "b88e0008-7c4a-4f01-9b11-ledgerline0008",
+        "name": "Transform Ledger Line",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          3584,
+          10080
+        ],
+        "parameters": {
+          "jsCode": "const toIso = (v) => {\n  if (v === null || v === undefined) return '';\n  const s = String(v).trim();\n  if (!s || s.startsWith('0001-01-01')) return '';\n  const d = new Date(s.includes('T') ? s : s.replace(' ', 'T'));\n  return Number.isNaN(d.getTime()) ? '' : d.toISOString();\n};\nconst pick = (r, ...keys) => {\n  for (const k of keys) {\n    if (r[k] !== undefined && r[k] !== null && String(r[k]).trim() !== '') return r[k];\n  }\n  return '';\n};\nconst cleanDate = (v) => {\n  const s = String(v ?? '').trim();\n  if (!s || s === '0001-01-01' || s.startsWith('0001-01-01')) return '';\n  return s.length >= 10 ? s.slice(0, 10) : s;\n};\nconst toNum = (v) => {\n  if (v === null || v === undefined || v === '') return 0;\n  const n = Number(v);\n  return Number.isFinite(n) ? n : 0;\n};\n\nconst input = $input.all();\nif (!input.length) {\n  return [{ json: { skipped: true, key: 'job_ledger_entry_line', companyName: '', rowsJson: '[]', batchSize: 0, yearsJson: '[]', overwriteYears: 'false' } }];\n}\nconst first = input[0]?.json || {};\nif (first.skipped) {\n  return [{ json: { skipped: true, key: 'job_ledger_entry_line', companyName: '', rowsJson: '[]', batchSize: 0, yearsJson: '[]', overwriteYears: 'false' } }];\n}\n\nconst companyName = $items('Build sync_state map')[0]?.json?.company || '';\nlet years = [];\ntry {\n  for (const it of $items('Prepare Ledger Line')) {\n    const y = Number(it?.json?.year);\n    if (Number.isFinite(y) && y >= 2000 && !years.includes(y)) years.push(y);\n  }\n} catch (e) {}\n\nlet __GLOBAL_MAX_TS__ = '';\nlet hadSuccess = false;\nconst m = new Map();\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  const statusCode = Number(raw?.statusCode ?? raw?.response?.statusCode ?? 0);\n  if (statusCode >= 400) continue;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value)\n    ? src.value\n    : (Array.isArray(src) ? src : (src && typeof src === 'object' && !src.body && src.entryNo == null && src.EntryNo == null ? [] : (src && typeof src === 'object' && !src.body ? [src] : [])));\n  if (!Array.isArray(chunk) || !chunk.length) continue;\n  hadSuccess = true;\n  for (const r of chunk) {\n    const entryNo = Number(pick(r, 'entryNo', 'EntryNo'));\n    if (!Number.isFinite(entryNo) || entryNo <= 0) continue;\n    const ts = toIso(r.lastModifiedDateTime ?? r.LastModifiedDateTime);\n    if (ts && (!__GLOBAL_MAX_TS__ || ts > __GLOBAL_MAX_TS__)) __GLOBAL_MAX_TS__ = ts;\n    const year = Number(pick(r, 'year', 'Year', 'YEAR')) || 0;\n    const month = Number(pick(r, 'month', 'Month')) || 0;\n    m.set(entryNo, {\n      entry_no: entryNo,\n      entry_type: String(pick(r, 'entryType', 'EntryType')),\n      document_no: String(pick(r, 'documentNo', 'DocumentNo')),\n      job_no: String(pick(r, 'jobNo', 'JobNo')),\n      job_task_no: String(pick(r, 'jobTaskNo', 'JobTaskNo')),\n      no: String(pick(r, 'no', 'No')),\n      description: String(pick(r, 'description', 'Description')),\n      quantity: toNum(r.quantity ?? r.Quantity),\n      original_unit_cost: toNum(r.originalUnitCost ?? r.OriginalUnitCost),\n      total_cost: toNum(r.totalCost ?? r.TotalCost),\n      unit_price: toNum(r.unitPrice ?? r.UnitPrice),\n      total_price: toNum(r.totalPrice ?? r.TotalPrice),\n      line_price: toNum(r.linePrice ?? r.LinePrice),\n      concepto_analitico_code: String(pick(r, 'ca', 'CA', 'globalDimension2Code', 'GlobalDimension2Code')),\n      concepto_analitico_descripcion: String(pick(r, 'descripcion', 'Descripcion')),\n      departamento: String(pick(r, 'globalDimension1Code', 'GlobalDimension1Code')),\n      tecnologia: String(pick(r, 'globalDimension4Code', 'GlobalDimension4Code')),\n      tipologia: String(pick(r, 'globalDimension5Code', 'GlobalDimension5Code')),\n      timesheet_date: cleanDate(pick(r, 'timeSheetDate', 'TimeSheetDate', 'TimeSheetDatePS')),\n      document_date: cleanDate(pick(r, 'documentDate', 'DocumentDate')),\n      origen: String(pick(r, 'origen', 'Origen')),\n      month,\n      year,\n      ng: String(pick(r, 'ng', 'Ng', 'NG')),\n      last_modified: ts,\n    });\n  }\n}\n\nconst rows = [...m.values()];\nconst yearsJson = JSON.stringify(years);\nconst chunkSize = 500;\nconst chunks = [];\nfor (let i = 0; i < rows.length; i += chunkSize) chunks.push(rows.slice(i, i + chunkSize));\nif (!chunks.length) chunks.push([]);\nconst out = [];\nfor (let i = 0; i < chunks.length; i++) {\n  out.push({\n    json: {\n      companyName,\n      rowsJson: JSON.stringify(chunks[i]),\n      batchSize: chunks[i].length,\n      years,\n      yearsJson,\n      overwriteYears: i === 0 && hadSuccess ? 'true' : 'false',\n      _maxRowTimestamp: __GLOBAL_MAX_TS__ || undefined,\n    },\n  });\n}\nreturn out;\n"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "c99e0009-7c4a-4f01-9b11-ledgerline0009",
+        "name": "Upsert Ledger Line",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          3808,
+          10080
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "WITH years AS (\n  SELECT DISTINCT y::int AS y\n  FROM jsonb_array_elements_text($3::jsonb) AS y\n),\ndeleted AS (\n  DELETE FROM public.bc_job_ledger_entry_line t\n  WHERE $4::boolean\n    AND t.company_name = $1\n    AND EXISTS (SELECT 1 FROM years y WHERE y.y = t.year)\n  RETURNING 1\n),\nsrc AS (\n  SELECT *\n  FROM jsonb_to_recordset($2::jsonb) AS r(\n    entry_no bigint,\n    entry_type text,\n    document_no text,\n    job_no text,\n    job_task_no text,\n    no text,\n    description text,\n    quantity numeric,\n    original_unit_cost numeric,\n    total_cost numeric,\n    unit_price numeric,\n    total_price numeric,\n    line_price numeric,\n    concepto_analitico_code text,\n    concepto_analitico_descripcion text,\n    departamento text,\n    tecnologia text,\n    tipologia text,\n    timesheet_date text,\n    document_date text,\n    origen text,\n    month integer,\n    year integer,\n    ng text,\n    last_modified text\n  )\n),\nupserted AS (\n  INSERT INTO public.bc_job_ledger_entry_line\n  (company_name, entry_no, entry_type, document_no, job_no, job_task_no, no, description,\n   quantity, original_unit_cost, total_cost, unit_price, total_price, line_price,\n   concepto_analitico_code, concepto_analitico_descripcion, departamento, tecnologia, tipologia,\n   timesheet_date, document_date, origen, month, year, ng, last_modified, updated_at)\n  SELECT\n    $1,\n    src.entry_no,\n    NULLIF(src.entry_type, ''),\n    NULLIF(src.document_no, ''),\n    NULLIF(src.job_no, ''),\n    NULLIF(src.job_task_no, ''),\n    NULLIF(src.no, ''),\n    NULLIF(src.description, ''),\n    src.quantity,\n    src.original_unit_cost,\n    src.total_cost,\n    src.unit_price,\n    src.total_price,\n    src.line_price,\n    NULLIF(src.concepto_analitico_code, ''),\n    NULLIF(src.concepto_analitico_descripcion, ''),\n    NULLIF(src.departamento, ''),\n    NULLIF(src.tecnologia, ''),\n    NULLIF(src.tipologia, ''),\n    NULLIF(NULLIF(src.timesheet_date, ''), '0001-01-01')::date,\n    NULLIF(NULLIF(src.document_date, ''), '0001-01-01')::date,\n    NULLIF(src.origen, ''),\n    src.month,\n    src.year,\n    NULLIF(src.ng, ''),\n    NULLIF(src.last_modified, '')::timestamptz,\n    NOW()\n  FROM src\n  WHERE src.entry_no IS NOT NULL\n  ON CONFLICT (company_name, entry_no) DO UPDATE SET\n    entry_type = EXCLUDED.entry_type,\n    document_no = EXCLUDED.document_no,\n    job_no = EXCLUDED.job_no,\n    job_task_no = EXCLUDED.job_task_no,\n    no = EXCLUDED.no,\n    description = EXCLUDED.description,\n    quantity = EXCLUDED.quantity,\n    original_unit_cost = EXCLUDED.original_unit_cost,\n    total_cost = EXCLUDED.total_cost,\n    unit_price = EXCLUDED.unit_price,\n    total_price = EXCLUDED.total_price,\n    line_price = EXCLUDED.line_price,\n    concepto_analitico_code = EXCLUDED.concepto_analitico_code,\n    concepto_analitico_descripcion = EXCLUDED.concepto_analitico_descripcion,\n    departamento = EXCLUDED.departamento,\n    tecnologia = EXCLUDED.tecnologia,\n    tipologia = EXCLUDED.tipologia,\n    timesheet_date = EXCLUDED.timesheet_date,\n    document_date = EXCLUDED.document_date,\n    origen = EXCLUDED.origen,\n    month = EXCLUDED.month,\n    year = EXCLUDED.year,\n    ng = EXCLUDED.ng,\n    last_modified = EXCLUDED.last_modified,\n    updated_at = NOW()\n  RETURNING 1\n)\nSELECT COUNT(*)::int AS affected FROM upserted;\n",
+          "options": {
+            "queryReplacement": "{{$json.companyName}}\n{{$json.rowsJson}}\n{{$json.yearsJson}}\n{{$json.overwriteYears}}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "TTHI6C7o3V8eVzzr",
+            "name": "Postgres PS_Analytics"
+          }
+        },
+        "typeVersion": 2.4,
+        "continueOnFail": true
+      },
+      {
+        "id": "d00e0010-7c4a-4f01-9b11-ledgerline0010",
+        "name": "Compute now ISO (Ledger Line)",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          4032,
+          10000
+        ],
+        "parameters": {
+          "jsCode": "const upsertItems = $items('Upsert Ledger Line');\nif (!upsertItems.length) { return []; }\nfor (const it of upsertItems) {\n  const j = it?.json || {};\n  if (j.error) { return []; }\n  if (j.skipped) { return []; }\n}\nconst map = $('Build sync_state map').first()?.json || {};\nconst companyName = map.company || '';\nconst prevSync = map.syncStateByEntity?.['job_ledger_entry_line'] || '1900-01-01T00:00:00.000Z';\nlet maxTs = '';\nconst transformItems = $items('Transform Ledger Line');\nfor (const it of transformItems) {\n  const t = it?.json?._maxRowTimestamp;\n  if (t && (!maxTs || t > maxTs)) maxTs = t;\n}\nif (!maxTs || maxTs <= prevSync) {\n  maxTs = prevSync;\n}\nreturn [{ json: { companyName, nowIso: maxTs } }];\n"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "e11e0011-7c4a-4f01-9b11-ledgerline0011",
+        "name": "Update sync_state (Ledger Line)",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          4256,
+          10000
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "UPDATE public.sync_state\nSET last_sync_at = $2::timestamptz\nWHERE company_name = $1 AND entity = 'bc_job_ledger_entry_line'\nRETURNING *;",
+          "options": {
+            "queryReplacement": "{{$json.companyName}}\n{{$json.nowIso}}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "TTHI6C7o3V8eVzzr",
+            "name": "Postgres PS_Analytics"
+          }
+        },
+        "typeVersion": 2.4
+      },
+      {
+        "id": "f22e0012-7c4a-4f01-9b11-ledgerline0012",
+        "name": "Skip Result Ledger Line",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          3360,
+          10240
+        ],
+        "parameters": {
+          "jsCode": "return [{ json: { status: 'skipped', key: 'job_ledger_entry_line', synced: 0, success: 0, skipped: true } }];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "a33e0013-7c4a-4f01-9b11-ledgerline0013",
+        "name": "Result Ledger Line",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          4032,
+          10160
+        ],
+        "parameters": {
+          "jsCode": "const items = $input.all();\nlet failed = 0;\nlet firstErr = '';\nlet affected = 0;\nfor (const it of items) {\n  const j = it?.json || {};\n  if (j.skipped) {\n    return [{ json: { key: 'job_ledger_entry_line', status: 'ok', synced: 0, success: 0, skipped: true } }];\n  }\n  const statusCode = Number(j?.statusCode ?? j?.response?.statusCode ?? 0);\n  const bodyErr = j?.body?.error?.message || (typeof j?.body === 'string' ? j.body : null);\n  const msg = j?.error?.message || j?.message || j?.data?.error || bodyErr || null;\n  if (!firstErr && msg) firstErr = String(msg);\n  if (msg || statusCode >= 400) failed++;\n  const n = Number(j?.affected ?? 0);\n  if (Number.isFinite(n)) affected += n;\n}\nconst success = items.length - failed;\nconst synced = affected || success;\nconst res = { key: 'job_ledger_entry_line', causeNode: 'Upsert Ledger Line' };\nif (failed > 0) {\n  res.status = 'error';\n  res.synced = synced;\n  res.failed = failed;\n  res.message = firstErr || ('HTTP ' + (items[0]?.json?.statusCode || 'error'));\n} else {\n  res.status = 'ok';\n  res.synced = synced;\n  res.success = success;\n  res.affected = affected;\n}\nreturn [{ json: res }];\n"
+        },
+        "typeVersion": 2
       }
     ],
     "connections": {
@@ -6405,6 +6640,11 @@
               "index": 0,
               "node": "IF sync dias_imputacion",
               "type": "main"
+            },
+            {
+              "index": 0,
+              "node": "IF sync job_ledger_entry_line",
+              "type": "main"
             }
           ]
         ]
@@ -6763,6 +7003,140 @@
               "node": "Merge",
               "type": "main",
               "index": 0
+            }
+          ]
+        ]
+      },
+      "IF sync job_ledger_entry_line": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Ensure sync_state (Ledger Line)",
+              "type": "main"
+            }
+          ],
+          [
+            {
+              "index": 0,
+              "node": "Skip Result Ledger Line",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Ensure sync_state (Ledger Line)": {
+        "main": [
+          [
+            {
+              "node": "Prepare Ledger Line",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prepare Ledger Line": {
+        "main": [
+          [
+            {
+              "node": "IF Ledger Line has request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IF Ledger Line has request": {
+        "main": [
+          [
+            {
+              "node": "BC API - Ledger Line",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Skip Result Ledger Line",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BC API - Ledger Line": {
+        "main": [
+          [
+            {
+              "node": "Transform Ledger Line",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Transform Ledger Line": {
+        "main": [
+          [
+            {
+              "node": "Upsert Ledger Line",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Upsert Ledger Line": {
+        "main": [
+          [
+            {
+              "node": "Compute now ISO (Ledger Line)",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Result Ledger Line",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Compute now ISO (Ledger Line)": {
+        "main": [
+          [
+            {
+              "node": "Update sync_state (Ledger Line)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Update sync_state (Ledger Line)": {
+        "main": [
+          []
+        ]
+      },
+      "Skip Result Ledger Line": {
+        "main": [
+          [
+            {
+              "node": "Result Ledger Line",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Result Ledger Line": {
+        "main": [
+          [
+            {
+              "node": "Merge",
+              "type": "main",
+              "index": 10
             }
           ]
         ]

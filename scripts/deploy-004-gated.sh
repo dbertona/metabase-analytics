@@ -322,6 +322,7 @@ WHERE company_name IN ($COMPANIES_SQL)
     'bc_job_planning_line',
     'bc_job_ledger_entry_month',
     'bc_job_ledger_cert_open',
+    'bc_job_ledger_entry_line',
     'bc_expediente_mes',
     'bc_meses_cerrados'
   );
@@ -332,6 +333,7 @@ WHERE company_name IN ($COMPANIES_SQL)
     'bc_job_planning_line',
     'bc_job_ledger_entry_month',
     'bc_job_ledger_cert_open',
+    'bc_job_ledger_entry_line',
     'bc_expediente_mes',
     'bc_meses_cerrados'
   )
@@ -351,7 +353,7 @@ fire_004_canary() {
   local slug="$1"
   local body
   body="$(python3 -c "import json; print(json.dumps({
-    'entities': ['planificacion_mes','movimientos_proyectos','expediente_mes','meses_cerrados'],
+    'entities': ['planificacion_mes','movimientos_proyectos','expediente_mes','meses_cerrados','mayor_analitico'],
     'sinceYear': int('$YEAR'),
     'untilYear': int('$YEAR'),
     'reason': 'gate-004-canary-testing'
