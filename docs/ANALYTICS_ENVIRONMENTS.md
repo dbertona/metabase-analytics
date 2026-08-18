@@ -62,7 +62,7 @@ SE en testing: `https://testingapp.powersolution.es/my-timesheet-app/` → Segui
 | Entorno | n8n | Workflow ID | Destino de escritura |
 | --- | --- | --- | --- |
 | Prod | VM 101 — `https://apps.powersolution.es/n8n/` | `d1f7647e114a486e` | VM 100 `:5433` |
-| DEV | VM 102 `:5678` | `d57165bf41a34b8eb215` | ver credencial `Postgres PS_Analytics` |
+| DEV | VM 102 `:5678` | `d57165bf41a34b8eb215` | `Postgres PS_Analytics` → Analytics DEV (`192.168.36.102:5435`) |
 | Testing | VM 103 `:5678` | `dlekAIp9f5FsdfJj` (activo) | credencial `Postgres PS_Analytics` → Analytics testing |
 
 El 004 de testing falló el 2026-08-10 en `Try Acquire Mutex 004`: `company_name` NULL al insertar en `sync_executions`. No se corrigió en este corte.

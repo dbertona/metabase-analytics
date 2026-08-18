@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- **004 / Mayor analítico:** entidad `job_ledger_entry_line` → tabla
+  `bc_job_ledger_entry_line` (query 50205 `movimientosProyectos`, 1 fila
+  por `entryNo`, signo BC, sin skip PP/PY). Webhook:
+  `mayor_analitico` / `movimientos_proyectos_line` / `job_ledger_entry_line`.
+  No reutiliza `movimientos_proyectos` (sigue yendo a month / SE).
+  SQL: `sql/tables/bc_job_ledger_entry_line.sql`.
+
 ### Fixed
 
 - **004 PlanificacionMes — meses huérfanos:** `Discover Partitions` une
