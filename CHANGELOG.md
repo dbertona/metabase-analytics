@@ -13,6 +13,11 @@
 
 ### Fixed
 
+- **004 Cert Open / tipo R:** el upsert ya no deja líneas Open de más
+  (doble conteo vs mes cerrado, p. ej. −980 € en 021). No inserta cert si
+  ya hay `Close` en el mismo job-mes-documento; borra Open de
+  `bc_meses_cerrados` o con gemela Close; al final del snapshot borra
+  Open que ya no vienen de BC.
 - **004 PlanificacionMes — meses huérfanos:** `Discover Partitions` une
   `partition.forceMonths` del batch BC y hace overwrite aunque el discovery
   por watermark esté vacío (borrado de línea / mes sin filas OData).
