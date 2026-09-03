@@ -25,6 +25,12 @@
   `PlanificacionMes`). Si falla el HTTP de BC, el check es `info` (no fail).
 
 ### Changed
+
+- **004 ciclo normal:** sin `entities[]` ya no tira maestros que upserta 017
+  (`resource`, `job`, `job_team`, `job_task`, `user_configuration`,
+  `centers_of_responsibility`, `departments`, `ps_year`, `technologies`,
+  `typologies`). Solo hechos. Resync: `fullResync` o `entities[]`.
+
 - **Enforcement del gate:** merge ya no aplica 004/SQL a prod. El script
   remoto de n8n rechaza el 004 hacia `n8n-prod` salvo `FIGURES_GATE_OK=1`.
   Regla `analytics-figures-gate.mdc`.
