@@ -13,6 +13,12 @@
 
 ### Fixed
 
+- **`v_se_lineas_movimientos` / gasto Iberia:** Fix 6 (Mano de Obra solo
+  Resource) tiraba el G/L de reclasificaciones (`AJ-INC526-2` / `PSI-ES-26-1000`
+  jun 2026) y dejaba el Resource Budget (+4.558 €). Ahora el G/L Mano de Obra
+  entra si hay Resource del mismo documento, job, mes e importe opuesto (neto 0).
+  El duplicado Lab (mismo signo) sigue excluido.
+
 - **004 Cert Open / tipo R:** el upsert ya no deja líneas Open de más
   (doble conteo vs mes cerrado, p. ej. −980 € en 021). No inserta cert si
   ya hay `Close` en el mismo job-mes-documento; borra Open de

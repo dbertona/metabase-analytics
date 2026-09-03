@@ -226,11 +226,31 @@ CREATE OR REPLACE VIEW public.v_se_lineas_movimientos AS
            FROM bc_job_ledger_entry_month m
              LEFT JOIN bc_job j ON j.company_name = m.company_name AND j.no::text = m.job_no::text
           WHERE m.job_no IS NOT NULL
-            -- Mano de Obra* solo type_line Resource (excluye G/L Account p.ej. nr 0000003)
+            -- Mano de Obra*: Resource siempre. G/L solo si es contra-asiento
+            -- del mismo documento (reclasificación AJ-INC*, signos opuestos).
+            -- Duplicado Lab (G/L y Resource mismo signo) sigue excluido.
             AND (
               COALESCE(m.concepto_analitico_descripcion, ''::character varying)::text
                 NOT LIKE 'Mano de Obra%'
               OR m.type_line::text = 'Resource'::text
+              OR (
+                m.document_no IS NOT NULL
+                AND EXISTS (
+                  SELECT 1
+                  FROM bc_job_ledger_entry_month r
+                  WHERE r.company_name = m.company_name
+                    AND r.job_no::text = m.job_no::text
+                    AND r.year = m.year
+                    AND r.month = m.month
+                    AND r.document_no::text = m.document_no::text
+                    AND r.type_line::text = 'Resource'::text
+                    AND COALESCE(r.concepto_analitico_descripcion, ''::character varying)::text
+                      LIKE 'Mano de Obra%'
+                    AND r.cost IS NOT NULL
+                    AND m.cost IS NOT NULL
+                    AND r.cost = - m.cost
+                )
+              )
             )
         )
  SELECT s.empresa,
@@ -267,7 +287,7 @@ CREATE OR REPLACE VIEW public.v_se_lineas_movimientos AS
    FROM src s;
 COMMENT ON VIEW public.v_se_lineas_movimientos IS
   'Replica M de Power BI para movimientosProyectosMes: invoice ya transformado en sync (OData * -1); sin ABS. '
-  'Mano de Obra* solo type_line=Resource (excluye G/L Account).';
+  'Mano de Obra*: Resource; G/L solo si contra-asiento Resource mismo documento (neto 0).';
 
 -- ---------------------------------------------------------------------------
 -- View: v_se_lineas_expedientes
