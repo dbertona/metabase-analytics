@@ -21,6 +21,8 @@
   `invalid syntax` (6 ms, sin llamar a BC). Misma forma que Proyectos
   y `$select=Year` (query 50220; no `PS_Year`). Result trata `error`
   string para no marcar ok en falso.
+  Cierre `fix/bc-ps-year-company-pk` (2026-09-05): gate `--004-only` +
+  004 Lab en prod; 8 filas `bc_ps_year` (Lab + Iberia 2023–2026).
 
 - **004 Cert Open / tipo R:** el upsert ya no deja líneas Open de más
   (doble conteo vs mes cerrado, p. ej. −980 € en 021). No inserta cert si
