@@ -17,6 +17,10 @@
   `ON CONFLICT (company_name, ps_year)` para que Lab e Iberia coexistán.
   Prod: ALTER + JSON 004 juntos; el JSON va por
   `deploy-004-gated.sh --yes --004-only` (el gate no aplica el ALTER).
+- **004 PS_Years:** la URL HTTP con `const`/`return` devolvía
+  `invalid syntax` (6 ms, sin llamar a BC). Misma forma que Proyectos
+  y `$select=Year` (query 50220; no `PS_Year`). Result trata `error`
+  string para no marcar ok en falso.
 
 - **004 Cert Open / tipo R:** el upsert ya no deja líneas Open de más
   (doble conteo vs mes cerrado, p. ej. −980 € en 021). No inserta cert si
