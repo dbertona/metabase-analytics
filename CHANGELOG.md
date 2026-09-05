@@ -13,6 +13,11 @@
 
 ### Fixed
 
+- **`bc_ps_year`:** PK `(company_name, ps_year)` y upsert 004
+  `ON CONFLICT (company_name, ps_year)` para que Lab e Iberia coexistán.
+  Prod: ALTER + JSON 004 juntos; el JSON va por
+  `deploy-004-gated.sh --yes --004-only` (el gate no aplica el ALTER).
+
 - **004 Cert Open / tipo R:** el upsert ya no deja líneas Open de más
   (doble conteo vs mes cerrado, p. ej. −980 € en 021). No inserta cert si
   ya hay `Close` en el mismo job-mes-documento; borra Open de

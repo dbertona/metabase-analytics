@@ -186,7 +186,7 @@
           1360
         ],
         "parameters": {
-          "query": "INSERT INTO public.bc_ps_year\n(company_name, ps_year)\nSELECT\n  $1,                 -- company_name\n  $2::integer         -- ps_year\nWHERE $2::text <> '' AND $2::text != '0'      -- ps_year obligatorio y válido\nON CONFLICT (ps_year)\nDO UPDATE SET\n  company_name = EXCLUDED.company_name\nRETURNING *;",
+          "query": "INSERT INTO public.bc_ps_year\n(company_name, ps_year)\nSELECT\n  $1,                 -- company_name\n  $2::integer         -- ps_year\nWHERE $2::text <> '' AND $2::text != '0'      -- ps_year obligatorio y válido\nON CONFLICT (company_name, ps_year)\nDO UPDATE SET\n  company_name = EXCLUDED.company_name\nRETURNING *;",
           "options": {
             "queryReplacement": "{{$json.companyName}}\n{{$json.PS_Year}}"
           },
