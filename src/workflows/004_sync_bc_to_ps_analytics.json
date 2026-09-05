@@ -66,7 +66,7 @@
           1216
         ],
         "parameters": {
-          "url": "={{ \n  const map = ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json);\n  const ls = map.syncStateByEntity['ps_year'];\n  return 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/' + ((($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })())) + '/api/Power_Solution/PS_API/v2.0/companies('\n  + map.companyId\n  + ')/PS_Years?$select=PS_Year,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20' + ls;\n}}",
+          "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/' + ((($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })())) + '/api/Power_Solution/PS_API/v2.0/companies('\n  + ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json).companyId\n  + ')/PS_Years?$select=Year,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json).syncStateByEntity['ps_year']\n}}",
           "options": {
             "pagination": {
               "pagination": {
@@ -186,7 +186,7 @@
           1360
         ],
         "parameters": {
-          "query": "INSERT INTO public.bc_ps_year\n(company_name, ps_year)\nSELECT\n  $1,                 -- company_name\n  $2::integer         -- ps_year\nWHERE $2::text <> '' AND $2::text != '0'      -- ps_year obligatorio y válido\nON CONFLICT (ps_year)\nDO UPDATE SET\n  company_name = EXCLUDED.company_name\nRETURNING *;",
+          "query": "INSERT INTO public.bc_ps_year\n(company_name, ps_year)\nSELECT\n  $1,                 -- company_name\n  $2::integer         -- ps_year\nWHERE $2::text <> '' AND $2::text != '0'      -- ps_year obligatorio y válido\nON CONFLICT (company_name, ps_year)\nDO UPDATE SET\n  company_name = EXCLUDED.company_name\nRETURNING *;",
           "options": {
             "queryReplacement": "{{$json.companyName}}\n{{$json.PS_Year}}"
           },
@@ -284,7 +284,7 @@
           1152
         ],
         "parameters": {
-          "jsCode": "// Resultado por entidad: PS_Years\nconst items = $input.all();\nlet failed = 0;\nlet firstErr = '';\nfor (const it of items) {\n  const j = it?.json || {};\n  const statusCode = Number(j?.statusCode ?? j?.response?.statusCode ?? 0);\n  const bodyErr = j?.body?.error?.message || (typeof j?.body === 'string' ? j.body : null);\n  const msg = j?.error?.message || j?.message || j?.data?.error || j?.response?.body || j?.responseBody || bodyErr || null;\n  if (!firstErr && msg) firstErr = String(msg);\n  if (msg || statusCode >= 400) failed++;\n}\nconst success = items.length - failed;\nconst synced = success;\nconst res = { key: 'ps_year', causeNode: 'Upsert PS_Year' };\nif (failed > 0) { res.status = 'error'; res.synced = success; res.failed = failed; res.message = firstErr || ('HTTP ' + (items[0]?.json?.statusCode || 'error')); } else { res.status = 'ok'; res.synced = synced; res.success = success; }\nreturn [{ json: res }];"
+          "jsCode": "// Resultado por entidad: PS_Years\nconst items = $input.all();\nlet failed = 0;\nlet firstErr = '';\nfor (const it of items) {\n  const j = it?.json || {};\n  const statusCode = Number(j?.statusCode ?? j?.response?.statusCode ?? 0);\n  const bodyErr = j?.body?.error?.message || (typeof j?.body === 'string' ? j.body : null);\n  const errRaw = j?.error;\n  const msg = (typeof errRaw === 'string' ? errRaw : (errRaw?.message || null)) || j?.message || j?.data?.error || j?.response?.body || j?.responseBody || bodyErr || null;\n  if (!firstErr && msg) firstErr = String(msg);\n  if (msg || statusCode >= 400) failed++;\n}\nconst success = items.length - failed;\nconst synced = success;\nconst res = { key: 'ps_year', causeNode: 'Upsert PS_Year' };\nif (failed > 0) { res.status = 'error'; res.synced = success; res.failed = failed; res.message = firstErr || ('HTTP ' + (items[0]?.json?.statusCode || 'error')); } else { res.status = 'ok'; res.synced = synced; res.success = success; }\nreturn [{ json: res }];"
         },
         "typeVersion": 2
       },

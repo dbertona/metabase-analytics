@@ -39,7 +39,14 @@ CREATE TABLE IF NOT EXISTS public.ps_year (
     -- Nota: ps_year no tiene updated_at porque es una tabla de referencia estática
 );
 
--- ON CONFLICT (ps_year) en workflow
+-- Tabla viva: public.bc_ps_year. PK (company_name, ps_year) para que
+-- Iberia y Lab puedan coexistir. El upsert 004 usa
+-- ON CONFLICT (company_name, ps_year).
+-- ALTER (DEV ahora; prod solo con 004 vía deploy-004-gated.sh):
+--   ALTER TABLE public.bc_ps_year DROP CONSTRAINT IF EXISTS bc_ps_year_pkey;
+--   ALTER TABLE public.bc_ps_year ADD PRIMARY KEY (company_name, ps_year);
+
+-- ON CONFLICT (ps_year) en workflow (legacy public.ps_year)
 
 -- =============================================================================
 -- 3. proyectos
