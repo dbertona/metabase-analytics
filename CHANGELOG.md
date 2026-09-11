@@ -37,6 +37,11 @@
 
 ### Changed
 
+- **021:** se quitan los checks de reloj `sync_freshness_planif_hours`,
+  `sync_freshness_expediente_hours` y `sync_freshness_hours`. El mail solo
+  salta por descuadre de cifras o grano (Tipo R / Tipo P / huérfanos /
+  meses cerrados / budget0). Un 004 incremental con 0–10 filas ya no
+  dispara fail.
 - **004 ciclo normal:** sin `entities[]` ya no tira maestros que upserta 017
   (`resource`, `job`, `job_team`, `job_task`, `user_configuration`,
   `centers_of_responsibility`, `departments`, `ps_year`, `technologies`,
