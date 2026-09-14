@@ -1,6 +1,6 @@
 # Entornos PostgreSQL Analytics
 
-**Última verificación:** 2026-08-14  
+**Última verificación:** 2026-09-14  
 **Alcance:** instancias Postgres de Analytics (datos BC / SE). No es la BD Timesheet.
 
 Sync BC → Analytics: [004_SYNC_BC_ANALYTICS.md](./shared/analytics/004_SYNC_BC_ANALYTICS.md)  
@@ -69,7 +69,15 @@ El 004 de testing falló el 2026-08-10 en `Try Acquire Mutex 004`: `company_name
 
 Canal BC → Analytics: solo 004 (salvo bypass explícito).
 
-**Publicar 004 o vistas/MVs a prod:** `./scripts/deploy-004-gated.sh` (copia prod→testing, valida 021 + cifras publicadas, luego JSON y/o SQL a prod). `--sql-only` / `--004-only` si el cambio es de un solo lado. `apply-bi-views.sh` no escribe fórmulas en prod sin el gate.
+**Publicar Analytics (004, 021, SQL) a testing o prod:** Gitea Action
+`Deploy Analytics Multi-Environment` (mismo modelo que Timesheet: manual,
+`testing` / `production` / `ambos`). CLI: `./scripts/deploy-analytics.sh --env … --yes`.
+
+**Prod 004 / vistas/MVs:** el Action llama a `./scripts/deploy-004-gated.sh`
+(copia prod→testing, valida 021 + cifras, luego JSON y/o SQL a prod).
+`--sql-only` / `--004-only` si el scope lo pide. `apply-bi-views.sh` no escribe
+fórmulas en prod sin el gate. **021 a n8n-prod** lo publica el mismo Action
+tras el gate (`deploy-n8n-workflow-021.sh`).
 
 **021 / 004 permanentes en testing:** leen `$env.BC_ENVIRONMENT` (Pruebas_PS) y el Analytics de `:5435`. El 021 de testing **no tiene cron** (solo webhook). El gate pinnea Production **solo durante el canary** post-clon y **restaura `$env` al terminar**. Cron L–V solo en n8n **prod** (BC Production vs Analytics prod).
 

@@ -15,7 +15,9 @@ Réplica de datos Business Central en **PostgreSQL Analytics** (prod VM 100; tes
 
 | Área | Ubicación |
 |------|-----------|
+| Deploy Gitea (testing / prod / ambos) | `.github/workflows/deploy-analytics.yml` — `./scripts/deploy-analytics.sh` |
 | Workflow 004 (BC → Analytics) | `src/workflows/004_sync_bc_to_ps_analytics.json` |
+| Workflow 021 (health check) | `src/workflows/021_health_check_analytics_bc.json` |
 | Vistas Seguimiento Económico | `sql/views/seguimiento_economico_views.sql` |
 | Vistas BI Apps | `scripts/sql/bi_dashboard_planificacion_views.sql` |
 | Docs sync / PBI | `docs/ACTUALIZAR_WORKFLOW_004.md`, `docs/shared/analytics/` |
@@ -36,6 +38,20 @@ psql "postgresql://postgres:SuperSecurePassword2025@192.168.36.100:5433/postgres
 # Testing (SE Apps en testingapp apunta aquí)
 psql "postgresql://postgres:analytics_testing_2025@192.168.36.103:5435/postgres"
 ```
+
+## Deploy (como Timesheet)
+
+Solo **manual** en Gitea (`workflow_dispatch`). No despliega al hacer push a `main`.
+
+1. Merge a `main` (la Action no aparece hasta estar en la rama por defecto).
+2. Gitea → **Actions** → **Deploy Analytics Multi-Environment**.
+3. `environment`: `testing` (default), `production` o `ambos` (testing primero).
+4. `scope`: `all` (004 + SQL + 021) o un subconjunto.
+5. Si `production` o `ambos`: marcar **confirm_production**.
+
+Prod 004/SQL pasa por el figures gate. Testing aplica el repo a n8n 103 y Analytics `:5435` (021 sin cron).
+
+CLI: `./scripts/deploy-analytics.sh --env testing|production --yes`
 
 ## Docs de entrada
 

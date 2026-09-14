@@ -4,6 +4,13 @@
 
 ### Added
 
+- **Gitea Deploy Analytics:** Action manual
+  `.github/workflows/deploy-analytics.yml` (testing / production / ambos),
+  igual que Timesheet. Canal único para 004, 021 y SQL. CLI:
+  `./scripts/deploy-analytics.sh`. Prod 004/SQL sigue por
+  `deploy-004-gated.sh` (el job de production lo llama). Testing:
+  `--apply-only` (sin clon ni canary). Secrets:
+  `DEPLOY_SSH_PASSWORD`, `APPS_CLONE_PASSWORD`.
 - **004 / Mayor analítico:** entidad `job_ledger_entry_line` → tabla
   `bc_job_ledger_entry_line` (query 50205 `movimientosProyectos`, 1 fila
   por `entryNo`, signo BC, sin skip PP/PY). Webhook:
