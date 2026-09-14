@@ -20,6 +20,9 @@
 
 ### Fixed
 
+- **Gitea Deploy Analytics Pre-flight:** ya no usa `actions/checkout@v4`
+  (Fortinet en VM 104 rompe TLS a `github.com`; Timesheet solo pasa por
+  caché local). El job clona el repo desde Gitea en `127.0.0.1:3000`.
 - **`bc_ps_year`:** PK `(company_name, ps_year)` y upsert 004
   `ON CONFLICT (company_name, ps_year)` para que Lab e Iberia coexistán.
   Prod: ALTER + JSON 004 juntos; el JSON va por

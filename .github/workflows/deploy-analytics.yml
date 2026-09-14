@@ -59,8 +59,28 @@ jobs:
     name: ✅ Pre-flight
     runs-on: self-hosted
     steps:
+      # No uses: actions/checkout@v4 — Fortinet en 104 rompe TLS a github.com
+      # (Timesheet solo pasa porque tiene el action en caché). Clone Gitea local.
       - name: 📥 Checkout Analytics
-        uses: actions/checkout@v4
+        run: |
+          set -euo pipefail
+          dest="${GITHUB_WORKSPACE:-.}"
+          cd "$dest"
+          if [[ -f scripts/deploy-analytics.sh ]]; then
+            echo "✅ Workspace con repo $(git rev-parse --short HEAD 2>/dev/null || echo '?')"
+            exit 0
+          fi
+          token="${GITHUB_TOKEN:-}"
+          if [[ -z "$token" ]]; then
+            echo "❌ Falta GITHUB_TOKEN para clonar Gitea" >&2
+            exit 1
+          fi
+          echo "Clonando admin/superset-analytics desde Gitea local"
+          git clone --depth 1 "http://oauth2:${token}@127.0.0.1:3000/admin/superset-analytics.git" .
+          if [[ -n "${GITHUB_SHA:-}" ]]; then
+            git fetch --depth 1 origin "${GITHUB_SHA}"
+            git checkout --force "${GITHUB_SHA}"
+          fi
 
       - name: 🛠️ Ensure deploy tools
         run: |
@@ -113,7 +133,25 @@ jobs:
       name: testing
     steps:
       - name: 📥 Checkout Analytics
-        uses: actions/checkout@v4
+        run: |
+          set -euo pipefail
+          dest="${GITHUB_WORKSPACE:-.}"
+          cd "$dest"
+          if [[ -f scripts/deploy-analytics.sh ]]; then
+            echo "✅ Workspace con repo $(git rev-parse --short HEAD 2>/dev/null || echo '?')"
+            exit 0
+          fi
+          token="${GITHUB_TOKEN:-}"
+          if [[ -z "$token" ]]; then
+            echo "❌ Falta GITHUB_TOKEN para clonar Gitea" >&2
+            exit 1
+          fi
+          echo "Clonando admin/superset-analytics desde Gitea local"
+          git clone --depth 1 "http://oauth2:${token}@127.0.0.1:3000/admin/superset-analytics.git" .
+          if [[ -n "${GITHUB_SHA:-}" ]]; then
+            git fetch --depth 1 origin "${GITHUB_SHA}"
+            git checkout --force "${GITHUB_SHA}"
+          fi
 
       - name: 📥 Checkout power-solution-apps (scripts n8n + copy)
         env:
@@ -175,7 +213,25 @@ jobs:
       name: production
     steps:
       - name: 📥 Checkout Analytics
-        uses: actions/checkout@v4
+        run: |
+          set -euo pipefail
+          dest="${GITHUB_WORKSPACE:-.}"
+          cd "$dest"
+          if [[ -f scripts/deploy-analytics.sh ]]; then
+            echo "✅ Workspace con repo $(git rev-parse --short HEAD 2>/dev/null || echo '?')"
+            exit 0
+          fi
+          token="${GITHUB_TOKEN:-}"
+          if [[ -z "$token" ]]; then
+            echo "❌ Falta GITHUB_TOKEN para clonar Gitea" >&2
+            exit 1
+          fi
+          echo "Clonando admin/superset-analytics desde Gitea local"
+          git clone --depth 1 "http://oauth2:${token}@127.0.0.1:3000/admin/superset-analytics.git" .
+          if [[ -n "${GITHUB_SHA:-}" ]]; then
+            git fetch --depth 1 origin "${GITHUB_SHA}"
+            git checkout --force "${GITHUB_SHA}"
+          fi
 
       - name: 📥 Checkout power-solution-apps (scripts n8n + copy)
         env:
