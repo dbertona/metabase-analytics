@@ -34,9 +34,29 @@ curl -sS -m 900 -X POST \
 
 ---
 
-## Publicar 004 o vistas que mueven cifras
+## Publicar Analytics (004, 021, SQL)
 
-**Canal obligatorio:** `./scripts/deploy-004-gated.sh`.
+**Canal operativo (como Timesheet):** Gitea Action **Deploy Analytics Multi-Environment**
+en `admin/superset-analytics` — solo `workflow_dispatch` (testing / production / ambos).
+No se lanza en push a `main`.
+
+Por debajo, **004 y SQL a prod** siguen yendo solo por `./scripts/deploy-004-gated.sh`
+(el job de production lo llama; no hay atajo PUT/API/`apply-bi-views` a VM 101/100).
+
+```text
+Gitea → Actions → Deploy Analytics Multi-Environment
+  environment: testing | production | ambos
+  scope: all | 004 | sql | 021 | 004+sql
+  confirm_production: true si production o ambos
+```
+
+CLI equivalente: `./scripts/deploy-analytics.sh --env testing|production --yes`.
+
+---
+
+## Publicar 004 o vistas que mueven cifras (gate)
+
+**Motor de prod:** `./scripts/deploy-004-gated.sh` (lo invoca el deploy de Gitea).
 
 Cubre el JSON 004 **y** SQL que alimenta Apps/PBI (`v_se_*`, `bi_v_*`, `bi_mv_*`).  
 No aplicar JSON a n8n prod ni `CREATE OR REPLACE` en Analytics prod sin pasar el gate.

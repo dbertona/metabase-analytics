@@ -25,10 +25,28 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APPS_ROOT="${APPS_ROOT:-$(cd "$ROOT/../../power-solution-apps" 2>/dev/null && pwd || true)}"
-if [[ -z "${APPS_ROOT}" || ! -d "$APPS_ROOT/scripts" ]]; then
-  APPS_ROOT="/Users/marcelodanielbertona/POWER-SOLUTION-PROJECTS/power-solution-apps"
-fi
+
+resolve_apps_root() {
+  local c
+  for c in \
+    "${APPS_ROOT:-}" \
+    "${GITHUB_WORKSPACE:-}/_apps" \
+    "${GITHUB_WORKSPACE:-}/power-solution-apps" \
+    "$ROOT/../power-solution-apps" \
+    "$ROOT/../../power-solution-apps" \
+    "/opt/power-solution-apps" \
+    "/Users/marcelodanielbertona/POWER-SOLUTION-PROJECTS/power-solution-apps"
+  do
+    if [[ -n "$c" && -f "$c/scripts/update-n8n-workflow-postgres-remote.sh" ]]; then
+      APPS_ROOT="$c"
+      return 0
+    fi
+  done
+  echo "❌ No encuentro power-solution-apps (update-n8n-workflow-postgres-remote.sh)." >&2
+  echo "   En Gitea: clona admin/power-solution-apps en _apps y exporta APPS_ROOT." >&2
+  exit 1
+}
+resolve_apps_root
 
 WF_004="$ROOT/src/workflows/004_sync_bc_to_ps_analytics.json"
 WF_021="$ROOT/src/workflows/021_health_check_analytics_bc.json"
@@ -59,6 +77,7 @@ YEAR="${YEAR:-2026}"
 ASSUME_YES=0
 APPLY_PROD=1
 SKIP_COPY=0
+APPLY_ONLY=0
 SCOPE="all"
 ALLOW_FIGURE_CHANGE=0
 CANARY_TIMEOUT_SEC="${CANARY_TIMEOUT_SEC:-2700}"
@@ -78,10 +97,14 @@ Gate de cifras: clona Analytics prod→testing, valida 004 y/o SQL, publica a pr
   ./scripts/deploy-004-gated.sh --yes --skip-copy
   ./scripts/deploy-004-gated.sh --yes --sql-only --allow-figure-change
   ./scripts/deploy-004-gated.sh --yes --year 2026
+  ./scripts/deploy-004-gated.sh --yes --no-prod --skip-copy --apply-only
+  ./scripts/deploy-004-gated.sh --yes --apply-only --021-only
 
 No lanza 004 en prod. No cambia BC_ENVIRONMENT del contenedor testing.
 --allow-figure-change: permite que v_se P/R / 1-02 se muevan vs el clon
 (solo si el cambio de vista DEBE mover cifras).
+--apply-only: publica artefactos en testing (004/021/SQL) sin clon, canary ni prod.
+--021-only: solo con --apply-only (testing) o via deploy-analytics.sh --scope 021.
 EOF
   exit "${1:-0}"
 }
@@ -92,8 +115,11 @@ while [[ $# -gt 0 ]]; do
     --no-prod) APPLY_PROD=0 ;;
     --apply-prod) APPLY_PROD=1 ;;
     --skip-copy) SKIP_COPY=1 ;;
+    --apply-only) APPLY_ONLY=1; APPLY_PROD=0; SKIP_COPY=1 ;;
     --sql-only) SCOPE="sql" ;;
     --004-only) SCOPE="004" ;;
+    --021-only) SCOPE="021" ;;
+    --004-sql|--004-sql-only) SCOPE="004sql" ;;
     --allow-figure-change) ALLOW_FIGURE_CHANGE=1 ;;
     --year) YEAR="$2"; shift ;;
     -h|--help) usage 0 ;;
@@ -102,8 +128,9 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-scope_has_004() { [[ "$SCOPE" == "all" || "$SCOPE" == "004" ]]; }
-scope_has_sql() { [[ "$SCOPE" == "all" || "$SCOPE" == "sql" ]]; }
+scope_has_004() { [[ "$SCOPE" == "all" || "$SCOPE" == "004" || "$SCOPE" == "004sql" ]]; }
+scope_has_sql() { [[ "$SCOPE" == "all" || "$SCOPE" == "sql" || "$SCOPE" == "004sql" ]]; }
+scope_has_021() { [[ "$SCOPE" == "all" || "$SCOPE" == "021" ]]; }
 
 ssh_testing() { sshpass -p "$SSH_PASS" ssh "${SSH_OPTS[@]}" "$SSH_USER@$N8N_TESTING_HOST" "$@"; }
 
@@ -681,15 +708,22 @@ confirm_or_die() {
   fi
   echo ""
   echo "Esto va a:"
-  [[ "$SKIP_COPY" -eq 0 ]] && echo "  • Sobrescribir Analytics TESTING desde prod"
-  scope_has_sql && echo "  • Aplicar v_se_* + bi_* en testing y comparar cifras vs clon"
-  scope_has_004 && echo "  • Aplicar 004/021 en n8n testing y lanzar canary 004 + 021"
-  scope_has_sql && ! scope_has_004 && echo "  • Lanzar 021 en testing (sin canary 004)"
-  if [[ "$APPLY_PROD" -eq 1 ]]; then
-    scope_has_004 && echo "  • Si cierra: aplicar JSON 004 a n8n PROD (sin lanzar 004)"
-    scope_has_sql && echo "  • Si cierra: aplicar v_se_* + bi_* a Analytics PROD"
+  if [[ "$APPLY_ONLY" -eq 1 ]]; then
+    echo "  • Apply-only testing (sin clon prod, sin canary, sin prod)"
+    scope_has_sql && echo "  • Aplicar v_se_* + bi_* en Analytics testing"
+    scope_has_004 && echo "  • Aplicar JSON 004 a n8n testing (\$env / Pruebas_PS)"
+    scope_has_021 && echo "  • Aplicar 021 a n8n testing (sin cron; remap creds 004)"
+  else
+    [[ "$SKIP_COPY" -eq 0 ]] && echo "  • Sobrescribir Analytics TESTING desde prod"
+    scope_has_sql && echo "  • Aplicar v_se_* + bi_* en testing y comparar cifras vs clon"
+    scope_has_004 && echo "  • Aplicar 004/021 en n8n testing y lanzar canary 004 + 021"
+    scope_has_sql && ! scope_has_004 && echo "  • Lanzar 021 en testing (sin canary 004)"
+    if [[ "$APPLY_PROD" -eq 1 ]]; then
+      scope_has_004 && echo "  • Si cierra: aplicar JSON 004 a n8n PROD (sin lanzar 004)"
+      scope_has_sql && echo "  • Si cierra: aplicar v_se_* + bi_* a Analytics PROD"
+    fi
+    [[ "$ALLOW_FIGURE_CHANGE" -eq 1 ]] && echo "  • Permitir que las cifras publicadas se muevan vs el clon"
   fi
-  [[ "$ALLOW_FIGURE_CHANGE" -eq 1 ]] && echo "  • Permitir que las cifras publicadas se muevan vs el clon"
   read -r -p "¿Confirmas? Escribe yes: " ans
   [[ "$ans" == "yes" ]] || { echo "Cancelado."; exit 0; }
 }
@@ -704,11 +738,40 @@ confirm_or_die() {
 
 echo "════════════════════════════════════════════════════════════"
 echo " Gate cifras (testing → prod)"
-echo " scope=${SCOPE} year=${YEAR} copy=$([[ $SKIP_COPY -eq 1 ]] && echo skip || echo yes) apply_prod=${APPLY_PROD}"
+echo " scope=${SCOPE} year=${YEAR} copy=$([[ $SKIP_COPY -eq 1 ]] && echo skip || echo yes) apply_prod=${APPLY_PROD} apply_only=${APPLY_ONLY}"
 echo "════════════════════════════════════════════════════════════"
+
+if [[ "$SCOPE" == "021" && "$APPLY_ONLY" -ne 1 ]]; then
+  echo "❌ --021-only solo con --apply-only (testing)." >&2
+  echo "   Prod 021: $ROOT/scripts/deploy-analytics.sh --env production --scope 021 --yes" >&2
+  exit 1
+fi
 
 confirm_or_die
 scope_has_004 && seatbelt_004
+
+if [[ "$APPLY_ONLY" -eq 1 ]]; then
+  TMPDIR_GATE="$(mktemp -d /tmp/gate-004-apply.XXXXXX)"
+  trap 'rm -rf "$TMPDIR_GATE"' EXIT
+  if scope_has_sql; then
+    apply_sql_testing
+  fi
+  if scope_has_004; then
+    apply_n8n_postgres "$N8N_TESTING_HOST" "$N8N_TESTING_APP" "$N8N_TESTING_PG" \
+      "$WF_004_TESTING" "$WF_004"
+  fi
+  if scope_has_021; then
+    disable_021_schedule "$WF_021" "$TMPDIR_GATE/021.testing.json"
+    ensure_021_testing "$TMPDIR_GATE/021.testing.json"
+  fi
+  if scope_has_004 || scope_has_021; then
+    restart_n8n_testing
+  fi
+  echo ""
+  echo "✅ Apply-only testing OK (scope=${SCOPE}). Sin clon, canary ni prod."
+  scope_has_021 && echo "   021 testing sin cron (solo webhook)."
+  exit 0
+fi
 
 if [[ "$SKIP_COPY" -eq 0 ]]; then
   copy_prod_to_testing

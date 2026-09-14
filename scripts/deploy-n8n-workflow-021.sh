@@ -1,16 +1,42 @@
 #!/bin/bash
-# Crea o actualiza el workflow 021 (Health Check Analytics vs BC) en n8n prod (VM 101).
-# Usa PostgreSQL de n8n (mismo método que 004).
+# Crea o actualiza el workflow 021 (Health Check Analytics vs BC).
+# Production (default): n8n-prod VM 101, cron L–V 07:00.
+# Testing: via deploy-analytics.sh (sin cron, remap creds desde 004).
 #
-# Uso: ./scripts/deploy-n8n-workflow-021.sh
+# Uso:
+#   ./scripts/deploy-n8n-workflow-021.sh
+#   ./scripts/deploy-n8n-workflow-021.sh --env production
+#   ./scripts/deploy-n8n-workflow-021.sh --env testing
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ENV="production"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --env) ENV="${2:-}"; shift ;;
+    --yes|-y) ;;
+    -h|--help)
+      sed -n '2,12p' "$0"
+      exit 0
+      ;;
+    *) echo "❌ Flag desconocido: $1" >&2; exit 1 ;;
+  esac
+  shift
+done
+
+if [[ "$ENV" == "testing" ]]; then
+  exec "$ROOT/scripts/deploy-analytics.sh" --env testing --scope 021 --yes
+fi
+if [[ "$ENV" != "production" ]]; then
+  echo "❌ --env debe ser testing|production" >&2
+  exit 1
+fi
+
 WF_FILE="$ROOT/src/workflows/021_health_check_analytics_bc.json"
 WF_ID="a021healthcheck0001"
 HOST="${N8N_HOST:-192.168.36.101}"
 USER="${N8N_SSH_USER:-ps_admin}"
-PASS="${N8N_SSH_PASS:-PsAdmin2025}"
+PASS="${N8N_SSH_PASS:-${DEPLOY_SSH_PASSWORD:-${SSH_PASS:-PsAdmin2025}}}"
 N8N_DB_PASSWORD="${N8N_DB_PASSWORD:-c7DxE3KNX72LlRzYPf5KGDskeM84jWvn}"
 PROJECT_ID="${N8N_PROJECT_ID:-HvpEZJBQb1R4siPC}"
 
