@@ -62,25 +62,48 @@ jobs:
       # No uses: actions/checkout@v4 — Fortinet en 104 rompe TLS a github.com
       # (Timesheet solo pasa porque tiene el action en caché). Clone Gitea local.
       - name: 📥 Checkout Analytics
+        env:
+          APPS_CLONE_PASSWORD: ${{ secrets.APPS_CLONE_PASSWORD }}
         run: |
           set -euo pipefail
           dest="${GITHUB_WORKSPACE:-.}"
+          mkdir -p "$dest"
           cd "$dest"
           if [[ -f scripts/deploy-analytics.sh ]]; then
             echo "✅ Workspace con repo $(git rev-parse --short HEAD 2>/dev/null || echo '?')"
             exit 0
           fi
-          token="${GITHUB_TOKEN:-}"
-          if [[ -z "$token" ]]; then
-            echo "❌ Falta GITHUB_TOKEN para clonar Gitea" >&2
-            exit 1
-          fi
           echo "Clonando admin/superset-analytics desde Gitea local"
-          git clone --depth 1 "http://oauth2:${token}@127.0.0.1:3000/admin/superset-analytics.git" .
-          if [[ -n "${GITHUB_SHA:-}" ]]; then
-            git fetch --depth 1 origin "${GITHUB_SHA}"
-            git checkout --force "${GITHUB_SHA}"
-          fi
+          python3 - <<'PY'
+          import os, shutil, subprocess, tempfile, urllib.parse
+          dest = os.getcwd()
+          sha = os.environ.get("GITHUB_SHA") or ""
+          token = os.environ.get("GITHUB_TOKEN") or ""
+          pw = os.environ.get("APPS_CLONE_PASSWORD") or ""
+          if token:
+              auth = "oauth2:" + urllib.parse.quote(token, safe="")
+          elif pw:
+              auth = "admin:" + urllib.parse.quote(pw, safe="")
+          else:
+              raise SystemExit("Falta GITHUB_TOKEN y secret APPS_CLONE_PASSWORD")
+          url = "http://%s@127.0.0.1:3000/admin/superset-analytics.git" % auth
+          tmp = tempfile.mkdtemp(prefix="analytics-co-")
+          repo = os.path.join(tmp, "repo")
+          try:
+              subprocess.check_call(["git", "clone", "--depth", "1", url, repo])
+              if sha:
+                  subprocess.call(["git", "-C", repo, "fetch", "--depth", "1", "origin", sha])
+                  subprocess.call(["git", "-C", repo, "checkout", "--force", sha])
+              for name in os.listdir(repo):
+                  src = os.path.join(repo, name)
+                  dst = os.path.join(dest, name)
+                  if os.path.exists(dst):
+                      shutil.rmtree(dst) if os.path.isdir(dst) else os.remove(dst)
+                  shutil.move(src, dst)
+          finally:
+              shutil.rmtree(tmp, ignore_errors=True)
+          print("Checkout OK", (sha[:12] if sha else "HEAD"))
+          PY
 
       - name: 🛠️ Ensure deploy tools
         run: |
@@ -133,25 +156,48 @@ jobs:
       name: testing
     steps:
       - name: 📥 Checkout Analytics
+        env:
+          APPS_CLONE_PASSWORD: ${{ secrets.APPS_CLONE_PASSWORD }}
         run: |
           set -euo pipefail
           dest="${GITHUB_WORKSPACE:-.}"
+          mkdir -p "$dest"
           cd "$dest"
           if [[ -f scripts/deploy-analytics.sh ]]; then
             echo "✅ Workspace con repo $(git rev-parse --short HEAD 2>/dev/null || echo '?')"
             exit 0
           fi
-          token="${GITHUB_TOKEN:-}"
-          if [[ -z "$token" ]]; then
-            echo "❌ Falta GITHUB_TOKEN para clonar Gitea" >&2
-            exit 1
-          fi
           echo "Clonando admin/superset-analytics desde Gitea local"
-          git clone --depth 1 "http://oauth2:${token}@127.0.0.1:3000/admin/superset-analytics.git" .
-          if [[ -n "${GITHUB_SHA:-}" ]]; then
-            git fetch --depth 1 origin "${GITHUB_SHA}"
-            git checkout --force "${GITHUB_SHA}"
-          fi
+          python3 - <<'PY'
+          import os, shutil, subprocess, tempfile, urllib.parse
+          dest = os.getcwd()
+          sha = os.environ.get("GITHUB_SHA") or ""
+          token = os.environ.get("GITHUB_TOKEN") or ""
+          pw = os.environ.get("APPS_CLONE_PASSWORD") or ""
+          if token:
+              auth = "oauth2:" + urllib.parse.quote(token, safe="")
+          elif pw:
+              auth = "admin:" + urllib.parse.quote(pw, safe="")
+          else:
+              raise SystemExit("Falta GITHUB_TOKEN y secret APPS_CLONE_PASSWORD")
+          url = "http://%s@127.0.0.1:3000/admin/superset-analytics.git" % auth
+          tmp = tempfile.mkdtemp(prefix="analytics-co-")
+          repo = os.path.join(tmp, "repo")
+          try:
+              subprocess.check_call(["git", "clone", "--depth", "1", url, repo])
+              if sha:
+                  subprocess.call(["git", "-C", repo, "fetch", "--depth", "1", "origin", sha])
+                  subprocess.call(["git", "-C", repo, "checkout", "--force", sha])
+              for name in os.listdir(repo):
+                  src = os.path.join(repo, name)
+                  dst = os.path.join(dest, name)
+                  if os.path.exists(dst):
+                      shutil.rmtree(dst) if os.path.isdir(dst) else os.remove(dst)
+                  shutil.move(src, dst)
+          finally:
+              shutil.rmtree(tmp, ignore_errors=True)
+          print("Checkout OK", (sha[:12] if sha else "HEAD"))
+          PY
 
       - name: 📥 Checkout power-solution-apps (scripts n8n + copy)
         env:
@@ -213,25 +259,48 @@ jobs:
       name: production
     steps:
       - name: 📥 Checkout Analytics
+        env:
+          APPS_CLONE_PASSWORD: ${{ secrets.APPS_CLONE_PASSWORD }}
         run: |
           set -euo pipefail
           dest="${GITHUB_WORKSPACE:-.}"
+          mkdir -p "$dest"
           cd "$dest"
           if [[ -f scripts/deploy-analytics.sh ]]; then
             echo "✅ Workspace con repo $(git rev-parse --short HEAD 2>/dev/null || echo '?')"
             exit 0
           fi
-          token="${GITHUB_TOKEN:-}"
-          if [[ -z "$token" ]]; then
-            echo "❌ Falta GITHUB_TOKEN para clonar Gitea" >&2
-            exit 1
-          fi
           echo "Clonando admin/superset-analytics desde Gitea local"
-          git clone --depth 1 "http://oauth2:${token}@127.0.0.1:3000/admin/superset-analytics.git" .
-          if [[ -n "${GITHUB_SHA:-}" ]]; then
-            git fetch --depth 1 origin "${GITHUB_SHA}"
-            git checkout --force "${GITHUB_SHA}"
-          fi
+          python3 - <<'PY'
+          import os, shutil, subprocess, tempfile, urllib.parse
+          dest = os.getcwd()
+          sha = os.environ.get("GITHUB_SHA") or ""
+          token = os.environ.get("GITHUB_TOKEN") or ""
+          pw = os.environ.get("APPS_CLONE_PASSWORD") or ""
+          if token:
+              auth = "oauth2:" + urllib.parse.quote(token, safe="")
+          elif pw:
+              auth = "admin:" + urllib.parse.quote(pw, safe="")
+          else:
+              raise SystemExit("Falta GITHUB_TOKEN y secret APPS_CLONE_PASSWORD")
+          url = "http://%s@127.0.0.1:3000/admin/superset-analytics.git" % auth
+          tmp = tempfile.mkdtemp(prefix="analytics-co-")
+          repo = os.path.join(tmp, "repo")
+          try:
+              subprocess.check_call(["git", "clone", "--depth", "1", url, repo])
+              if sha:
+                  subprocess.call(["git", "-C", repo, "fetch", "--depth", "1", "origin", sha])
+                  subprocess.call(["git", "-C", repo, "checkout", "--force", sha])
+              for name in os.listdir(repo):
+                  src = os.path.join(repo, name)
+                  dst = os.path.join(dest, name)
+                  if os.path.exists(dst):
+                      shutil.rmtree(dst) if os.path.isdir(dst) else os.remove(dst)
+                  shutil.move(src, dst)
+          finally:
+              shutil.rmtree(tmp, ignore_errors=True)
+          print("Checkout OK", (sha[:12] if sha else "HEAD"))
+          PY
 
       - name: 📥 Checkout power-solution-apps (scripts n8n + copy)
         env:
