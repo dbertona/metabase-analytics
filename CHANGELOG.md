@@ -20,12 +20,6 @@
 
 ### Fixed
 
-- **004 MesesCerrados:** la URL HTTP con `const`/`return` devolvía
-  `invalid syntax` (6 ms, sin llamar a BC). El webhook PSI
-  `entities=meses_cerrados` marcaba `synced:1` y no escribía julio
-  (86 filas vs 274 en BC). Misma forma que Recursos; Result trata
-  `error` string. Mismo arreglo en Objectives y Prefetch Proyectos.
-
 - **Gitea Deploy Analytics Pre-flight:** ya no usa `actions/checkout@v4`
   (Fortinet en VM 104 rompe TLS a `github.com`; Timesheet solo pasa por
   caché local). El job clona el repo desde Gitea en `127.0.0.1:3000`.
@@ -55,14 +49,6 @@
 
 ### Changed
 
-- **021:** recuento de meses cerrados por año/mes (`meses_cerrados_YYYY_MM`,
-  kind `cerrados_month`): `fail` si Analytics tiene 0 filas y BC ≥20, o
-  si |delta| > 50. El recuento total (todos los años) sigue en
-  `meses_cerrados_count` (fail solo >5%). Nuevo check
-  `sync_004_entity_errors` si el último 004 de la empresa tiene entidad
-  en error o `invalid syntax` (el Result del 004 ya persiste el string).
-  El mail cubre mes ausente/incompleto y error de entidad 004. El gate
-  `wait_021_money` no cambia (sigue solo las 6 cifras €).
 - **021:** se quitan los checks de reloj `sync_freshness_planif_hours`,
   `sync_freshness_expediente_hours` y `sync_freshness_hours`. El mail solo
   salta por descuadre de cifras o grano (Tipo R / Tipo P / huérfanos /
@@ -106,6 +92,27 @@
   Evita filas duplicadas en Apps (p. ej. PSI-OT-23-2002 INGESAN vs Disponibilidad).
   Aplicar: `CREATE OR REPLACE` vista + `REFRESH` `bi_mv_facturacion` /
   `bi_mv_facturacion_probabilidad`.
+
+## [2026-09-16] — 004 MesesCerrados URL + 021 mes/error 004
+
+### Fixed
+
+- **004 MesesCerrados:** la URL HTTP con `const`/`return` devolvía
+  `invalid syntax` (6 ms, sin llamar a BC). El webhook PSI
+  `entities=meses_cerrados` marcaba `synced:1` y no escribía julio
+  (86 filas vs 274 en BC). Misma forma que Recursos; Result trata
+  `error` string. Mismo arreglo en Objectives y Prefetch Proyectos.
+
+### Changed
+
+- **021:** recuento de meses cerrados por año/mes (`meses_cerrados_YYYY_MM`,
+  kind `cerrados_month`): `fail` si Analytics tiene 0 filas y BC ≥20, o
+  si |delta| > 50. El recuento total (todos los años) sigue en
+  `meses_cerrados_count` (fail solo >5%). Nuevo check
+  `sync_004_entity_errors` si el último 004 de la empresa tiene entidad
+  en error o `invalid syntax` (el Result del 004 ya persiste el string).
+  El mail cubre mes ausente/incompleto y error de entidad 004. El gate
+  `wait_021_money` no cambia (sigue solo las 6 cifras €).
 
 ## [2026-08-17] — 021/004 testing: $env + sin cron
 
