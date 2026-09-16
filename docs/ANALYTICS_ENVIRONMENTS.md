@@ -3,6 +3,9 @@
 **Última verificación:** 2026-09-14  
 **Alcance:** instancias Postgres de Analytics (datos BC / SE). No es la BD Timesheet.
 
+`https://…/analytics/` en Internet es **404** (UI Superset retirada, NPM).
+No es la API de Apps (`/api/analytics/…`) ni este Postgres.
+
 Sync BC → Analytics: [004_SYNC_BC_ANALYTICS.md](./shared/analytics/004_SYNC_BC_ANALYTICS.md)  
 Copia entre entornos (script): `power-solution-apps/scripts/copy-analytics-production-to-env.sh`  
 Compose: `power-solution-apps/ops/supabase-analytics/docker-compose.{dev,testing,production}.yml`
