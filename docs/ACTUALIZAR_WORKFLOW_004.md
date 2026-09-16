@@ -68,7 +68,7 @@ El gate:
 3. Si hay SQL: snapshot de `v_se_facturacion` (empresa + depto `1-02`) → aplica `v_se_*` + `bi_*` **solo en testing** → compara vs snapshot (tol 0,50 €). Un cambio que deba mover cifras exige `--allow-figure-change`.
 4. Si hay 004: JSON del repo a n8n **testing** (004 + 021). El contenedor testing tiene `BC_ENVIRONMENT=Pruebas_PS`. El gate **pinnea Production solo durante el canary** (clon prod fresco). El 021 de testing **no lleva cron** (solo webhook).
 5. Reset de watermarks + canary 004 (`planificacion_mes`, `movimientos_proyectos`, `expediente_mes`, `meses_cerrados`, `mayor_analitico`) en psi y pslab (solo alcance 004). La tabla `bc_job_ledger_entry_line` no la crea el gate (vistas); aplicar `sql/tables/bc_job_ledger_entry_line.sql` antes.
-6. 021 en testing **bajo demanda** (gate / webhook): `tipo_p_planif_sum`, `tipo_r_sum`, `tipo_p_expediente_sum` (tol 0,50 €). El cron L–V del 021 vive solo en n8n **prod**.
+6. 021 en testing **bajo demanda** (gate / webhook): `tipo_p_planif_sum`, `tipo_r_sum`, `tipo_p_expediente_sum` (tol 0,50 €). El cron L–V del 021 vive solo en n8n **prod**. El mail del 021 también falla por mes cerrado ausente/incompleto y por error de entidad en el último 004; el gate **no** espera esos checks (solo las 6 cifras €).
 7. Cifras publicadas: `bi_mv_planificacion_kpi` == `v_se_facturacion`; `v_se` tipo R == 021 `tipo_r_sum` BC. Si falla → **no se toca prod**.
 8. **Restaura** 004 y 021 de testing a `$env.BC_ENVIRONMENT` (Pruebas_PS). El pin no se queda de residente. El 021 sigue sin cron.
 9. Si cierran: mismo JSON a n8n prod y/o mismo SQL a Analytics prod. **No lanza 004 en prod.**

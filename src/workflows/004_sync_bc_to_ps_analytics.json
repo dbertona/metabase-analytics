@@ -2114,7 +2114,7 @@
           8064
         ],
         "parameters": {
-          "url": "={{ \n  const map = ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json);\n  const ls = map.syncStateByEntity['meses_cerrados'];\n  return 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/' + ((($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })())) + '/api/Power_Solution/PS_API/v2.0/companies('\n  + map.companyId\n  + ')/MesesCerrados?$select=job,fecha,estado,billablePriceTotal,costTotal,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20' + ls;\n}}",
+          "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/' + ((($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })())) + '/api/Power_Solution/PS_API/v2.0/companies('\n  + ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json).companyId\n  + ')/MesesCerrados?$select=job,fecha,estado,billablePriceTotal,costTotal,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json).syncStateByEntity['meses_cerrados']\n}}",
           "options": {
             "pagination": {
               "pagination": {
@@ -2220,7 +2220,7 @@
           7888
         ],
         "parameters": {
-          "jsCode": "const items=$input.all(); let failed=0; let firstErr=''; for(const it of items){ const j=it?.json||{}; const statusCode=Number(j?.statusCode??j?.response?.statusCode??0); const bodyErr=j?.body?.error?.message||(typeof j?.body==='string'?j.body:null); const msg=j?.error?.message||j?.message||j?.data?.error||j?.response?.body||j?.responseBody||bodyErr||null; if(!firstErr&&msg) firstErr=String(msg); if(msg||statusCode>=400) failed++; } const success=items.length-failed; const synced=success; const res={ key:'meses_cerrados', causeNode:'Upsert MesesCerrados'}; if(failed>0){ res.status='error'; res.synced=success; res.failed=failed; res.message=firstErr||('HTTP '+(items[0]?.json?.statusCode||'error')); } else { res.status='ok'; res.synced=synced; res.success=success; } return [{json:res}];"
+          "jsCode": "const items=$input.all(); let failed=0; let firstErr=''; for(const it of items){ const j=it?.json||{}; const statusCode=Number(j?.statusCode??j?.response?.statusCode??0); const bodyErr=j?.body?.error?.message||(typeof j?.body==='string'?j.body:null); const errStr=(typeof j.error==='string'&&j.error)?j.error:null; const msg=errStr||j?.error?.message||j?.message||j?.data?.error||j?.response?.body||j?.responseBody||bodyErr||null; if(!firstErr&&msg) firstErr=String(msg); if(msg||statusCode>=400) failed++; } const success=items.length-failed; const synced=success; const res={ key:'meses_cerrados', causeNode:'Upsert MesesCerrados'}; if(failed>0){ res.status='error'; res.synced=success; res.failed=failed; res.message=firstErr||('HTTP '+(items[0]?.json?.statusCode||'error')); } else { res.status='ok'; res.synced=synced; res.success=success; } return [{json:res}];"
         },
         "typeVersion": 2
       },
@@ -2257,7 +2257,7 @@
           8608
         ],
         "parameters": {
-          "url": "={{ \n  const map = ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json);\n  const ls = map.syncStateByEntity['objectives_by_department'];\n  return 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/' + ((($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })())) + '/api/Power_Solution/PS_API/v2.0/companies('\n  + map.companyId\n  + ')/ObjectivesByDepartaments?$select=departments,year,costTarget,billingTarget,marginTarget,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20' + ls;\n}}",
+          "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/' + ((($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })())) + '/api/Power_Solution/PS_API/v2.0/companies('\n  + ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json).companyId\n  + ')/ObjectivesByDepartaments?$select=departments,year,costTarget,billingTarget,marginTarget,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json).syncStateByEntity['objectives_by_department']\n}}",
           "options": {
             "pagination": {
               "pagination": {
@@ -3666,7 +3666,7 @@
           3376
         ],
         "parameters": {
-          "url": "={{ \n  const map = ($('Finalize Sync Context').first()?.json || ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json));\n  const ls = map.syncStateByEntity['job'];\n  return 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/' + ((($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })())) + '/api/Power_Solution/PS_API/v2.0/companies('\n  + map.companyId\n  + ')/Proyectos?$select=no,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20' + ls;\n}}",
+          "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/' + ((($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })())) + '/api/Power_Solution/PS_API/v2.0/companies('\n  + ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json).companyId\n  + ')/Proyectos?$select=no,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json).syncStateByEntity['job']\n}}",
           "options": {
             "pagination": {
               "pagination": {
