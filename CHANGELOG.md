@@ -55,6 +55,14 @@
 
 ### Changed
 
+- **021:** recuento de meses cerrados por año/mes (`meses_cerrados_YYYY_MM`,
+  kind `cerrados_month`): `fail` si Analytics tiene 0 filas y BC ≥20, o
+  si |delta| > 50. El recuento total (todos los años) sigue en
+  `meses_cerrados_count` (fail solo >5%). Nuevo check
+  `sync_004_entity_errors` si el último 004 de la empresa tiene entidad
+  en error o `invalid syntax` (el Result del 004 ya persiste el string).
+  El mail cubre mes ausente/incompleto y error de entidad 004. El gate
+  `wait_021_money` no cambia (sigue solo las 6 cifras €).
 - **021:** se quitan los checks de reloj `sync_freshness_planif_hours`,
   `sync_freshness_expediente_hours` y `sync_freshness_hours`. El mail solo
   salta por descuadre de cifras o grano (Tipo R / Tipo P / huérfanos /
