@@ -20,6 +20,12 @@
 
 ### Fixed
 
+- **004 MesesCerrados:** la URL HTTP con `const`/`return` devolvía
+  `invalid syntax` (6 ms, sin llamar a BC). El webhook PSI
+  `entities=meses_cerrados` marcaba `synced:1` y no escribía julio
+  (86 filas vs 274 en BC). Misma forma que Recursos; Result trata
+  `error` string. Mismo arreglo en Objectives y Prefetch Proyectos.
+
 - **Gitea Deploy Analytics Pre-flight:** ya no usa `actions/checkout@v4`
   (Fortinet en VM 104 rompe TLS a `github.com`; Timesheet solo pasa por
   caché local). El job clona el repo desde Gitea en `127.0.0.1:3000`.
