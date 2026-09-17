@@ -20,6 +20,11 @@
 
 ### Fixed
 
+- **004 Guard `forceMonths`:** `Transform PlanificacionMes` y
+  `Transform ExpedienteMes` leían `_ctxNode.forceMonths` (raíz).
+  El batch lo guarda en `partition.forceMonths` (`Build sync_state map`).
+  Mes vacío + `forceMonths` se omitía (021 `planif_orphan_grain`).
+  El Guard ahora lee `partition.forceMonths` (fallback a raíz).
 - **Gitea Deploy Analytics Pre-flight:** ya no usa `actions/checkout@v4`
   (Fortinet en VM 104 rompe TLS a `github.com`; Timesheet solo pasa por
   caché local). El job clona el repo desde Gitea en `127.0.0.1:3000`.
