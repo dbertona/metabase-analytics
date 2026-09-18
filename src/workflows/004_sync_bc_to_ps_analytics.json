@@ -234,7 +234,7 @@
           2416
         ],
         "parameters": {
-          "query": "INSERT INTO public.bc_job_team (company_name, job_no, resource_no, resource_name, updated_at)\nSELECT $1, $2, $3, NULLIF(btrim($4), ''), NOW()\nWHERE EXISTS (SELECT 1 FROM public.bc_job j WHERE j.company_name = $1 AND j.no = $2)\n  AND EXISTS (SELECT 1 FROM public.bc_resource r WHERE r.company_name = $1 AND r.code = $3)\nON CONFLICT ON CONSTRAINT job_team_pkey\nDO UPDATE SET\n  resource_name = EXCLUDED.resource_name,\n  updated_at = NOW()\nWHERE EXISTS (SELECT 1 FROM public.bc_job j WHERE j.company_name = EXCLUDED.company_name AND j.no = EXCLUDED.job_no)\n  AND EXISTS (SELECT 1 FROM public.bc_resource r WHERE r.company_name = EXCLUDED.company_name AND r.code = EXCLUDED.resource_no)\nRETURNING *;",
+          "query": "INSERT INTO public.bc_job_team (company_name, job_no, resource_no, resource_name, updated_at)\nSELECT $1, $2, $3, NULLIF(btrim($4), ''), NOW()\nWHERE EXISTS (SELECT 1 FROM public.bc_job j WHERE j.company_name = $1 AND j.no = $2)\n  AND EXISTS (SELECT 1 FROM public.bc_resource r WHERE r.code = $3)\nON CONFLICT ON CONSTRAINT job_team_pkey\nDO UPDATE SET\n  resource_name = EXCLUDED.resource_name,\n  updated_at = NOW()\nWHERE EXISTS (SELECT 1 FROM public.bc_job j WHERE j.company_name = EXCLUDED.company_name AND j.no = EXCLUDED.job_no)\n  AND EXISTS (SELECT 1 FROM public.bc_resource r WHERE r.code = EXCLUDED.resource_no)\nRETURNING *;",
           "options": {
             "queryReplacement": "{{$json.companyName}}\n{{$json.jobNo}}\n{{$json.resourceNo}}\n{{$json.resourceName}}"
           },
@@ -459,7 +459,7 @@
           2416
         ],
         "parameters": {
-          "jsCode": "// Transform Equipo Proyectos — alineado con workflow 001\nconst input = $input.all();\nif (input.length === 0) return [];\n\nconst raw = input[0]?.json ?? {};\nconst src = raw?.body ?? raw;\nconst registros = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : [src]);\nconst items = [];\nconst companyName = $items('Build sync_state map')[0]?.json?.company || '';\n\nfor (const r of registros) {\n  const jobNo = String(r.arbvrnJobNo ?? r.ARBVRNJobNo ?? r.job_no ?? r.jobNo ?? '').trim();\n  const resourceNo = String(r.arbvrnResourceNo ?? r.ARBVRNResourceNo ?? r.resource_no ?? r.resourceNo ?? '').trim();\n  const resourceName = String(r.arbvrnResourceName ?? r.ARBVRNResourceName ?? r.resource_name ?? '').trim();\n\n  if (!jobNo || !resourceNo) continue;\n  if (jobNo.startsWith('PP') || jobNo.startsWith('PY')) continue;\n\n  items.push({ json: { companyName, jobNo, resourceNo, resourceName } });\n}\n\nconsole.log(`✅ Transform Equipo Proyectos: ${items.length} miembros de ${registros.length} totales`);\nif (items.length === 0) {\n  return [{ json: { _skip: true, reason: 'no_valid_team_members' } }];\n}\nreturn items;"
+          "jsCode": "// Transform Equipo Proyectos — con validación de padres (fix job_team parent ordering)\nconst input = $input.all();\nif (input.length === 0) return [];\n\nconst raw = input[0]?.json ?? {};\nconst src = raw?.body ?? raw;\nconst registros = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : [src]);\nconst items = [];\nconst companyName = $items('Build sync_state map')[0]?.json?.company || '';\n\n// Leer claves de padres desde Get JT Parent Keys\nconst parentRow = $items('Get JT Parent Keys')[0]?.json ?? {};\nconst validJobs = new Set(Array.isArray(parentRow.jobs) ? parentRow.jobs.map(String) : []);\nconst validResources = new Set(Array.isArray(parentRow.resources) ? parentRow.resources.map(String) : []);\n\nlet skippedMissingParents = 0;\n\nfor (const r of registros) {\n  const jobNo = String(r.arbvrnJobNo ?? r.ARBVRNJobNo ?? r.job_no ?? r.jobNo ?? '').trim();\n  const resourceNo = String(r.arbvrnResourceNo ?? r.ARBVRNResourceNo ?? r.resource_no ?? r.resourceNo ?? '').trim();\n  const resourceName = String(r.arbvrnResourceName ?? r.ARBVRNResourceName ?? r.resource_name ?? '').trim();\n\n  if (!jobNo || !resourceNo) continue;\n  if (jobNo.startsWith('PP') || jobNo.startsWith('PY')) continue;\n\n  if (!validJobs.has(jobNo) || !validResources.has(resourceNo)) {\n    skippedMissingParents++;\n    continue;\n  }\n\n  items.push({ json: { companyName, jobNo, resourceNo, resourceName } });\n}\n\nconsole.log(`✅ Transform Equipo Proyectos: ${items.length} miembros de ${registros.length} totales | sin_padres=${skippedMissingParents}`);\n\nif (skippedMissingParents > 0) {\n  throw new Error(`job_team (004): ${skippedMissingParents} registros sin padres en DB (job o resource). Reintenta tras sincronizar proyectos y recursos.`);\n}\n\nif (items.length === 0) {\n  return [{ json: { _skip: true, reason: 'no_valid_team_members' } }];\n}\nreturn items;\n"
         },
         "typeVersion": 2
       },
@@ -4531,6 +4531,29 @@
           "jsCode": "const items = $input.all();\nlet failed = 0;\nlet firstErr = '';\nlet affected = 0;\nfor (const it of items) {\n  const j = it?.json || {};\n  if (j.skipped) {\n    return [{ json: { key: 'job_ledger_entry_line', status: 'ok', synced: 0, success: 0, skipped: true } }];\n  }\n  const statusCode = Number(j?.statusCode ?? j?.response?.statusCode ?? 0);\n  const bodyErr = j?.body?.error?.message || (typeof j?.body === 'string' ? j.body : null);\n  const msg = j?.error?.message || j?.message || j?.data?.error || bodyErr || null;\n  if (!firstErr && msg) firstErr = String(msg);\n  if (msg || statusCode >= 400) failed++;\n  const n = Number(j?.affected ?? 0);\n  if (Number.isFinite(n)) affected += n;\n}\nconst success = items.length - failed;\nconst synced = affected || success;\nconst res = { key: 'job_ledger_entry_line', causeNode: 'Upsert Ledger Line' };\nif (failed > 0) {\n  res.status = 'error';\n  res.synced = synced;\n  res.failed = failed;\n  res.message = firstErr || ('HTTP ' + (items[0]?.json?.statusCode || 'error'));\n} else {\n  res.status = 'ok';\n  res.synced = synced;\n  res.success = success;\n  res.affected = affected;\n}\nreturn [{ json: res }];\n"
         },
         "typeVersion": 2
+      },
+      {
+        "id": "get-jt-parent-keys-004",
+        "name": "Get JT Parent Keys",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          2912,
+          2416
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "TTHI6C7o3V8eVzzr",
+            "name": "Postgres PS_Analytics"
+          }
+        },
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT\n  COALESCE((SELECT json_agg(j.no ORDER BY j.no) FROM public.bc_job j WHERE j.company_name = $1), '[]'::json) AS jobs,\n  COALESCE((SELECT json_agg(r.code ORDER BY r.code) FROM public.bc_resource r), '[]'::json) AS resources;",
+          "options": {
+            "queryReplacement": "={{ $items('Build sync_state map')[0].json.company }}"
+          }
+        }
       }
     ],
     "connections": {
@@ -4587,12 +4610,12 @@
           [
             {
               "index": 0,
-              "node": "Transform Equipo Proyectos",
+              "node": "Result Equipo Proyectos",
               "type": "main"
             },
             {
               "index": 0,
-              "node": "Result Equipo Proyectos",
+              "node": "Get JT Parent Keys",
               "type": "main"
             }
           ]
@@ -7137,6 +7160,17 @@
               "node": "Merge",
               "type": "main",
               "index": 10
+            }
+          ]
+        ]
+      },
+      "Get JT Parent Keys": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Transform Equipo Proyectos",
+              "type": "main"
             }
           ]
         ]
