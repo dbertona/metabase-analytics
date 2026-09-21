@@ -52,6 +52,12 @@ Gitea → Actions → Deploy Analytics Multi-Environment
 
 CLI equivalente: `./scripts/deploy-analytics.sh --env testing|production --yes`.
 
+Leftover `job_team` (no publica JSON): el 004 de n8n testing debe ser el de
+`main` — `Build sync_state map` prefiere `bc_*` frente a alias leftover;
+`Transform Equipo Proyectos` lee `BC API - Equipo Proyectos`. Canal testing:
+`./scripts/deploy-analytics.sh --env testing --scope 004 --yes` (`--apply-only`,
+sin clon ni canary). Prod 004: solo el gate.
+
 ---
 
 ## Publicar 004 o vistas que mueven cifras (gate)
