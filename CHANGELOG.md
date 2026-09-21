@@ -20,6 +20,14 @@
 
 ### Fixed
 
+- **004 equipo:** el HTTP de `job_team` lee `ProyectosEquipos` (query
+  50223), el mismo filtro que el 001: job Open/Planning/Completed/Lost y
+  recurso con email `@` + departamento. El recurso sin email no llega y
+  no es error. En full sync (watermark anterior a 2000) purga de
+  `bc_job_team` las filas que esa query no devuelve. Si el nombre no
+  viene en la query, se conserva el de `bc_resource`. Así Timesheet y
+  Analytics coinciden.
+
 - **004 leftover `job_team`:** encadena `job` → `resource` → `job_team`,
   lanza si faltan padres y busca recursos sin filtrar por empresa
   (`Get JT Parent Keys` en `executeQuery`). Si leftover incluye
