@@ -33,7 +33,8 @@
   no usa `min()`. `Transform Equipo Proyectos` lee las páginas de
   `BC API - Equipo Proyectos` (como 001), no `$input` de padres.
   El fail-fast si faltan padres no se relaja. Cierre
-  `fix/004-wm-bc-prefer-equipo-input`.
+  `fix/004-wm-bc-prefer-equipo-input`. Testing: Deploy Analytics
+  `--scope 004` (`--apply-only`). Prod: solo gate.
 
 - **Gitea Deploy Analytics Pre-flight:** ya no usa `actions/checkout@v4`
   (Fortinet en VM 104 rompe TLS a `github.com`; Timesheet solo pasa por
