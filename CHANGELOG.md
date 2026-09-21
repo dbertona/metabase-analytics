@@ -28,6 +28,12 @@
   `fix/job-team-parent-ordering` y
   `fix/004-leftover-parent-wm-reset`. Prod 004: solo gate
   (`deploy-004-gated.sh`), no apply directo.
+- **004 watermarks `bc_*` + Transform Equipo:** `Build sync_state map`
+  prefiere filas `bc_*` frente a alias leftover (`job`/`job_team`);
+  no usa `min()`. `Transform Equipo Proyectos` lee las páginas de
+  `BC API - Equipo Proyectos` (como 001), no `$input` de padres.
+  El fail-fast si faltan padres no se relaja. Cierre
+  `fix/004-wm-bc-prefer-equipo-input`.
 
 - **Gitea Deploy Analytics Pre-flight:** ya no usa `actions/checkout@v4`
   (Fortinet en VM 104 rompe TLS a `github.com`; Timesheet solo pasa por
