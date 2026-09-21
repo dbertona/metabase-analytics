@@ -22,8 +22,11 @@
 
 - **004 leftover `job_team`:** encadena `job` → `resource` → `job_team`,
   lanza si faltan padres y busca recursos sin filtrar por empresa
-  (`Get JT Parent Keys` en `executeQuery`). Cierre
-  `fix/job-team-parent-ordering`. Prod 004: solo gate
+  (`Get JT Parent Keys` en `executeQuery`). Si leftover incluye
+  `job_team` y el watermark de equipo es epoch (< 2000), fuerza
+  `job`/`resource` a epoch en esa pasada. Cierre
+  `fix/job-team-parent-ordering` y
+  `fix/004-leftover-parent-wm-reset`. Prod 004: solo gate
   (`deploy-004-gated.sh`), no apply directo.
 
 - **Gitea Deploy Analytics Pre-flight:** ya no usa `actions/checkout@v4`
