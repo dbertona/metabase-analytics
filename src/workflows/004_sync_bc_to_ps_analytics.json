@@ -130,7 +130,7 @@
           2272
         ],
         "parameters": {
-          "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/' + ((($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })())) + '/api/Power_Solution/PS_API/v2.0/companies('\n  + ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json).companyId\n  + ')/EquipoProyectos?$select=ARBVRNJobNo,ARBVRNResourceNo,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json).syncStateByEntity['job_team']\n}}",
+          "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/' + ((($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })())) + '/api/Power_Solution/PS_API/v2.0/companies('\n  + ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json).companyId\n  + ')/ProyectosEquipos?$select=job_no,resource_no,lastModifiedDateTime&$filter=lastModifiedDateTime%20ge%20'\n  + ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json).syncStateByEntity['job_team']\n}}",
           "options": {
             "pagination": {
               "pagination": {
@@ -234,7 +234,7 @@
           2416
         ],
         "parameters": {
-          "query": "INSERT INTO public.bc_job_team (company_name, job_no, resource_no, resource_name, updated_at)\nSELECT $1, $2, $3, NULLIF(btrim($4), ''), NOW()\nWHERE EXISTS (SELECT 1 FROM public.bc_job j WHERE j.company_name = $1 AND j.no = $2)\n  AND EXISTS (SELECT 1 FROM public.bc_resource r WHERE r.code = $3)\nON CONFLICT ON CONSTRAINT job_team_pkey\nDO UPDATE SET\n  resource_name = EXCLUDED.resource_name,\n  updated_at = NOW()\nWHERE EXISTS (SELECT 1 FROM public.bc_job j WHERE j.company_name = EXCLUDED.company_name AND j.no = EXCLUDED.job_no)\n  AND EXISTS (SELECT 1 FROM public.bc_resource r WHERE r.code = EXCLUDED.resource_no)\nRETURNING *;",
+          "query": "INSERT INTO public.bc_job_team (company_name, job_no, resource_no, resource_name, updated_at)\nSELECT $1, $2, $3,\n  COALESCE(\n    NULLIF(btrim($4), ''),\n    (SELECT r.name FROM public.bc_resource r WHERE r.company_name = $1 AND r.code = $3)\n  ),\n  NOW()\nWHERE EXISTS (SELECT 1 FROM public.bc_job j WHERE j.company_name = $1 AND j.no = $2)\n  AND EXISTS (SELECT 1 FROM public.bc_resource r WHERE r.code = $3)\nON CONFLICT ON CONSTRAINT job_team_pkey\nDO UPDATE SET\n  resource_name = COALESCE(EXCLUDED.resource_name, bc_job_team.resource_name),\n  updated_at = NOW()\nWHERE EXISTS (SELECT 1 FROM public.bc_job j WHERE j.company_name = EXCLUDED.company_name AND j.no = EXCLUDED.job_no)\n  AND EXISTS (SELECT 1 FROM public.bc_resource r WHERE r.code = EXCLUDED.resource_no)\nRETURNING *;",
           "options": {
             "queryReplacement": "{{$json.companyName}}\n{{$json.jobNo}}\n{{$json.resourceNo}}\n{{$json.resourceName}}"
           },
@@ -459,7 +459,7 @@
           2416
         ],
         "parameters": {
-          "jsCode": "// Transform Equipo Proyectos — filas desde BC API (paginas), padres desde Get JT Parent Keys\nconst parentRow = $items('Get JT Parent Keys')[0]?.json ?? $input.first()?.json ?? {};\nconst jobsRaw = parentRow.jobs ?? [];\nconst resourcesRaw = parentRow.resources ?? [];\nconst validJobs = new Set((Array.isArray(jobsRaw) ? jobsRaw : []).map((x) => String(x).trim()).filter(Boolean));\nconst validResources = new Set((Array.isArray(resourcesRaw) ? resourcesRaw : []).map((x) => String(x).trim()).filter(Boolean));\nconst companyName = $items('Build sync_state map')[0]?.json?.company || '';\n\nconst bcPages = $items('BC API - Equipo Proyectos') || [];\nconst allRows = [];\nfor (const page of bcPages) {\n  const raw = page?.json ?? {};\n  if (raw?.error) continue;\n  const src = raw?.body ?? raw;\n  const registros = Array.isArray(src?.value) ? src.value : (Array.isArray(src) ? src : [src]);\n  for (const r of registros) {\n    if (r && typeof r === 'object') allRows.push(r);\n  }\n}\n\nconst items = [];\nlet skippedMissingParents = 0;\n\nfor (const r of allRows) {\n  const jobNo = String(r.arbvrnJobNo ?? r.ARBVRNJobNo ?? r.job_no ?? r.jobNo ?? '').trim();\n  const resourceNo = String(r.arbvrnResourceNo ?? r.ARBVRNResourceNo ?? r.resource_no ?? r.resourceNo ?? '').trim();\n  const resourceName = String(r.arbvrnResourceName ?? r.ARBVRNResourceName ?? r.resource_name ?? '').trim();\n\n  if (!jobNo || !resourceNo) continue;\n  if (jobNo.startsWith('PP') || jobNo.startsWith('PY')) continue;\n\n  if (!validJobs.has(jobNo) || !validResources.has(resourceNo)) {\n    skippedMissingParents++;\n    continue;\n  }\n\n  items.push({ json: { companyName, jobNo, resourceNo, resourceName } });\n}\n\nconsole.log(`✅ Transform Equipo Proyectos: ${items.length} miembros de ${allRows.length} totales | sin_padres=${skippedMissingParents}`);\n\nif (skippedMissingParents > 0) {\n  throw new Error(`job_team (004): ${skippedMissingParents} registros sin padres en DB (job o resource). Reintenta tras sincronizar proyectos y recursos.`);\n}\n\nif (items.length === 0) {\n  return [{ json: { _skip: true, reason: 'no_valid_team_members' } }];\n}\nreturn items;\n"
+          "jsCode": "// Transform Equipo Proyectos — ProyectosEquipos (mismo filtro que el 001)\n// Job Open/Planning/Completed/Lost y recurso con email + departamento.\n// El recurso sin email no llega, no se importa y no es error.\nconst parentRow = $items('Get JT Parent Keys')[0]?.json ?? $input.first()?.json ?? {};\nconst jobsRaw = parentRow.jobs ?? [];\nconst resourcesRaw = parentRow.resources ?? [];\nconst validJobs = new Set((Array.isArray(jobsRaw) ? jobsRaw : []).map((x) => String(x).trim()).filter(Boolean));\nconst validResources = new Set((Array.isArray(resourcesRaw) ? resourcesRaw : []).map((x) => String(x).trim()).filter(Boolean));\nconst mapRow = $items('Build sync_state map')[0]?.json || {};\nconst companyName = mapRow.company || '';\nconst watermark = mapRow.syncStateByEntity?.job_team || '';\nconst wmMs = Date.parse(watermark);\nconst isFullSync = !Number.isFinite(wmMs) || wmMs < Date.parse('2000-01-01T00:00:00Z');\n\nconst bcPages = $items('BC API - Equipo Proyectos') || [];\nlet bcOk = bcPages.length > 0;\nfor (const page of bcPages) {\n  if (page?.json?.error) { bcOk = false; break; }\n}\nconst allRows = [];\nfor (const page of bcPages) {\n  const raw = page?.json ?? {};\n  if (raw?.error) continue;\n  const src = raw?.body ?? raw;\n  const registros = Array.isArray(src?.value) ? src.value : (Array.isArray(src) ? src : [src]);\n  for (const r of registros) {\n    if (r && typeof r === 'object') allRows.push(r);\n  }\n}\n\nconst items = [];\nconst keepPairs = [];\nlet skippedMissingParents = 0;\n\nfor (const r of allRows) {\n  const jobNo = String(r.arbvrnJobNo ?? r.ARBVRNJobNo ?? r.job_no ?? r.jobNo ?? '').trim();\n  const resourceNo = String(r.arbvrnResourceNo ?? r.ARBVRNResourceNo ?? r.resource_no ?? r.resourceNo ?? '').trim();\n  const resourceName = String(r.arbvrnResourceName ?? r.ARBVRNResourceName ?? r.resource_name ?? r.resourceName ?? '').trim();\n\n  if (!jobNo || !resourceNo) continue;\n  if (jobNo.startsWith('PP') || jobNo.startsWith('PY')) continue;\n\n  if (!validJobs.has(jobNo) || !validResources.has(resourceNo)) {\n    skippedMissingParents++;\n    continue;\n  }\n\n  keepPairs.push({ job_no: jobNo, resource_no: resourceNo });\n  items.push({ json: { companyName, jobNo, resourceNo, resourceName } });\n}\n\nconsole.log(`✅ Transform Equipo Proyectos: ${items.length} miembros de ${allRows.length} totales | sin_padres=${skippedMissingParents} | full=${isFullSync}`);\n\nif (skippedMissingParents > 0) {\n  throw new Error(`job_team (004): ${skippedMissingParents} registros sin padres en DB (job o resource). Reintenta tras sincronizar proyectos y recursos.`);\n}\n\nconst meta = {\n  _keepPairsJson: JSON.stringify(keepPairs),\n  _isFullSync: isFullSync,\n  _canPurge: bcOk && isFullSync,\n  companyName,\n};\n\nif (items.length === 0) {\n  return [{ json: { _skip: true, reason: 'no_valid_team_members', ...meta } }];\n}\nObject.assign(items[0].json, meta);\nreturn items;\n"
         },
         "typeVersion": 2
       },
@@ -507,11 +507,11 @@
         "name": "Compute now ISO (Equipo Proyectos)",
         "type": "n8n-nodes-base.code",
         "position": [
-          3584,
+          4928,
           2512
         ],
         "parameters": {
-          "jsCode": "const upsertNode = 'Upsert Equipo Proyectos';\nconst err = $node[upsertNode]?.json?.error;\nif (err) { return []; }\nconst upserted = ($items(upsertNode) || []).filter((i) => {\n  const j = i?.json || {};\n  if (!j || j._skip || j.error) return false;\n  if (j.success === true && Object.keys(j).length === 1) return false;\n  return Object.keys(j).length > 0;\n}).length;\nif (upserted === 0) { return []; }\nconst companyName = $items('Build sync_state map')[0]?.json?.company || '';\nreturn [{ json: { companyName, nowIso: new Date().toISOString() } }];"
+          "jsCode": "const upsertNode = 'Upsert Equipo Proyectos';\nconst purgeNode = 'Purge Equipo Proyectos';\nconst err = $node[upsertNode]?.json?.error || $node[purgeNode]?.json?.error;\nif (err) { return []; }\nconst upserted = ($items(upsertNode) || []).filter((i) => {\n  const j = i?.json || {};\n  if (!j || j._skip || j.error) return false;\n  if (j.success === true && Object.keys(j).length === 1) return false;\n  return Object.keys(j).length > 0;\n}).length;\nconst purged = Number(($items(purgeNode) || [])[0]?.json?.purged || 0);\nconst prepare = ($items('Prepare Purge Equipo Proyectos') || [])[0]?.json || {};\nconst isFullSync = prepare.is_full_sync === true;\nif (upserted === 0 && purged === 0 && !isFullSync) { return []; }\nconst companyName = $items('Build sync_state map')[0]?.json?.company || '';\nreturn [{ json: { companyName, nowIso: new Date().toISOString() } }];\n"
         },
         "typeVersion": 2
       },
@@ -4554,6 +4554,43 @@
             "queryReplacement": "={{ $items('Build sync_state map')[0].json.company }}"
           }
         }
+      },
+      {
+        "id": "1e462d6c-ed58-4999-8c9c-4b7c85be79c3",
+        "name": "Prepare Purge Equipo Proyectos",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          3808,
+          2416
+        ],
+        "parameters": {
+          "jsCode": "const transformItems = ($items('Transform Equipo Proyectos') || []).map((i) => i?.json || {});\nconst first = transformItems.find((j) => j && (j._keepPairsJson != null || j._skip || j.jobNo)) || {};\nconst companyName = first.companyName || $items('Build sync_state map')[0]?.json?.company || '';\nreturn [{\n  json: {\n    company_name: companyName,\n    do_purge: first._canPurge === true,\n    keep_pairs_json: first._keepPairsJson || '[]',\n    is_full_sync: first._isFullSync === true,\n  },\n}];\n"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "cf8ac898-f21c-42a7-9564-58ff666b597c",
+        "name": "Purge Equipo Proyectos",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          4256,
+          2416
+        ],
+        "parameters": {
+          "query": "WITH params AS (\n  SELECT $1::text AS company_name,\n         COALESCE($2::boolean, false) AS do_purge,\n         COALESCE($3::jsonb, '[]'::jsonb) AS keep\n), deleted AS (\n  DELETE FROM public.bc_job_team t\n  WHERE (SELECT do_purge FROM params)\n    AND t.company_name = (SELECT company_name FROM params)\n    AND NOT EXISTS (\n      SELECT 1 FROM jsonb_array_elements((SELECT keep FROM params)) e\n      WHERE e->>'job_no' = t.job_no AND e->>'resource_no' = t.resource_no\n    )\n  RETURNING t.job_no\n)\nSELECT COUNT(*)::int AS purged FROM deleted;",
+          "options": {
+            "queryReplacement": "={{ $json.company_name }}\n={{ $json.do_purge }}\n={{ $json.keep_pairs_json }}"
+          },
+          "operation": "executeQuery"
+        },
+        "credentials": {
+          "postgres": {
+            "id": "TTHI6C7o3V8eVzzr",
+            "name": "Postgres PS_Analytics"
+          }
+        },
+        "typeVersion": 2.4,
+        "continueOnFail": true
       }
     ],
     "connections": {
@@ -5263,12 +5300,12 @@
           [
             {
               "index": 0,
-              "node": "Compute now ISO (Equipo Proyectos)",
+              "node": "Result Equipo Proyectos",
               "type": "main"
             },
             {
               "index": 0,
-              "node": "Result Equipo Proyectos",
+              "node": "Prepare Purge Equipo Proyectos",
               "type": "main"
             }
           ]
@@ -7170,6 +7207,28 @@
             {
               "index": 0,
               "node": "Transform Equipo Proyectos",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Prepare Purge Equipo Proyectos": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Purge Equipo Proyectos",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Purge Equipo Proyectos": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Compute now ISO (Equipo Proyectos)",
               "type": "main"
             }
           ]
