@@ -20,6 +20,12 @@
 
 ### Fixed
 
+- **004 leftover `job_team`:** encadena `job` → `resource` → `job_team`,
+  lanza si faltan padres y busca recursos sin filtrar por empresa
+  (`Get JT Parent Keys` en `executeQuery`). Cierre
+  `fix/job-team-parent-ordering`. Prod 004: solo gate
+  (`deploy-004-gated.sh`), no apply directo.
+
 - **Gitea Deploy Analytics Pre-flight:** ya no usa `actions/checkout@v4`
   (Fortinet en VM 104 rompe TLS a `github.com`; Timesheet solo pasa por
   caché local). El job clona el repo desde Gitea en `127.0.0.1:3000`.
