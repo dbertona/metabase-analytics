@@ -2,7 +2,7 @@
 
 ## 🎯 ¿Para qué sirve este repo?
 
-Réplica de datos BC en **PostgreSQL Analytics** (VM 100) para Apps (Seguimiento Económico) y Power BI.
+Réplica de datos BC en **PostgreSQL Analytics** (VM 100) para Apps (Seguimiento Económico).
 Contiene el **workflow n8n 004** (sync BC → Analytics) en `src/workflows/`.
 NO contiene código de la app Timesheet/Gastos (eso está en `power-solution-apps`).
 
@@ -39,7 +39,7 @@ psql "postgresql://postgres:analytics_testing_2025@192.168.36.103:5435/postgres"
 
 | Repo | Qué contiene | ¿Tocar desde aquí? |
 |---|----|----|
-| **superset-analytics** (este) | Workflow 004, SQL vistas, scripts apply, docs SE/PBI | ✅ Sí |
+| **superset-analytics** (este) | Workflow 004, SQL vistas, scripts apply, docs SE | ✅ Sí |
 | **power-solution-apps** | App Timesheet/Gastos | ❌ No (otro workspace) |
 | **power-solution-docs** | Docs compartidas (`docs/shared/`) | Solo via submódulo |
 

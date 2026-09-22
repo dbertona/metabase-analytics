@@ -1,6 +1,6 @@
-# Spec del modelo — Seguimiento Económico PS
+# Spec de campos — Seguimiento Económico
 
-Extraído del `.pbix` (backup XPress9 + pbixray). Dataset cloud ID: `bd3dc81a-3bd3-4699-8fc6-f039c79c1821`.
+Lógica de campos de las vistas Analytics (origen histórico: el informe que ya no se usa).
 
 ## Tabla central: Facturacion
 
@@ -13,9 +13,9 @@ Facturacion = Table.Combine({
 })
 ```
 
-### Transformaciones comunes (Power Query → SQL)
+### Transformaciones comunes (origen → SQL)
 
-| Campo PBI | Lógica |
+| Campo | Lógica |
 |-----------|--------|
 | `Facturado` | `probability = 0 → invoice` else `invoice * probability / 100` |
 | `%` | `probability = 0 → 100` else `probability` |

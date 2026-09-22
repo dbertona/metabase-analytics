@@ -1,4 +1,4 @@
-# Fase 2 — Ampliar workflow 004 para paridad PBI
+# Fase 2 — Ampliar workflow 004 (movimientos por mes)
 
 Archivo canónico en este repo: `src/workflows/004_sync_bc_to_ps_analytics.json`
 
@@ -29,7 +29,7 @@ Query BC: `Business-Central/src/Queries/PSMovimientosProyectosMes.Query.al`
 
 ## Prioridad 3 — Recursos enriquecidos
 
-PBI `RecursosHoras` usa campos de perfil desde API recursos. Verificar que `bc_resource` incluye columnas equivalentes a `perfil` si Superset lo necesita.
+La vista de recursos usa campos de perfil desde la API de recursos. Verificar que `bc_resource` incluye columnas equivalentes a `perfil`.
 
 ## Checklist despliegue
 
@@ -38,6 +38,6 @@ PBI `RecursosHoras` usa campos de perfil desde API recursos. Verificar que `bc_r
 3. Publicar 004 + SQL a prod **solo** con `./scripts/deploy-004-gated.sh --yes` (no API PUT ni `apply-bi-views` directo)
 4. El gate aplica el JSON del repo en n8n prod (VM 101) y el SQL canónico en Analytics prod (VM 100) si las cifras cierran
 5. Sync: `POST https://apps.powersolution.es/n8n/webhook/sync-bc-to-analytics?company=psi`
-6. Validar `v_se_kpi_cards` contra PBI
+6. Validar `v_se_kpi_cards` en Analytics
 
 > **n8n:** solo `https://apps.powersolution.es/n8n/` (workflow `d1f7647e114a486e`). No hay n8n en VM 100.

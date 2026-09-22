@@ -459,7 +459,7 @@
           2416
         ],
         "parameters": {
-          "jsCode": "// Transform Equipo Proyectos — ProyectosEquipos (mismo filtro que el 001)\n// Job Open/Planning/Completed/Lost y recurso con email + departamento.\n// El recurso sin email no llega, no se importa y no es error.\nconst parentRow = $items('Get JT Parent Keys')[0]?.json ?? $input.first()?.json ?? {};\nconst jobsRaw = parentRow.jobs ?? [];\nconst resourcesRaw = parentRow.resources ?? [];\nconst validJobs = new Set((Array.isArray(jobsRaw) ? jobsRaw : []).map((x) => String(x).trim()).filter(Boolean));\nconst validResources = new Set((Array.isArray(resourcesRaw) ? resourcesRaw : []).map((x) => String(x).trim()).filter(Boolean));\nconst mapRow = $items('Build sync_state map')[0]?.json || {};\nconst companyName = mapRow.company || '';\nconst watermark = mapRow.syncStateByEntity?.job_team || '';\nconst wmMs = Date.parse(watermark);\nconst isFullSync = !Number.isFinite(wmMs) || wmMs < Date.parse('2000-01-01T00:00:00Z');\n\nconst bcPages = $items('BC API - Equipo Proyectos') || [];\nlet bcOk = bcPages.length > 0;\nfor (const page of bcPages) {\n  if (page?.json?.error) { bcOk = false; break; }\n}\nconst allRows = [];\nfor (const page of bcPages) {\n  const raw = page?.json ?? {};\n  if (raw?.error) continue;\n  const src = raw?.body ?? raw;\n  const registros = Array.isArray(src?.value) ? src.value : (Array.isArray(src) ? src : [src]);\n  for (const r of registros) {\n    if (r && typeof r === 'object') allRows.push(r);\n  }\n}\n\nconst items = [];\nconst keepPairs = [];\nlet skippedMissingParents = 0;\n\nfor (const r of allRows) {\n  const jobNo = String(r.arbvrnJobNo ?? r.ARBVRNJobNo ?? r.job_no ?? r.jobNo ?? '').trim();\n  const resourceNo = String(r.arbvrnResourceNo ?? r.ARBVRNResourceNo ?? r.resource_no ?? r.resourceNo ?? '').trim();\n  const resourceName = String(r.arbvrnResourceName ?? r.ARBVRNResourceName ?? r.resource_name ?? r.resourceName ?? '').trim();\n\n  if (!jobNo || !resourceNo) continue;\n  if (jobNo.startsWith('PP') || jobNo.startsWith('PY')) continue;\n\n  if (!validJobs.has(jobNo) || !validResources.has(resourceNo)) {\n    skippedMissingParents++;\n    continue;\n  }\n\n  keepPairs.push({ job_no: jobNo, resource_no: resourceNo });\n  items.push({ json: { companyName, jobNo, resourceNo, resourceName } });\n}\n\nconsole.log(`✅ Transform Equipo Proyectos: ${items.length} miembros de ${allRows.length} totales | sin_padres=${skippedMissingParents} | full=${isFullSync}`);\n\nif (skippedMissingParents > 0) {\n  throw new Error(`job_team (004): ${skippedMissingParents} registros sin padres en DB (job o resource). Reintenta tras sincronizar proyectos y recursos.`);\n}\n\nconst meta = {\n  _keepPairsJson: JSON.stringify(keepPairs),\n  _isFullSync: isFullSync,\n  _canPurge: bcOk && isFullSync,\n  companyName,\n};\n\nif (items.length === 0) {\n  return [{ json: { _skip: true, reason: 'no_valid_team_members', ...meta } }];\n}\nObject.assign(items[0].json, meta);\nreturn items;\n"
+          "jsCode": "// Transform Equipo Proyectos — ProyectosEquipos (mismo filtro que el 001)\n// Job Open/Planning/Completed/Lost y recurso con email + departamento.\n// El recurso sin email no llega, no se importa y no es error.\nconst parentRow = $items('Get JT Parent Keys')[0]?.json ?? $input.first()?.json ?? {};\nconst jobsRaw = parentRow.jobs ?? [];\nconst resourcesRaw = parentRow.resources ?? [];\nconst validJobs = new Set((Array.isArray(jobsRaw) ? jobsRaw : []).map((x) => String(x).trim()).filter(Boolean));\nconst validResources = new Set((Array.isArray(resourcesRaw) ? resourcesRaw : []).map((x) => String(x).trim()).filter(Boolean));\n\nconst allowedJobStatus = new Set(['Planning', 'Quote', 'Open', 'Completed', 'Lost']);\nfunction jobEligibility(row) {\n  const no = String(row?.no ?? row?.No ?? '').trim();\n  if (!no) return null;\n  if (no.startsWith('PP') || no.startsWith('PY')) return 'skip';\n  const description = String(row?.description ?? '').trim();\n  const departamento = String(\n    row?.departamento ?? row?.GlobalDimension1Code ?? row?.globalDimension1Code ?? ''\n  ).trim();\n  const statusRaw = String(row?.Estado ?? row?.estado ?? row?.status ?? '').trim();\n  if (!description || !departamento || !allowedJobStatus.has(statusRaw)) return 'skip';\n  return 'keep';\n}\nfunction rowsOf(nodeName) {\n  const pages = $items(nodeName) || [];\n  const out = [];\n  for (const page of pages) {\n    const raw = page?.json ?? {};\n    if (raw?.error) {\n      const msg = raw.error.message || raw.error.description || 'Error en Business Central';\n      throw new Error(String(msg));\n    }\n    const src = raw?.body ?? raw;\n    const registros = Array.isArray(src?.value) ? src.value : (Array.isArray(src) ? src : []);\n    for (const r of registros) {\n      if (r && typeof r === 'object') out.push(r);\n    }\n  }\n  return out;\n}\nfunction sample(values, n) {\n  return [...values].slice(0, n).join(', ');\n}\nconst ineligibleJobs = new Set();\nfor (const row of rowsOf('BC API - Job Eligibility')) {\n  const no = String(row?.no ?? row?.No ?? '').trim();\n  const decision = jobEligibility(row);\n  if (no && decision === 'skip') ineligibleJobs.add(no);\n}\nconst mapRow = $items('Build sync_state map')[0]?.json || {};\nconst companyName = mapRow.company || '';\nconst watermark = mapRow.syncStateByEntity?.job_team || '';\nconst wmMs = Date.parse(watermark);\nconst isFullSync = !Number.isFinite(wmMs) || wmMs < Date.parse('2000-01-01T00:00:00Z');\n\nconst bcPages = $items('BC API - Equipo Proyectos') || [];\nlet bcOk = bcPages.length > 0;\nfor (const page of bcPages) {\n  if (page?.json?.error) { bcOk = false; break; }\n}\nconst allRows = [];\nfor (const page of bcPages) {\n  const raw = page?.json ?? {};\n  if (raw?.error) continue;\n  const src = raw?.body ?? raw;\n  const registros = Array.isArray(src?.value) ? src.value : (Array.isArray(src) ? src : [src]);\n  for (const r of registros) {\n    if (r && typeof r === 'object') allRows.push(r);\n  }\n}\n\nconst items = [];\nconst keepPairs = [];\nconst seen = new Set();\nconst missingJobs = new Set();\nconst missingResources = new Set();\nlet skippedMissingParents = 0;\nlet skippedIneligible = 0;\n\nfor (const r of allRows) {\n  const jobNo = String(r.arbvrnJobNo ?? r.ARBVRNJobNo ?? r.job_no ?? r.jobNo ?? '').trim();\n  const resourceNo = String(r.arbvrnResourceNo ?? r.ARBVRNResourceNo ?? r.resource_no ?? r.resourceNo ?? '').trim();\n  const resourceName = String(r.arbvrnResourceName ?? r.ARBVRNResourceName ?? r.resource_name ?? r.resourceName ?? '').trim();\n\n  if (!jobNo || !resourceNo) continue;\n  if (jobNo.startsWith('PP') || jobNo.startsWith('PY')) continue;\n  const pairKey = jobNo + '::' + resourceNo;\n  if (seen.has(pairKey)) continue;\n  seen.add(pairKey);\n\n  if (!validJobs.has(jobNo)) {\n    if (ineligibleJobs.has(jobNo)) { skippedIneligible++; continue; }\n    skippedMissingParents++;\n    missingJobs.add(jobNo);\n    continue;\n  }\n  if (!validResources.has(resourceNo)) {\n    skippedMissingParents++;\n    missingResources.add(resourceNo);\n    continue;\n  }\n\n  keepPairs.push({ job_no: jobNo, resource_no: resourceNo });\n  items.push({ json: { companyName, jobNo, resourceNo, resourceName } });\n}\n\nconsole.log(`✅ Transform Equipo Proyectos: ${items.length} miembros de ${allRows.length} totales | sin_padres=${skippedMissingParents} | full=${isFullSync}`);\n\nif (skippedMissingParents > 0) {\n  throw new Error(\n    `job_team (004): ${skippedMissingParents} registros sin padres que deberían existir.` +\n    ` proyectos=${sample(missingJobs, 20) || '-'}; recursos=${sample(missingResources, 20) || '-'}.` +\n    ` No se avanza la marca.`\n  );\n}\n\nconst meta = {\n  _keepPairsJson: JSON.stringify(keepPairs),\n  _isFullSync: isFullSync,\n  _canPurge: bcOk && isFullSync,\n  companyName,\n};\n\nif (items.length === 0) {\n  return [{ json: { _skip: true, reason: 'no_valid_team_members', ...meta } }];\n}\nObject.assign(items[0].json, meta);\nreturn items;\n"
         },
         "typeVersion": 2
       },
@@ -681,7 +681,7 @@
           3456
         ],
         "parameters": {
-          "jsCode": "const batch = $('Resolve Company').first()?.json?.batch || { syncAll: true, enabledEntities: [] };\nconst syncAll = batch.syncAll !== false && (!Array.isArray(batch.enabledEntities) || batch.enabledEntities.length === 0);\nconst enabledEntities = syncAll ? [] : [...(batch.enabledEntities || [])];\n// job_team upsert exige padres en bc_job + bc_resource (EXISTS).\nif (!syncAll && enabledEntities.includes('job_team')) {\n  if (!enabledEntities.includes('job')) enabledEntities.unshift('job');\n  if (!enabledEntities.includes('resource')) enabledEntities.push('resource');\n}\nconst AGG = new Set(['job_planning_line','job_ledger_entry_month','expediente_mes','historico_planificacion_mes']);\nconst enabled = enabledEntities || [];\nconst needsJobFallback = !syncAll && enabled.includes('job') && enabled.some(k => AGG.has(k));\nconst rows = $input.all().flatMap(i => Array.isArray(i.json) ? i.json : [i.json]);\nconst entities = [\n  'resource','ps_year','job','job_team','job_task',\n  'centers_of_responsibility','user_configuration',\n  'technologies','typologies','departments',\n  'job_ledger_entry_month','job_ledger_cert_open','job_planning_line',\n  'expediente_mes','meses_cerrados','objectives_by_department',\n  'historico_planificacion_mes','dias_imputacion','job_ledger_entry_line'\n];\nconst alias = {\n  bc_resource: 'resource',\n  bc_ps_year: 'ps_year',\n  bc_job: 'job',\n  bc_job_team: 'job_team',\n  bc_job_task: 'job_task',\n  bc_responsibility_center: 'centers_of_responsibility',\n  bc_user_configuration: 'user_configuration',\n  bc_technology: 'technologies',\n  bc_typology: 'typologies',\n  bc_department: 'departments',\n  bc_job_ledger_entry_month: 'job_ledger_entry_month',\n  bc_job_ledger_cert_open: 'job_ledger_cert_open',\n  bc_job_planning_line: 'job_planning_line',\n  bc_expediente_mes: 'expediente_mes',\n  bc_meses_cerrados: 'meses_cerrados',\n  bc_objectives_by_department: 'objectives_by_department',\n  bc_historico_planificacion_mes: 'historico_planificacion_mes',\n  bc_dias_imputacion: 'dias_imputacion',\n  bc_job_ledger_entry_line: 'job_ledger_entry_line',\n  resource: 'resource', ps_year: 'ps_year', job: 'job', job_team: 'job_team', job_task: 'job_task',\n  centers_of_responsibility: 'centers_of_responsibility', user_configuration: 'user_configuration',\n  technologies: 'technologies', typologies: 'typologies', departments: 'departments',\n  job_ledger_entry: 'job_ledger_entry_month', job_ledger_entry_month: 'job_ledger_entry_month',\n  job_ledger_cert_open: 'job_ledger_cert_open',\n  job_ledger_entry_line: 'job_ledger_entry_line',\n  mayor_analitico: 'job_ledger_entry_line',\n  job_planning_line: 'job_planning_line'\n};\nconst byEntity = {};\nconst fromBc = {};\nfor (const r of rows) {\n  const rawEntity = String(r.entity || '').trim();\n  const isBc = rawEntity.startsWith('bc_');\n  const key = alias[rawEntity] || rawEntity.replace(/^bc_/, '');\n  const raw = String(r.last_sync_at || '').trim();\n  if (!key || !raw) continue;\n  const iso = new Date(raw.replace(' ', 'T')).toISOString();\n  if (isBc) {\n    if (!fromBc[key] || iso > byEntity[key]) {\n      byEntity[key] = iso;\n      fromBc[key] = true;\n    }\n  } else if (!fromBc[key]) {\n    if (!byEntity[key] || iso > byEntity[key]) byEntity[key] = iso;\n  }\n}\nconst defaultDate = '1900-01-01T00:00:00.000Z';\nfor (const entity of entities) if (!byEntity[entity]) byEntity[entity] = defaultDate;\n// Leftover job_team con WM epoch: full-sync también de job + resource.\nconst leftoverTeam = !syncAll && enabledEntities.includes('job_team');\nif (leftoverTeam) {\n  const teamMs = Date.parse(byEntity.job_team);\n  if (!Number.isFinite(teamMs) || teamMs < Date.parse('2000-01-01T00:00:00Z')) {\n    byEntity.job = '1970-01-01T00:00:00Z';\n    byEntity.resource = '1970-01-01T00:00:00Z';\n  }\n}\n\nconst companyName = $('Resolve Company').first().json.companyName;\nconst companyId = $('Resolve Company').first().json.companyId;\n\nconst now = new Date();\nconst currentYear = now.getUTCFullYear();\nconst partition = batch.partition && typeof batch.partition === 'object' ? batch.partition : {};\nconst parsedSinceYear = Number(batch.sinceYear ?? partition.sinceYear);\nconst sinceYear = Number.isFinite(parsedSinceYear) && parsedSinceYear >= 2000\n  ? Math.floor(parsedSinceYear)\n  : currentYear - 2;\nconst parsedUntilYear = Number(batch.untilYear ?? partition.untilYear);\nconst untilYearRaw = Number.isFinite(parsedUntilYear) && parsedUntilYear >= 2000\n  ? Math.floor(parsedUntilYear)\n  : currentYear;\nconst untilYear = Math.max(untilYearRaw, sinceYear);\nconst parsedWindowDays = Number(batch.windowDays ?? partition.windowDays);\nconst windowDays = Number.isFinite(parsedWindowDays) && parsedWindowDays >= 1\n  ? Math.floor(parsedWindowDays)\n  : 21;\nconst parsedMaxWindows = Number(batch.maxWindows ?? partition.maxWindows);\nconst maxWindows = Number.isFinite(parsedMaxWindows) && parsedMaxWindows >= 1\n  ? Math.floor(parsedMaxWindows)\n  : 120;\n\nconst rawForce = Array.isArray(partition.forceMonths)\n  ? partition.forceMonths\n  : (Array.isArray(batch.forceMonths) ? batch.forceMonths : []);\nconst forceMonths = [];\nconst forceSeen = new Set();\nfor (const m of rawForce) {\n  const fy = Number(m?.year) || 0;\n  const fm = Number(m?.month) || 0;\n  if (fy < 2000 || fm < 1 || fm > 12) continue;\n  const fk = fy + '|' + fm;\n  if (forceSeen.has(fk)) continue;\n  forceSeen.add(fk);\n  forceMonths.push({ year: fy, month: fm });\n}\n\nreturn [{ json: {\n  syncStateByEntity: byEntity,\n  company: companyName,\n  companyId,\n  syncAll,\n  enabledEntities,\n  batchReason: batch.reason || null,\n  batchQueuedAt: batch.queued_at || null,\n  needsJobFallback,\n  modifiedJobNos: [],\n  partition: {\n    sinceYear,\n    untilYear,\n    windowDays,\n    maxWindows,\n    forceMonths,\n  },\n} }];\n"
+          "jsCode": "const batch = $('Resolve Company').first()?.json?.batch || { syncAll: true, enabledEntities: [] };\nconst syncAll = batch.syncAll !== false && (!Array.isArray(batch.enabledEntities) || batch.enabledEntities.length === 0);\nconst enabledEntities = syncAll ? [] : [...(batch.enabledEntities || [])];\n// job_team upsert exige padres en bc_job + bc_resource (EXISTS).\nconst reconcileTeam = batch.reconcileTeam === true;\nif (!syncAll && enabledEntities.includes('job_team') && !reconcileTeam) {\n  if (!enabledEntities.includes('job')) enabledEntities.unshift('job');\n  if (!enabledEntities.includes('resource')) enabledEntities.push('resource');\n}\nconst AGG = new Set(['job_planning_line','job_ledger_entry_month','expediente_mes','historico_planificacion_mes']);\nconst enabled = enabledEntities || [];\nconst needsJobFallback = !syncAll && enabled.includes('job') && enabled.some(k => AGG.has(k));\nconst rows = $input.all().flatMap(i => Array.isArray(i.json) ? i.json : [i.json]);\nconst entities = [\n  'resource','ps_year','job','job_team','job_task',\n  'centers_of_responsibility','user_configuration',\n  'technologies','typologies','departments',\n  'job_ledger_entry_month','job_ledger_cert_open','job_planning_line',\n  'expediente_mes','meses_cerrados','objectives_by_department',\n  'historico_planificacion_mes','dias_imputacion','job_ledger_entry_line'\n];\nconst alias = {\n  bc_resource: 'resource',\n  bc_ps_year: 'ps_year',\n  bc_job: 'job',\n  bc_job_team: 'job_team',\n  bc_job_task: 'job_task',\n  bc_responsibility_center: 'centers_of_responsibility',\n  bc_user_configuration: 'user_configuration',\n  bc_technology: 'technologies',\n  bc_typology: 'typologies',\n  bc_department: 'departments',\n  bc_job_ledger_entry_month: 'job_ledger_entry_month',\n  bc_job_ledger_cert_open: 'job_ledger_cert_open',\n  bc_job_planning_line: 'job_planning_line',\n  bc_expediente_mes: 'expediente_mes',\n  bc_meses_cerrados: 'meses_cerrados',\n  bc_objectives_by_department: 'objectives_by_department',\n  bc_historico_planificacion_mes: 'historico_planificacion_mes',\n  bc_dias_imputacion: 'dias_imputacion',\n  bc_job_ledger_entry_line: 'job_ledger_entry_line',\n  resource: 'resource', ps_year: 'ps_year', job: 'job', job_team: 'job_team', job_task: 'job_task',\n  centers_of_responsibility: 'centers_of_responsibility', user_configuration: 'user_configuration',\n  technologies: 'technologies', typologies: 'typologies', departments: 'departments',\n  job_ledger_entry: 'job_ledger_entry_month', job_ledger_entry_month: 'job_ledger_entry_month',\n  job_ledger_cert_open: 'job_ledger_cert_open',\n  job_ledger_entry_line: 'job_ledger_entry_line',\n  mayor_analitico: 'job_ledger_entry_line',\n  job_planning_line: 'job_planning_line'\n};\nconst byEntity = {};\nconst fromBc = {};\nfor (const r of rows) {\n  const rawEntity = String(r.entity || '').trim();\n  const isBc = rawEntity.startsWith('bc_');\n  const key = alias[rawEntity] || rawEntity.replace(/^bc_/, '');\n  const raw = String(r.last_sync_at || '').trim();\n  if (!key || !raw) continue;\n  const iso = new Date(raw.replace(' ', 'T')).toISOString();\n  if (isBc) {\n    if (!fromBc[key] || iso > byEntity[key]) {\n      byEntity[key] = iso;\n      fromBc[key] = true;\n    }\n  } else if (!fromBc[key]) {\n    if (!byEntity[key] || iso > byEntity[key]) byEntity[key] = iso;\n  }\n}\nconst defaultDate = '1900-01-01T00:00:00.000Z';\nfor (const entity of entities) if (!byEntity[entity]) byEntity[entity] = defaultDate;\n// Leftover job_team con WM epoch: full-sync también de job + resource.\nconst leftoverTeam = !syncAll && enabledEntities.includes('job_team');\nif (reconcileTeam) {\n  byEntity.job_team = '1970-01-01T00:00:00Z';\n} else if (leftoverTeam) {\n  const teamMs = Date.parse(byEntity.job_team);\n  if (!Number.isFinite(teamMs) || teamMs < Date.parse('2000-01-01T00:00:00Z')) {\n    byEntity.job = '1970-01-01T00:00:00Z';\n    byEntity.resource = '1970-01-01T00:00:00Z';\n  }\n}\n\nconst companyName = $('Resolve Company').first().json.companyName;\nconst companyId = $('Resolve Company').first().json.companyId;\n\nconst now = new Date();\nconst currentYear = now.getUTCFullYear();\nconst partition = batch.partition && typeof batch.partition === 'object' ? batch.partition : {};\nconst parsedSinceYear = Number(batch.sinceYear ?? partition.sinceYear);\nconst sinceYear = Number.isFinite(parsedSinceYear) && parsedSinceYear >= 2000\n  ? Math.floor(parsedSinceYear)\n  : currentYear - 2;\nconst parsedUntilYear = Number(batch.untilYear ?? partition.untilYear);\nconst untilYearRaw = Number.isFinite(parsedUntilYear) && parsedUntilYear >= 2000\n  ? Math.floor(parsedUntilYear)\n  : currentYear;\nconst untilYear = Math.max(untilYearRaw, sinceYear);\nconst parsedWindowDays = Number(batch.windowDays ?? partition.windowDays);\nconst windowDays = Number.isFinite(parsedWindowDays) && parsedWindowDays >= 1\n  ? Math.floor(parsedWindowDays)\n  : 21;\nconst parsedMaxWindows = Number(batch.maxWindows ?? partition.maxWindows);\nconst maxWindows = Number.isFinite(parsedMaxWindows) && parsedMaxWindows >= 1\n  ? Math.floor(parsedMaxWindows)\n  : 120;\n\nconst rawForce = Array.isArray(partition.forceMonths)\n  ? partition.forceMonths\n  : (Array.isArray(batch.forceMonths) ? batch.forceMonths : []);\nconst forceMonths = [];\nconst forceSeen = new Set();\nfor (const m of rawForce) {\n  const fy = Number(m?.year) || 0;\n  const fm = Number(m?.month) || 0;\n  if (fy < 2000 || fm < 1 || fm > 12) continue;\n  const fk = fy + '|' + fm;\n  if (forceSeen.has(fk)) continue;\n  forceSeen.add(fk);\n  forceMonths.push({ year: fy, month: fm });\n}\n\nreturn [{ json: {\n  syncStateByEntity: byEntity,\n  company: companyName,\n  companyId,\n  syncAll,\n  enabledEntities,\n  batchReason: batch.reason || null,\n  batchQueuedAt: batch.queued_at || null,\n  needsJobFallback,\n  modifiedJobNos: [],\n  partition: {\n    sinceYear,\n    untilYear,\n    windowDays,\n    maxWindows,\n    forceMonths,\n  },\n} }];\n"
         },
         "typeVersion": 2
       },
@@ -2663,7 +2663,7 @@
           3568
         ],
         "parameters": {
-          "jsCode": "const root = $json;\nconst body = root.body ?? root;\nconst query = root.query ?? {};\n\nconst truthy = (v) => {\n  const s = String(v ?? '').trim().toLowerCase();\n  return s === '1' || s === 'true' || s === 'yes' || v === true;\n};\nconst fullResync = truthy(body.fullResync) || truthy(body.syncAll) || truthy(body.include017Masters)\n  || truthy(query.fullResync) || truthy(query.syncAll) || truthy(query.include017Masters);\n\nconst bcToInternal = {\n  recursos: 'resource', resource: 'resource',\n  proyectos: 'job', job: 'job',\n  equipo_proyectos: 'job_team', job_team: 'job_team',\n  proyectos_tareas: 'job_task', tareas: 'job_task', job_task: 'job_task',\n  centros_responsabilidad: 'centers_of_responsibility',\n  centros_de_responsabilidad: 'centers_of_responsibility',\n  centers_of_responsibility: 'centers_of_responsibility',\n  configuracion_usuarios: 'user_configuration',\n  user_configuration: 'user_configuration',\n  tecnologias: 'technologies', technologies: 'technologies',\n  tipologias: 'typologies', typologies: 'typologies',\n  departamentos: 'departments', departments: 'departments',\n  movimientos_proyectos: 'job_ledger_entry_month',\n  job_ledger_entry_month: 'job_ledger_entry_month',\n  planificacion_mes: 'job_planning_line', job_planning_line: 'job_planning_line',\n  historico_planificacion_mes: 'historico_planificacion_mes',\n  expediente_mes: 'expediente_mes',\n  meses_cerrados: 'meses_cerrados',\n  ps_year: 'ps_year', ps_years: 'ps_year',\n  objetivos_departamento: 'objectives_by_department',\n  objetivos: 'objectives_by_department',\n  objectives_by_department: 'objectives_by_department',\n  dias_imputacion: 'dias_imputacion',\n  mayor_analitico: 'job_ledger_entry_line',\n  movimientos_proyectos_line: 'job_ledger_entry_line',\n  job_ledger_entry_line: 'job_ledger_entry_line',\n};\n\nconst MASTERS_017 = [\n  'resource','job','job_team','job_task','user_configuration',\n  'centers_of_responsibility','departments','ps_year','technologies','typologies'\n];\nconst FACT_DEFAULT = [\n  'job_ledger_entry_month','job_ledger_cert_open','job_planning_line',\n  'expediente_mes','meses_cerrados','objectives_by_department',\n  'historico_planificacion_mes','dias_imputacion','job_ledger_entry_line'\n];\n\nconst rawList = [];\nconst pushRaw = (v) => {\n  if (v == null) return;\n  if (Array.isArray(v)) { v.forEach(pushRaw); return; }\n  String(v).split(',').forEach((s) => { const t = s.trim(); if (t) rawList.push(t); });\n};\npushRaw(body.entities);\npushRaw(body.enabledEntities);\npushRaw(body.entity);\npushRaw(query.entities);\npushRaw(query.entity);\nconst rawEntities = rawList.slice();\n\nconst enabled = [];\nfor (const raw of rawEntities) {\n  const k = String(raw || '').trim().toLowerCase();\n  const mapped = bcToInternal[k];\n  if (mapped && !enabled.includes(mapped)) enabled.push(mapped);\n}\n\nlet syncAll;\nlet enabledEntities;\nif (fullResync && enabled.length === 0) {\n  syncAll = true;\n  enabledEntities = [];\n} else if (enabled.length > 0) {\n  syncAll = false;\n  enabledEntities = enabled;\n} else {\n  syncAll = false;\n  enabledEntities = FACT_DEFAULT.slice();\n}\n\nconst partition = body.partition && typeof body.partition === 'object' ? body.partition : {};\nreturn [{\n  json: {\n    ...root,\n    batch: {\n      syncAll,\n      enabledEntities,\n      bcEntities: rawEntities,\n      reason: body.reason || null,\n      queued_at: body.queued_at || null,\n      companyFromBody: body.company || query.company || null,\n      partition,\n      sinceYear: body.sinceYear ?? partition.sinceYear ?? null,\n      untilYear: body.untilYear ?? partition.untilYear ?? null,\n      windowDays: body.windowDays ?? partition.windowDays ?? null,\n      maxWindows: body.maxWindows ?? partition.maxWindows ?? null,\n      fullResync: !!fullResync,\n      masters017: MASTERS_017,\n    },\n  },\n}];\n"
+          "jsCode": "const root = $json;\nconst body = root.body ?? root;\nconst query = root.query ?? {};\n\nconst truthy = (v) => {\n  const s = String(v ?? '').trim().toLowerCase();\n  return s === '1' || s === 'true' || s === 'yes' || v === true;\n};\nconst fullResync = truthy(body.fullResync) || truthy(body.syncAll) || truthy(body.include017Masters)\n  || truthy(query.fullResync) || truthy(query.syncAll) || truthy(query.include017Masters);\n\nconst bcToInternal = {\n  recursos: 'resource', resource: 'resource',\n  proyectos: 'job', job: 'job',\n  equipo_proyectos: 'job_team', job_team: 'job_team',\n  proyectos_tareas: 'job_task', tareas: 'job_task', job_task: 'job_task',\n  centros_responsabilidad: 'centers_of_responsibility',\n  centros_de_responsabilidad: 'centers_of_responsibility',\n  centers_of_responsibility: 'centers_of_responsibility',\n  configuracion_usuarios: 'user_configuration',\n  user_configuration: 'user_configuration',\n  tecnologias: 'technologies', technologies: 'technologies',\n  tipologias: 'typologies', typologies: 'typologies',\n  departamentos: 'departments', departments: 'departments',\n  movimientos_proyectos: 'job_ledger_entry_month',\n  job_ledger_entry_month: 'job_ledger_entry_month',\n  planificacion_mes: 'job_planning_line', job_planning_line: 'job_planning_line',\n  historico_planificacion_mes: 'historico_planificacion_mes',\n  expediente_mes: 'expediente_mes',\n  meses_cerrados: 'meses_cerrados',\n  ps_year: 'ps_year', ps_years: 'ps_year',\n  objetivos_departamento: 'objectives_by_department',\n  objetivos: 'objectives_by_department',\n  objectives_by_department: 'objectives_by_department',\n  dias_imputacion: 'dias_imputacion',\n  mayor_analitico: 'job_ledger_entry_line',\n  movimientos_proyectos_line: 'job_ledger_entry_line',\n  job_ledger_entry_line: 'job_ledger_entry_line',\n};\n\nconst MASTERS_017 = [\n  'resource','job','job_team','job_task','user_configuration',\n  'centers_of_responsibility','departments','ps_year','technologies','typologies'\n];\nconst FACT_DEFAULT = [\n  'job_ledger_entry_month','job_ledger_cert_open','job_planning_line',\n  'expediente_mes','meses_cerrados','objectives_by_department',\n  'historico_planificacion_mes','dias_imputacion','job_ledger_entry_line'\n];\n\nconst rawList = [];\nconst pushRaw = (v) => {\n  if (v == null) return;\n  if (Array.isArray(v)) { v.forEach(pushRaw); return; }\n  String(v).split(',').forEach((s) => { const t = s.trim(); if (t) rawList.push(t); });\n};\npushRaw(body.entities);\npushRaw(body.enabledEntities);\npushRaw(body.entity);\npushRaw(query.entities);\npushRaw(query.entity);\nconst rawEntities = rawList.slice();\n\nconst enabled = [];\nfor (const raw of rawEntities) {\n  const k = String(raw || '').trim().toLowerCase();\n  const mapped = bcToInternal[k];\n  if (mapped && !enabled.includes(mapped)) enabled.push(mapped);\n}\n\nlet syncAll;\nlet enabledEntities;\nif (fullResync && enabled.length === 0) {\n  syncAll = true;\n  enabledEntities = [];\n} else if (enabled.length > 0) {\n  syncAll = false;\n  enabledEntities = enabled;\n} else {\n  syncAll = false;\n  enabledEntities = FACT_DEFAULT.slice();\n}\n\nconst reconcileTeam = truthy(body.reconcileTeam) || truthy(query.reconcileTeam);\nif (reconcileTeam) {\n  syncAll = false;\n  enabledEntities = ['job_team'];\n}\n\nconst partition = body.partition && typeof body.partition === 'object' ? body.partition : {};\nreturn [{\n  json: {\n    ...root,\n    batch: {\n      syncAll,\n      enabledEntities,\n      bcEntities: rawEntities,\n      reason: body.reason || null,\n      queued_at: body.queued_at || null,\n      companyFromBody: body.company || query.company || null,\n      partition,\n      sinceYear: body.sinceYear ?? partition.sinceYear ?? null,\n      untilYear: body.untilYear ?? partition.untilYear ?? null,\n      windowDays: body.windowDays ?? partition.windowDays ?? null,\n      maxWindows: body.maxWindows ?? partition.maxWindows ?? null,\n      fullResync: !!fullResync,\n      reconcileTeam: !!reconcileTeam,\n      masters017: MASTERS_017,\n    },\n  },\n}];\n"
         },
         "typeVersion": 2
       },
@@ -4590,6 +4590,113 @@
           }
         },
         "typeVersion": 2.4,
+        "continueOnFail": true
+      },
+      {
+        "parameters": {
+          "jsCode": "// Proyectos ausentes en bc_job: se consultan en Proyectos para aplicar\n// la misma regla de descarte que Transform Proyectos (sin descripción,\n// sin departamento, PP/PY o estado no admitido). Eso no es un error.\n// Un proyecto que sí debería existir, o un recurso ausente, sí lo es.\nconst parent = $items('Get JT Parent Keys')[0]?.json || {};\nconst jobsRaw = parent.jobs ?? [];\nconst jobs = new Set((Array.isArray(jobsRaw) ? jobsRaw : []).map((x) => String(x).trim()).filter(Boolean));\nconst pages = $items('BC API - Equipo Proyectos') || [];\nconst missing = [];\nconst seen = new Set();\nfor (const page of pages) {\n  const raw = page?.json ?? {};\n  if (raw?.error) continue;\n  const src = raw?.body ?? raw;\n  const registros = Array.isArray(src?.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const e of registros) {\n    const jobNo = String(e?.arbvrnJobNo ?? e?.ARBVRNJobNo ?? e?.job_no ?? e?.jobNo ?? '').trim();\n    const resourceNo = String(e?.arbvrnResourceNo ?? e?.ARBVRNResourceNo ?? e?.resource_no ?? e?.resourceNo ?? '').trim();\n    if (!jobNo || !resourceNo) continue;\n    if (jobNo.startsWith('PP') || jobNo.startsWith('PY')) continue;\n    if (jobs.has(jobNo) || seen.has(jobNo)) continue;\n    seen.add(jobNo);\n    missing.push(jobNo);\n  }\n}\nif (missing.length > 25) {\n  throw new Error(\n    'job_team (004): ' + missing.length + ' proyectos ausentes en la base. Códigos: ' +\n    missing.slice(0, 25).join(', ') + '. No se avanza la marca.'\n  );\n}\nconst eligibilityFilter = missing.length\n  ? missing.map((n) => \"no eq '\" + String(n).replace(/'/g, \"''\") + \"'\").join(' or ')\n  : \"no eq '__none__'\";\nreturn [{ json: { eligibilityFilter, missingJobCount: missing.length } }];\n"
+        },
+        "id": "jt-eligibility-prepare-004",
+        "name": "Prepare Job Eligibility",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2912,
+          2680
+        ]
+      },
+      {
+        "id": "jt-eligibility-http-004",
+        "name": "BC API - Job Eligibility",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          3136,
+          2680
+        ],
+        "parameters": {
+          "url": "={{ \n  'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/' + ((($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })())) + '/api/Power_Solution/PS_API/v2.0/companies('\n  + $('Build sync_state map').first().json.companyId\n  + ')/Proyectos?$select=no,description,departamento,Estado&$filter='\n  + encodeURIComponent($json.eligibilityFilter)\n}}",
+          "options": {
+            "pagination": {
+              "pagination": {
+                "nextURL": "={{ $response.body['@odata.nextLink'] }}",
+                "paginationMode": "responseContainsNextURL",
+                "completeExpression": "={{ !$response.body['@odata.nextLink'] }}",
+                "paginationCompleteWhen": "other"
+              }
+            }
+          },
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api"
+        },
+        "credentials": {
+          "oAuth2Api": {
+            "id": "5caHilW1m87Snw87",
+            "name": "Business Central"
+          }
+        },
+        "typeVersion": 4.2,
+        "continueOnFail": true,
+        "alwaysOutputData": true
+      },
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "30 6 * * 1-5"
+              }
+            ]
+          }
+        },
+        "id": "sched-004-team-reconcile",
+        "name": "Schedule Equipo 06:30 Lun-Vie",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          4920,
+          4200
+        ]
+      },
+      {
+        "id": "jt-reconcile-companies-004",
+        "name": "List Companies For Team Reconcile",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          5200,
+          4200
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "TTHI6C7o3V8eVzzr",
+            "name": "Postgres PS_Analytics"
+          }
+        },
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT DISTINCT company_name\nFROM public.sync_state\nWHERE entity = 'bc_job_team'\n  AND btrim(COALESCE(company_name, '')) <> ''\nORDER BY 1;"
+        }
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "={{ (String($env.N8N_SELF_BASE_URL || 'http://localhost:5678').trim().replace(/\\/+$/, '')) + '/webhook/sync-bc-to-analytics?company=' + encodeURIComponent($json.company_name) }}",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ entities: ['job_team'], reconcileTeam: true }) }}",
+          "options": {
+            "timeout": 300000
+          }
+        },
+        "id": "jt-reconcile-http-004",
+        "name": "POST Team Reconcile",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          5480,
+          4200
+        ],
         "continueOnFail": true
       }
     ],
@@ -7205,9 +7312,9 @@
         "main": [
           [
             {
-              "index": 0,
-              "node": "Transform Equipo Proyectos",
-              "type": "main"
+              "node": "Prepare Job Eligibility",
+              "type": "main",
+              "index": 0
             }
           ]
         ]
@@ -7230,6 +7337,50 @@
               "index": 0,
               "node": "Compute now ISO (Equipo Proyectos)",
               "type": "main"
+            }
+          ]
+        ]
+      },
+      "Prepare Job Eligibility": {
+        "main": [
+          [
+            {
+              "node": "BC API - Job Eligibility",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BC API - Job Eligibility": {
+        "main": [
+          [
+            {
+              "node": "Transform Equipo Proyectos",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Schedule Equipo 06:30 Lun-Vie": {
+        "main": [
+          [
+            {
+              "node": "List Companies For Team Reconcile",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "List Companies For Team Reconcile": {
+        "main": [
+          [
+            {
+              "node": "POST Team Reconcile",
+              "type": "main",
+              "index": 0
             }
           ]
         ]

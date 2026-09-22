@@ -20,13 +20,12 @@ Réplica de datos Business Central en **PostgreSQL Analytics** (prod VM 100; tes
 | Workflow 021 (health check) | `src/workflows/021_health_check_analytics_bc.json` |
 | Vistas Seguimiento Económico | `sql/views/seguimiento_economico_views.sql` |
 | Vistas BI Apps | `scripts/sql/bi_dashboard_planificacion_views.sql` |
-| Docs sync / PBI | `docs/ACTUALIZAR_WORKFLOW_004.md`, `docs/shared/analytics/` |
-| Spec PBI / SE | `docs/seguimiento-economico/` |
+| Docs sync | `docs/ACTUALIZAR_WORKFLOW_004.md`, `docs/shared/analytics/` |
+| Spec SE | `docs/seguimiento-economico/` |
 
 ## Consumidores
 
 - **Apps** (Seguimiento Económico / planificación) — pool Analytics solo lectura
-- **Power BI** — paridad documentada en `docs/shared/analytics/ANALYTICS_FACTURACION_PBI_ALIGNMENT.md`
 
 ## Conexión DB Analytics
 

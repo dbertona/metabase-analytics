@@ -20,6 +20,11 @@
 
 ### Fixed
 
+- **004 equipo:** misma regla de descarte que los proyectos (sin descripción,
+  sin departamento, `PP*`/`PY*` o estado no admitido) antes del fail-fast.
+  Esas líneas no son error; en el repaso diario (`30 6 * * 1-5`, solo
+  `job_team`) el purge las borra. No reinicia marcas de `job` ni `resource`.
+  Un padre que sí debería existir sigue parando el sync, con los códigos.
 - **004 equipo:** el HTTP de `job_team` lee `ProyectosEquipos` (query
   50223), el mismo filtro que el 001: job Open/Planning/Completed/Lost y
   recurso con email `@` + departamento. El recurso sin email no llega y
@@ -27,6 +32,8 @@
   `bc_job_team` las filas que esa query no devuelve. Si el nombre no
   viene en la query, se conserva el de `bc_resource`. Así Timesheet y
   Analytics coinciden.
+- **Documentación:** la guía del 004 describe `ProyectosEquipos` (50223)
+  y el cron de equipo. Power BI deja de figurar como consumidor.
 
 - **004 leftover `job_team`:** encadena `job` → `resource` → `job_team`,
   lanza si faltan padres y busca recursos sin filtrar por empresa
@@ -90,7 +97,7 @@
 
 ### Added
 - **Gate de publicación de cifras:** `scripts/deploy-004-gated.sh` cubre el
-  JSON 004 **y** SQL que mueve Apps/PBI (`v_se_*`, `bi_v_*`, `bi_mv_*`).
+  JSON 004 **y** SQL que mueve Apps (`v_se_*`, `bi_v_*`, `bi_mv_*`).
   Clona Analytics prod→testing; si hay SQL, compara `v_se_facturacion`
   (empresa + 1-02) vs el clon; canary 004+021 si hay JSON; exige
   `bi_mv_planificacion_kpi` == `v_se` y `v_se` R == 021 `tipo_r` BC

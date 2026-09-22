@@ -32,6 +32,11 @@ curl -sS -m 900 -X POST \
 
 **BC:** `BC_ENVIRONMENT=Production` en n8n-prod.
 
+**Repaso de equipo (lun–vie 06:30, hora de n8n):** el propio 004 relee solo
+`job_team` (`reconcileTeam`) y purga lo que `ProyectosEquipos` ya no devuelve.
+No reinicia proyectos ni recursos. Publicar este JSON a producción sigue siendo
+el gate; el gate no lanza el 004.
+
 ---
 
 ## Publicar Analytics (004, 021, SQL)
@@ -66,7 +71,7 @@ sin clon ni canary). Prod 004: solo el gate.
 
 **Motor de prod:** `./scripts/deploy-004-gated.sh` (lo invoca el deploy de Gitea).
 
-Cubre el JSON 004 **y** SQL que alimenta Apps/PBI (`v_se_*`, `bi_v_*`, `bi_mv_*`).  
+Cubre el JSON 004 **y** SQL que alimenta Apps (`v_se_*`, `bi_v_*`, `bi_mv_*`).  
 No aplicar JSON a n8n prod ni `CREATE OR REPLACE` en Analytics prod sin pasar el gate.
 
 El gate:
