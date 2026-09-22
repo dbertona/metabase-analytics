@@ -20,6 +20,11 @@
 
 ### Fixed
 
+- **004 equipo:** misma regla de descarte que los proyectos (sin descripción,
+  sin departamento, `PP*`/`PY*` o estado no admitido) antes del fail-fast.
+  Esas líneas no son error; en el repaso diario (`30 6 * * 1-5`, solo
+  `job_team`) el purge las borra. No reinicia marcas de `job` ni `resource`.
+  Un padre que sí debería existir sigue parando el sync, con los códigos.
 - **004 equipo:** el HTTP de `job_team` lee `ProyectosEquipos` (query
   50223), el mismo filtro que el 001: job Open/Planning/Completed/Lost y
   recurso con email `@` + departamento. El recurso sin email no llega y

@@ -212,6 +212,23 @@ if not isinstance(conns, dict):
     raise SystemExit(path + ': falta connections')
 print(f'  nodes={len(nodes)} connections={len(conns)}')
 " "$f"
+        case "$f" in
+          src/workflows/004_*.json)
+            python3 -c "
+import json, sys
+path = sys.argv[1]
+data = json.load(open(path))
+wf = data[0] if isinstance(data, list) else data
+url = ''
+for n in wf.get('nodes') or []:
+    if n.get('name') == 'BC API - Equipo Proyectos':
+        url = (n.get('parameters') or {}).get('url') or ''
+if '/ProyectosEquipos?' not in url or '/EquipoProyectos?' in url:
+    raise SystemExit(path + ': job_team debe usar /ProyectosEquipos? y no /EquipoProyectos?')
+print('  equipo=ProyectosEquipos')
+" "$f"
+            ;;
+        esac
         ok "JSON OK: $f"
         ;;
       sql/*.sql|sql/*/*.sql)
