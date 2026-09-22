@@ -1,15 +1,12 @@
 # Seguimiento Económico PS — capa Analytics
 
-Informe origen: Power BI `Seguimiento Económico PS.pbix` (dataset en la nube, fuente **BC Production**).
-
-> **Documentación maestra:** [004_SYNC_BC_ANALYTICS.md](../shared/analytics/004_SYNC_BC_ANALYTICS.md) — sync 004, vistas Analytics, paridad PBI y operaciones de datos.
+> **Documentación maestra:** [004_SYNC_BC_ANALYTICS.md](../shared/analytics/004_SYNC_BC_ANALYTICS.md) — sync 004, vistas Analytics y operaciones de datos.
 
 ## Objetivo
 
 Mantener en **PostgreSQL Analytics** (prod VM 100; testing 103; DEV 102 — [entornos](../ANALYTICS_ENVIRONMENTS.md)) las vistas y tablas que alimentan:
 
 - **Apps** (Seguimiento Económico / planificación)
-- **Power BI** (paridad numérica documentada)
 
 La UI Apache Superset está **retirada**.
 
@@ -17,7 +14,7 @@ La UI Apache Superset está **retirada**.
 
 | Repo | Responsabilidad |
 |------|-----------------|
-| **superset-analytics** (este) | Spec PBI, SQL canónico (`v_se_*`, `bi_v_*`), workflow 004, docs de sync |
+| **superset-analytics** (este) | SQL canónico (`v_se_*`, `bi_v_*`), workflow 004, docs de sync |
 | **power-solution-apps** | Consumo Apps (fuera de alcance para cambios SQL/004 aquí) |
 
 ## Infraestructura
@@ -56,7 +53,7 @@ WHERE empresa ILIKE '%Iberia%' AND year = 2026
 GROUP BY tipo;
 ```
 
-## Páginas del informe PBI (referencia)
+## Páginas del seguimiento (referencia)
 
 1. **Resumen** — KPIs, margen, acumulados
 2. **Unidad** — Pivot por concepto analítico (`bi_v_unidad`)
@@ -72,12 +69,11 @@ Canónico en este repo:
 - `sql/views/seguimiento_economico_views.sql`
 - `scripts/sql/bi_dashboard_planificacion_views.sql`
 
-Consumidores: Apps y PBI sobre `v_se_*` / `bi_v_*`.
+Consumidor: Apps sobre `v_se_*` / `bi_v_*`.
 
 ## Documentación relacionada
 
 - [004_SYNC_BC_ANALYTICS.md](../shared/analytics/004_SYNC_BC_ANALYTICS.md)
 - [ANALYTICS_FACTURACION_PBI_ALIGNMENT.md](../shared/analytics/ANALYTICS_FACTURACION_PBI_ALIGNMENT.md)
 - [ACTUALIZAR_WORKFLOW_004.md](../ACTUALIZAR_WORKFLOW_004.md)
-- [pbix-model-spec.md](./pbix-model-spec.md)
 - [phase-2-sync-004.md](./phase-2-sync-004.md)

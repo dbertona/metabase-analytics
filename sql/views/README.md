@@ -12,7 +12,7 @@ Snapshot de las vistas `v_se_*` y helpers `se_*` alineado con la **BD analytics 
 | **Documentación funcional** | `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md` |
 
 **No apliques cambios SQL en prod a ciegas:** las vistas `v_se_*` alimentan KPIs
-de Apps/PBI. Canal: `./scripts/deploy-004-gated.sh --yes --sql-only`.
+de Apps. Canal: `./scripts/deploy-004-gated.sh --yes --sql-only`.
 
 ## Aplicar cambios reales
 

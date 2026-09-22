@@ -71,7 +71,7 @@ sin clon ni canary). Prod 004: solo el gate.
 
 **Motor de prod:** `./scripts/deploy-004-gated.sh` (lo invoca el deploy de Gitea).
 
-Cubre el JSON 004 **y** SQL que alimenta Apps/PBI (`v_se_*`, `bi_v_*`, `bi_mv_*`).  
+Cubre el JSON 004 **y** SQL que alimenta Apps (`v_se_*`, `bi_v_*`, `bi_mv_*`).  
 No aplicar JSON a n8n prod ni `CREATE OR REPLACE` en Analytics prod sin pasar el gate.
 
 El gate:
