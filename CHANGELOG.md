@@ -32,6 +32,8 @@
   `bc_job_team` las filas que esa query no devuelve. Si el nombre no
   viene en la query, se conserva el de `bc_resource`. Así Timesheet y
   Analytics coinciden.
+- **Documentación:** la guía del 004 describe `ProyectosEquipos` (50223)
+  y el cron de equipo. Power BI deja de figurar como consumidor.
 
 - **004 leftover `job_team`:** encadena `job` → `resource` → `job_team`,
   lanza si faltan padres y busca recursos sin filtrar por empresa
