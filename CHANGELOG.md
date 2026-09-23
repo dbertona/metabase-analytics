@@ -20,6 +20,8 @@
 
 ### Fixed
 
+- **004 mes forzado vacío:** si la relectura de un mes forzado no devuelve filas, se borra esa partición en Analytics. No se conservan las filas anteriores.
+
 - **004 equipo:** misma regla de descarte que los proyectos (sin descripción,
   sin departamento, `PP*`/`PY*` o estado no admitido) antes del fail-fast.
   Esas líneas no son error; en el repaso diario (`30 6 * * 1-5`, solo
