@@ -9,6 +9,8 @@
   El mes cerrado ya no se reescribe. La certificación abierta sigue
   en `bc_job_ledger_entry_month`. El anti-join de ingresos cerrados
   del expediente lee la tabla de líneas.
+- **004 resumen de ejecución:** cada entidad guarda filas leídas/escritas,
+  marcas de agua antes/después y el motivo si se omite (`skipReason`).
 
 ### Added
 
