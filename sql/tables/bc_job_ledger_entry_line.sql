@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS public.bc_job_ledger_entry_line (
     company_name                     text NOT NULL,
     entry_no                         bigint NOT NULL,
     entry_type                       text,
+    type_line                        text,
+    line_type                        text,
     document_no                      text,
     job_no                           text,
     job_task_no                      text,
@@ -45,5 +47,9 @@ CREATE INDEX IF NOT EXISTS bc_job_ledger_entry_line_job_idx
 CREATE INDEX IF NOT EXISTS bc_job_ledger_entry_line_origen_idx
     ON public.bc_job_ledger_entry_line (company_name, origen);
 
+ALTER TABLE public.bc_job_ledger_entry_line
+    ADD COLUMN IF NOT EXISTS type_line text,
+    ADD COLUMN IF NOT EXISTS line_type text;
+
 COMMENT ON TABLE public.bc_job_ledger_entry_line IS
-  'Job Ledger línea (50205 movimientosProyectos) para Mayor analítico; signo BC; sync 004.';
+  'Job Ledger línea (50205 movimientosProyectos). type_line y line_type permiten sumar el mes en SQL. Signo BC; sync 004.';
