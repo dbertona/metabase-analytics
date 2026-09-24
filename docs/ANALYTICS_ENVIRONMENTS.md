@@ -82,7 +82,7 @@ Canal BC → Analytics: solo 004 (salvo bypass explícito).
 fórmulas en prod sin el gate. **021 a n8n-prod** lo publica el mismo Action
 tras el gate (`deploy-n8n-workflow-021.sh`).
 
-**021 / 004 permanentes en testing:** leen `$env.BC_ENVIRONMENT` (Pruebas_PS) y el Analytics de `:5435`. El 021 de testing **no tiene cron** (solo webhook). El gate pinnea Production **solo durante el canary** post-clon y **restaura `$env` al terminar**. Cron L–V solo en n8n **prod** (BC Production vs Analytics prod).
+**021 / 004 permanentes en testing:** leen `$env.BC_ENVIRONMENT` (Pruebas_PS) y el Analytics de `:5435`. El 021 de testing **no tiene cron** (solo webhook). El gate compara contra Production en una **copia temporal** (otro webhook) y la borra al terminar. No reescribe el 004/021 de la cola. Cron L–V solo en n8n **prod**.
 
 ---
 
