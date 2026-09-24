@@ -49,7 +49,7 @@ Desde un host sin `psql` local, el mismo DSN vía `docker exec` en el contenedor
 | Entorno | `ANALYTICS_DB_HOST` | Puerto | Password | `.env` en servidor | Estado 2026-08-14 |
 | --- | --- | --- | --- | --- | --- |
 | **Testing** | `192.168.36.103` | `5435` | `analytics_testing_2025` | `/opt/langchain-agent-v2/.env` | **Apunta a Analytics local** |
-| **DEV** | `192.168.36.100` | `5433` | prod | `/opt/langchain-agent-v2/.env` | Sigue leyendo **prod** |
+| **DEV** | `192.168.36.102` | `5435` | `analytics_dev_2025` | `/opt/langchain-agent-v2/.env` | Analytics DEV local |
 | **Prod** | `192.168.36.100` | `5433` | prod | (VM 101) | Prod |
 
 Tras cambiar el `.env` hay que **recrear** el contenedor (`docker compose up -d --force-recreate --no-deps app-backend`). Un `restart` no recarga env.
