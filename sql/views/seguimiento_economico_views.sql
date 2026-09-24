@@ -311,6 +311,50 @@ CREATE OR REPLACE VIEW public.v_se_lineas_movimientos_desde_linea AS
                 NOT LIKE 'Mano de Obra%'
               OR l.type_line::text = 'Resource'::text
             )
+            AND EXISTS (
+              SELECT 1
+              FROM bc_job_ledger_entry_month m
+              WHERE m.company_name = l.company_name
+                AND m.job_no::text = l.job_no::text
+                AND m.year = l.year
+                AND m.month = l.month
+                AND m.month_closing_status::text = 'Close'::text
+            )
+        ),
+        cert AS (
+         SELECT m.company_name AS empresa,
+            m.job_no AS job,
+            m.year,
+            m.month,
+            m.cost,
+            m.nr,
+            m.type_line,
+            m.line_type,
+            m.quantity,
+            COALESCE(m.departamento, j.departamento) AS departamento,
+            COALESCE(m.description, j.description) AS descripcion,
+            COALESCE(m.status, j.status) AS estado,
+            COALESCE(m.tipo_proyecto, j.tipo_proyecto) AS tipo_proyecto,
+            COALESCE(m.probability, j.probability) AS probability,
+            m.month_closing_status AS status1,
+            m.concepto_analitico_descripcion AS descripcion_ca,
+            m.document_no,
+            m.document_date,
+            m.timesheet_date,
+                CASE
+                    WHEN m.concepto_analitico_descripcion::text = 'Kilometraje'::text THEN 0::numeric
+                    WHEN m.type_line::text = 'Resource'::text THEN 0::numeric
+                    ELSE COALESCE(m.invoice, 0::numeric)
+                END AS invoice_m
+           FROM bc_job_ledger_entry_month m
+             LEFT JOIN bc_job j ON j.company_name = m.company_name AND j.no::text = m.job_no::text
+          WHERE m.job_no IS NOT NULL
+            AND m.month_closing_status::text = 'Open'::text
+            AND (
+              COALESCE(m.concepto_analitico_descripcion, ''::character varying)::text
+                NOT LIKE 'Mano de Obra%'
+              OR m.type_line::text = 'Resource'::text
+            )
         )
  SELECT s.empresa,
     s.job,
@@ -343,9 +387,19 @@ CREATE OR REPLACE VIEW public.v_se_lineas_movimientos_desde_linea AS
         END AS fecha_calculada,
     (s.empresa || ':'::text) || s.year::text AS empresa_ano,
     (s.empresa || ':'::text) || COALESCE(s.nr, ''::character varying)::text AS empresa_recurso
-   FROM src s;
+   FROM (
+         SELECT empresa, job, year, month, invoice_m, cost, nr, type_line, quantity, line_type,
+                departamento, descripcion, estado, tipo_proyecto, probability, status1, descripcion_ca,
+                document_no, document_date, timesheet_date
+           FROM src
+         UNION ALL
+         SELECT empresa, job, year, month, invoice_m, cost, nr, type_line, quantity, line_type,
+                departamento, descripcion, estado, tipo_proyecto, probability, status1, descripcion_ca,
+                document_no, document_date, timesheet_date
+           FROM cert
+        ) s;
 COMMENT ON VIEW public.v_se_lineas_movimientos_desde_linea IS
-  'Misma forma que v_se_lineas_movimientos, leída desde el apunte. No la usa el seguimiento económico.';
+  'Misma forma que v_se_lineas_movimientos. Suma el apunte solo del mes cerrado y añade la certificación abierta tal como está ahora. No la usa el seguimiento económico.';
 
 -- ---------------------------------------------------------------------------
 -- View: v_se_lineas_expedientes
