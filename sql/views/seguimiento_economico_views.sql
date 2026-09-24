@@ -269,6 +269,84 @@ COMMENT ON VIEW public.v_se_lineas_movimientos IS
   'Replica M de Power BI para movimientosProyectosMes: invoice ya transformado en sync (OData * -1); sin ABS. '
   'Mano de Obra* solo type_line=Resource (excluye G/L Account).';
 
+-- Vista paralela. No sustituye a v_se_lineas_movimientos.
+-- Invoice de la línea va en signo BC; aquí se niega para igualar el mes del 004.
+CREATE OR REPLACE VIEW public.v_se_lineas_movimientos_desde_linea AS
+ WITH src AS (
+         SELECT l.company_name AS empresa,
+            l.job_no AS job,
+            l.year,
+            l.month,
+            l.line_price,
+            l.total_cost AS cost,
+            l.no AS nr,
+            l.type_line,
+            l.line_type,
+            l.quantity,
+            COALESCE(l.departamento, j.departamento) AS departamento,
+            COALESCE(j.description, l.description) AS descripcion,
+            j.status AS estado,
+            j.tipo_proyecto,
+            j.probability,
+            CASE WHEN c.job_no IS NOT NULL THEN 'Close'::text ELSE NULL::text END AS status1,
+            l.concepto_analitico_descripcion AS descripcion_ca,
+            l.document_no,
+            l.document_date,
+            l.timesheet_date,
+                CASE
+                    WHEN l.concepto_analitico_descripcion::text = 'Kilometraje'::text THEN 0::numeric
+                    WHEN l.type_line::text = 'Resource'::text THEN 0::numeric
+                    ELSE COALESCE(-l.line_price, 0::numeric)
+                END AS invoice_m
+           FROM bc_job_ledger_entry_line l
+             LEFT JOIN bc_job j ON j.company_name = l.company_name AND j.no::text = l.job_no::text
+             LEFT JOIN bc_meses_cerrados c
+               ON c.company_name = l.company_name
+              AND c.job_no::text = l.job_no::text
+              AND c.year = l.year
+              AND c.month = l.month
+          WHERE l.job_no IS NOT NULL
+            AND (
+              COALESCE(l.concepto_analitico_descripcion, ''::character varying)::text
+                NOT LIKE 'Mano de Obra%'
+              OR l.type_line::text = 'Resource'::text
+            )
+        )
+ SELECT s.empresa,
+    s.job,
+    s.year,
+    s.month,
+    s.invoice_m::numeric(15,5) AS invoice,
+    s.cost,
+    s.nr,
+    s.type_line,
+    s.quantity,
+    s.line_type,
+    s.departamento,
+    s.descripcion,
+    s.estado,
+    s.tipo_proyecto,
+    s.probability,
+    NULL::integer AS budget_date_year,
+    NULL::integer AS budget_date_month,
+    s.status1,
+    s.descripcion_ca,
+    'R'::text AS tipo,
+    s.invoice_m AS facturado,
+    se_prob_pct(s.probability) AS prob_pct,
+    s.cost::numeric AS coste,
+    s.quantity::numeric AS cantidad,
+    (s.empresa || ':'::text) || COALESCE(s.departamento, ''::character varying)::text AS codigo_unico_departamento,
+        CASE
+            WHEN s.timesheet_date IS NOT NULL AND EXTRACT(year FROM s.timesheet_date) > 1001::numeric THEN s.timesheet_date
+            ELSE s.document_date
+        END AS fecha_calculada,
+    (s.empresa || ':'::text) || s.year::text AS empresa_ano,
+    (s.empresa || ':'::text) || COALESCE(s.nr, ''::character varying)::text AS empresa_recurso
+   FROM src s;
+COMMENT ON VIEW public.v_se_lineas_movimientos_desde_linea IS
+  'Misma forma que v_se_lineas_movimientos, leída desde el apunte. No la usa el seguimiento económico.';
+
 -- ---------------------------------------------------------------------------
 -- View: v_se_lineas_expedientes
 -- ---------------------------------------------------------------------------
