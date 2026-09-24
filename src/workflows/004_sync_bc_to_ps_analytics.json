@@ -3163,7 +3163,7 @@
                   "operation": "true",
                   "singleValue": true
                 },
-                "leftValue": "={{ ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json).syncAll || (($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json).enabledEntities || []).includes('job_ledger_entry_month') }}",
+                "leftValue": "={{ false }}",
                 "rightValue": ""
               }
             ]
