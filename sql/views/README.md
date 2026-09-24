@@ -39,7 +39,7 @@ Cuando cambie la lógica de negocio PBI/Superset:
 
 ## Contenido vigente (resumen)
 
-- `v_se_lineas_movimientos` → `bc_job_ledger_entry_month` (no `bc_job_ledger_entry`).
+- `v_se_lineas_movimientos` suma `bc_job_ledger_entry_line` en los meses de `bc_meses_cerrados`. La certificación abierta sigue en `bc_job_ledger_entry_month`.
 - `v_se_lineas_planificacion` → excluye meses con Ingresos reales en ledger;
   `invoice`/`facturado` = 0 si `line_type = Budget` (ventas solo Billable).
 - Incluye fase 2: expedientes, meses cerrados, objetivos, histórico, KPI cards.
