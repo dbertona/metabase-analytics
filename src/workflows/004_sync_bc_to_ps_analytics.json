@@ -6408,7 +6408,12 @@
           [
             {
               "index": 0,
-              "node": "Ensure sync_state (MovimientosProyectos)",
+              "node": "Skip Result MovimientosProyectos",
+              "type": "main"
+            },
+            {
+              "index": 0,
+              "node": "Ensure sync_state (Cert Open Ingresos)",
               "type": "main"
             }
           ],
@@ -6417,19 +6422,18 @@
               "index": 0,
               "node": "Skip Result MovimientosProyectos",
               "type": "main"
+            },
+            {
+              "index": 0,
+              "node": "Skip Result Cert Open Ingresos",
+              "type": "main"
             }
           ]
         ]
       },
       "Skip Result MovimientosProyectos": {
         "main": [
-          [
-            {
-              "node": "Skip Result Cert Open Ingresos",
-              "type": "main",
-              "index": 0
-            }
-          ]
+          []
         ]
       },
       "IF sync job_planning_line": {
