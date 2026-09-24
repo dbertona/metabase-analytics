@@ -86,6 +86,13 @@ El gate:
 8. **Restaura** 004 y 021 de testing a `$env.BC_ENVIRONMENT` (Pruebas_PS). El pin no se queda de residente. El 021 sigue sin cron.
 9. Si cierran: mismo JSON a n8n prod y/o mismo SQL a Analytics prod. **No lanza 004 en prod.**
 
+**Seguimiento Económico (Tipo R / mes cerrado):** el SQL canónico hace que
+`v_se_lineas_movimientos` lea `v_se_lineas_movimientos_desde_linea`
+(suma de `bc_job_ledger_entry_line` con `COALESCE(-line_price, 0)`). Detalle:
+`docs/shared/analytics/004_SYNC_BC_ANALYTICS.md` y
+`ANALYTICS_FACTURACION_PBI_ALIGNMENT.md`. Tras `--sql-only` / Deploy Analytics,
+verificar Iberia+Lab delta 0 vs la vista de prueba si hubo cambio de fórmula.
+
 ```bash
 cd superset-analytics
 ./scripts/deploy-004-gated.sh --yes                 # 004 + SQL
