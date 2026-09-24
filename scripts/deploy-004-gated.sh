@@ -5,12 +5,13 @@
 # 2) Copia Analytics prod → testing (solo 103)
 # 3) Snapshot cifras publicadas (v_se / 1-02)
 # 4) Si SQL: aplica v_se_* + bi_* solo en testing; compara vs snapshot
-# 5) Si 004: JSON repo a n8n testing (004+021), pin BC=Production SOLO
-#    para el canary, 021 testing SIN cron (solo webhook), reset + canary 004
+# 5) Si 004: JSON repo a n8n testing (004+021) SIEMPRE con $env.BC_ENVIRONMENT.
+#    El canary corre en una copia temporal (otro id, otro webhook) pinchada a
+#    Production. Esa copia se borra al terminar, también si el gate falla.
+#    021 testing SIN cron (solo webhook).
 # 6) 021 en testing (bajo demanda): tipo_p_planif_sum / tipo_r_sum / tipo_p_expediente_sum
 # 7) Cifras publicadas: bi_mv == v_se; v_se R == 021 tipo_r BC
-# 8) Restaura 004/021 testing a $env.BC_ENVIRONMENT (Pruebas_PS). El pin
-#    no se queda de residente. 021 sigue sin cron.
+# 8) Borra las copias canary. 004/021 de pruebas no se pinnean.
 # 9) Si cierran → mismo JSON a n8n prod y/o mismo SQL a Analytics prod
 #
 # NO lanza 004 en prod. NO cambia BC_ENVIRONMENT del contenedor testing.
@@ -62,6 +63,11 @@ N8N_TESTING_PG="${N8N_TESTING_PG:-supabase-db}"
 ANALYTICS_TESTING_CONTAINER="${ANALYTICS_TESTING_CONTAINER:-supabase-analytics-db-testing}"
 WF_004_TESTING="${WF_004_TESTING:-dlekAIp9f5FsdfJj}"
 WF_021_ID="${WF_021_ID:-a021healthcheck0001}"
+# Copias de un solo uso. Nunca son el 004/021 que dispara la cola de pruebas.
+CANARY_004_ID="${CANARY_004_ID:-c4n4ry004testing1}"
+CANARY_021_ID="${CANARY_021_ID:-c4n4ry021testing1}"
+CANARY_004_PATH="sync-bc-to-analytics-canary"
+CANARY_021_PATH="analytics-health-check-canary"
 N8N_TESTING_PROJECT_ID="${N8N_TESTING_PROJECT_ID:-4AwsO1IPiJcgJ2tj}"
 N8N_TESTING_WEBHOOK="${N8N_TESTING_WEBHOOK:-http://192.168.36.103:5678/webhook}"
 
@@ -201,8 +207,70 @@ print(f"unpin {n} env pin(s) → {dest}")
 PY
 }
 
-# Testing permanente: 021/004 leen $env (Pruebas_PS). El pin a Production
-# es solo el canary post-clon; al terminar se restaura. Cron solo en prod.
+# Copia de un solo uso: otro webhook, para no pisar el 004/021 de la cola.
+retarget_canary_webhook() {
+  local src="$1" dest="$2" old_path="$3" new_path="$4"
+  python3 - "$src" "$dest" "$old_path" "$new_path" <<'PY'
+import json, sys
+src, dest, old_path, new_path = sys.argv[1:5]
+wf = json.load(open(src, encoding="utf-8"))
+root = wf[0] if isinstance(wf, list) else wf
+n = 0
+for node in root.get("nodes", []):
+    params = node.get("parameters") or {}
+    if node.get("type") == "n8n-nodes-base.webhook" and params.get("path") == old_path:
+        params["path"] = new_path
+        node["parameters"] = params
+        n += 1
+if n != 1:
+    raise SystemExit(f"canary: esperaba 1 webhook {old_path}, hay {n}")
+root["name"] = (root.get("name") or "workflow") + " CANARY"
+json.dump(wf, open(dest, "w", encoding="utf-8"), ensure_ascii=False)
+print(f"canary webhook {old_path} → {new_path}")
+PY
+}
+
+# Inserta la fila si no existe, copiando el residente, para poder aplicar el JSON.
+n8n_testing_psql() {
+  local sql="$1"
+  ssh_testing "bash -s" <<REMOTE
+set -euo pipefail
+PW=\$(docker exec ${N8N_TESTING_APP} printenv DB_POSTGRESDB_PASSWORD)
+docker exec -e PGPASSWORD="\$PW" -i ${N8N_TESTING_PG} \
+  psql -h 127.0.0.1 -U n8n -d n8n -v ON_ERROR_STOP=1 -c $(printf '%q' "$sql")
+REMOTE
+}
+
+ensure_canary_stub() {
+  local canary_id="$1" donor_id="$2"
+  n8n_testing_psql "
+INSERT INTO workflow_entity (
+  id, name, active, nodes, connections, \"createdAt\", \"updatedAt\",
+  settings, \"staticData\", \"pinData\", \"versionId\", \"triggerCount\",
+  meta, \"isArchived\", \"versionCounter\", \"nodeGroups\"
+)
+SELECT '${canary_id}', name || ' CANARY', false, nodes, connections, NOW(), NOW(),
+  settings, NULL, NULL, \"versionId\", 0,
+  meta, false, 1, \"nodeGroups\"
+FROM workflow_entity WHERE id = '${donor_id}'
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO shared_workflow (\"workflowId\", \"projectId\", role, \"createdAt\", \"updatedAt\")
+SELECT '${canary_id}', \"projectId\", role, NOW(), NOW()
+FROM shared_workflow WHERE \"workflowId\" = '${donor_id}'
+ON CONFLICT (\"workflowId\", \"projectId\") DO NOTHING;
+"
+}
+
+delete_canary_workflows() {
+  n8n_testing_psql "
+DELETE FROM webhook_entity WHERE \"workflowId\" IN ('${CANARY_004_ID}','${CANARY_021_ID}');
+DELETE FROM shared_workflow WHERE \"workflowId\" IN ('${CANARY_004_ID}','${CANARY_021_ID}');
+DELETE FROM workflow_history WHERE \"workflowId\" IN ('${CANARY_004_ID}','${CANARY_021_ID}');
+DELETE FROM workflow_entity WHERE id IN ('${CANARY_004_ID}','${CANARY_021_ID}');
+" || true
+}
+
+# Testing permanente: 004/021 leen $env. Production solo vive en la copia canary.
 disable_021_schedule() {
   local src="$1" dest="$2"
   python3 - "$src" "$dest" <<'PY'
@@ -222,8 +290,22 @@ print(f"021 testing: disabled {n} schedule trigger(s) → {dest}")
 PY
 }
 
+assert_resident_not_pinned() {
+  local wf_id="$1" json_path="$2"
+  if [[ "$wf_id" != "$WF_004_TESTING" && "$wf_id" != "$WF_021_ID" ]]; then
+    return 0
+  fi
+  if grep -q "String('Production')" "$json_path"; then
+    echo "❌ Rechazado: el workflow de pruebas ${wf_id} no puede llevar Production fijo." >&2
+    exit 1
+  fi
+}
+
 apply_n8n_postgres() {
   local host="$1" app="$2" pg="$3" wf_id="$4" json_path="$5"
+  if [[ "$host" == "$N8N_TESTING_HOST" ]]; then
+    assert_resident_not_pinned "$wf_id" "$json_path"
+  fi
   FIGURES_GATE_OK=1 \
   DEPLOY_HOST_IP="$host" \
   DEPLOY_SSH_PASSWORD="$SSH_PASS" \
@@ -387,7 +469,7 @@ fire_004_canary() {
   }))")"
   echo "🚀 Canary 004 testing company=${slug} year=${YEAR} ..."
   curl -sS -m 15 -X POST \
-    "${N8N_TESTING_WEBHOOK}/sync-bc-to-analytics?company=${slug}" \
+    "${N8N_TESTING_WEBHOOK}/${CANARY_004_PATH}?company=${slug}" \
     -H "Content-Type: application/json" \
     -d "$body" >/tmp/gate-004-${slug}.out 2>/tmp/gate-004-${slug}.err || true
 }
@@ -436,7 +518,7 @@ ORDER BY id DESC LIMIT 3;
 fire_021() {
   echo "🩺 Lanzando 021 testing ..."
   curl -sS -m 30 -X POST \
-    "${N8N_TESTING_WEBHOOK}/analytics-health-check" \
+    "${N8N_TESTING_WEBHOOK}/${CANARY_021_PATH}" \
     -H "Content-Type: application/json" \
     -d "{\"year\": ${YEAR}}" >/tmp/gate-021.out 2>/tmp/gate-021.err || true
 }
@@ -780,7 +862,14 @@ else
 fi
 
 TMPDIR_GATE="$(mktemp -d /tmp/gate-004.XXXXXX)"
-trap 'rm -rf "$TMPDIR_GATE"' EXIT
+cleanup_gate() {
+  if [[ -f "${TMPDIR_GATE:-}/canary-installed" ]]; then
+    delete_canary_workflows || true
+    restart_n8n_testing || true
+  fi
+  rm -rf "$TMPDIR_GATE"
+}
+trap cleanup_gate EXIT
 
 if scope_has_sql; then
   snapshot_published_figures "$TMPDIR_GATE/figures.before.tsv"
@@ -789,14 +878,30 @@ if scope_has_sql; then
   compare_figure_files "$TMPDIR_GATE/figures.before.tsv" "$TMPDIR_GATE/figures.after.tsv"
 fi
 
-pin_bc_production "$WF_021" "$TMPDIR_GATE/021.pinned.json"
-disable_021_schedule "$TMPDIR_GATE/021.pinned.json" "$TMPDIR_GATE/021.testing.json"
+# Residentes: siempre $env. Production solo en copias con otro webhook.
+disable_021_schedule "$WF_021" "$TMPDIR_GATE/021.testing.json"
 if scope_has_004; then
-  pin_bc_production "$WF_004" "$TMPDIR_GATE/004.testing.json"
   apply_n8n_postgres "$N8N_TESTING_HOST" "$N8N_TESTING_APP" "$N8N_TESTING_PG" \
-    "$WF_004_TESTING" "$TMPDIR_GATE/004.testing.json"
+    "$WF_004_TESTING" "$WF_004"
 fi
 ensure_021_testing "$TMPDIR_GATE/021.testing.json"
+
+pin_bc_production "$WF_021" "$TMPDIR_GATE/021.prod.json"
+disable_021_schedule "$TMPDIR_GATE/021.prod.json" "$TMPDIR_GATE/021.canary.json"
+retarget_canary_webhook "$TMPDIR_GATE/021.canary.json" "$TMPDIR_GATE/021.canary.json" \
+  "analytics-health-check" "$CANARY_021_PATH"
+ensure_canary_stub "$CANARY_021_ID" "$WF_021_ID"
+apply_n8n_postgres "$N8N_TESTING_HOST" "$N8N_TESTING_APP" "$N8N_TESTING_PG" \
+  "$CANARY_021_ID" "$TMPDIR_GATE/021.canary.json"
+if scope_has_004; then
+  pin_bc_production "$WF_004" "$TMPDIR_GATE/004.prod.json"
+  retarget_canary_webhook "$TMPDIR_GATE/004.prod.json" "$TMPDIR_GATE/004.canary.json" \
+    "sync-bc-to-analytics" "$CANARY_004_PATH"
+  ensure_canary_stub "$CANARY_004_ID" "$WF_004_TESTING"
+  apply_n8n_postgres "$N8N_TESTING_HOST" "$N8N_TESTING_APP" "$N8N_TESTING_PG" \
+    "$CANARY_004_ID" "$TMPDIR_GATE/004.canary.json"
+fi
+touch "$TMPDIR_GATE/canary-installed"
 restart_n8n_testing
 
 if scope_has_004; then
@@ -813,12 +918,12 @@ fire_021
 wait_021_money "$GATE_021_START"
 check_published_vs_021 "$GATE_021_START"
 
-restore_testing_workflows_to_env
+# El trap borra las copias canary y reinicia n8n. Los residentes no se pinnean.
 
 if [[ "$APPLY_PROD" -eq 0 ]]; then
   echo ""
   echo "✅ Gate testing OK. --no-prod: no se tocó prod."
-  echo "   Testing: 004/021 de vuelta a \$env (Pruebas_PS); 021 sin cron."
+  echo "   Testing: 004/021 siguen en \$env (Pruebas_PS). El canary se borra al salir."
   echo "   Para publicar: $0 --yes --skip-copy --apply-prod"
   exit 0
 fi
