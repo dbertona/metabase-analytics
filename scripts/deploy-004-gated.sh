@@ -257,7 +257,7 @@ INSERT INTO workflow_entity (
   settings, \"staticData\", \"pinData\", \"versionId\", \"triggerCount\",
   meta, \"isArchived\", \"versionCounter\", \"nodeGroups\"
 )
-SELECT '${canary_id}', name || ' CANARY', false, nodes, connections, NOW(), NOW(),
+SELECT '${canary_id}', name || ' CANARY', true, nodes, connections, NOW(), NOW(),
   settings, NULL, NULL, gen_random_uuid()::text, 0,
   meta, false, 1, \"nodeGroups\"
 FROM workflow_entity WHERE id = '${donor_id}';
@@ -272,13 +272,41 @@ JOIN workflow_entity d ON d.id = '${donor_id}'
 JOIN workflow_history h ON h.\"versionId\" = d.\"activeVersionId\"
 WHERE e.id = '${canary_id}';
 UPDATE workflow_entity c
-SET \"activeVersionId\" = c.\"versionId\"
+SET \"activeVersionId\" = c.\"versionId\", active = true
 WHERE c.id = '${canary_id}';
 INSERT INTO shared_workflow (\"workflowId\", \"projectId\", role, \"createdAt\", \"updatedAt\")
 SELECT '${canary_id}', \"projectId\", role, NOW(), NOW()
 FROM shared_workflow WHERE \"workflowId\" = '${donor_id}'
 ON CONFLICT (\"workflowId\", \"projectId\") DO NOTHING;
 "
+}
+
+# Tras apply_n8n (pisa nodes): forzar active=true para que el restart registre el webhook canary.
+activate_canary_workflows() {
+  n8n_testing_psql "
+UPDATE workflow_entity
+SET active = true, \"updatedAt\" = NOW()
+WHERE id IN ('${CANARY_004_ID}', '${CANARY_021_ID}');
+"
+}
+
+# Mutex 004: si n8n se reinicia a mitad, sync_executions queda en running y el wait cuelga.
+release_orphan_004_mutex_testing() {
+  echo "🔓 Liberando mutex 004 huérfanos (status=running) en Analytics testing ..."
+  ssh_testing "docker exec $ANALYTICS_TESTING_CONTAINER psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c \"
+UPDATE sync_executions
+SET status = 'error',
+    finished_at = NOW(),
+    details = COALESCE(details, '{}'::jsonb) || jsonb_build_object(
+      'finished', true,
+      'gate_note', 'orphan mutex released before gate canary'
+    )
+WHERE status = 'running'
+  AND company_name IN (
+    '$(company_name_for psi)',
+    '$(company_name_for pslab)'
+  );
+\"" || true
 }
 
 delete_canary_workflows() {
@@ -498,12 +526,19 @@ fire_004_canary() {
 
 wait_004_company() {
   local slug="$1" started="$2"
-  local name status elapsed=0
+  local name status elapsed=0 phase=""
   name="$(company_name_for "$slug")"
   echo "⏳ Esperando 004 ${slug} (${name}) ..."
   while (( elapsed < CANARY_TIMEOUT_SEC )); do
     status="$(ssh_testing "docker exec $ANALYTICS_TESTING_CONTAINER psql -U postgres -d postgres -tAc \"
 SELECT COALESCE(status,'') FROM sync_executions
+WHERE company_name = '${name}'
+  AND started_at >= TIMESTAMPTZ '${started}'
+ORDER BY id DESC LIMIT 1;
+\"" | tr -d '[:space:]')"
+    phase="$(ssh_testing "docker exec $ANALYTICS_TESTING_CONTAINER psql -U postgres -d postgres -tAc \"
+SELECT COALESCE(details->>'phase', details->>'n8n_execution_id', '')
+FROM sync_executions
 WHERE company_name = '${name}'
   AND started_at >= TIMESTAMPTZ '${started}'
 ORDER BY id DESC LIMIT 1;
@@ -524,10 +559,16 @@ ORDER BY id DESC LIMIT 3;
         return 1
         ;;
       running|"")
+        if (( elapsed > 0 && elapsed % 60 == 0 )); then
+          echo "   … ${slug} aún ${status:-pending} (${elapsed}s/${CANARY_TIMEOUT_SEC}s)${phase:+ phase=${phase}}"
+        fi
         sleep 20
         elapsed=$((elapsed + 20))
         ;;
       *)
+        if (( elapsed > 0 && elapsed % 60 == 0 )); then
+          echo "   … ${slug} status='${status}' (${elapsed}s)"
+        fi
         sleep 20
         elapsed=$((elapsed + 20))
         ;;
@@ -923,10 +964,12 @@ if scope_has_004; then
   apply_n8n_postgres "$N8N_TESTING_HOST" "$N8N_TESTING_APP" "$N8N_TESTING_PG" \
     "$CANARY_004_ID" "$TMPDIR_GATE/004.canary.json"
 fi
+activate_canary_workflows
 touch "$TMPDIR_GATE/canary-installed"
 restart_n8n_testing
 
 if scope_has_004; then
+  release_orphan_004_mutex_testing
   reset_testing_watermarks
   GATE_004_START="$(date -u +"%Y-%m-%d %H:%M:%S+00:00")"
   fire_004_canary psi

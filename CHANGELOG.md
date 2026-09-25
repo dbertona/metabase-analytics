@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- Canary del gate: stub con `active=true`, re-activación tras apply, libera
+  mutex `sync_executions` huérfanos antes de disparar, y heartbeat en el wait
+  (antes un n8n restart a mitad dejaba el job colgado en «Esperando 004 psi»).
 - El gate borra el canary en orden seguro (`activeVersionId` → NULL,
   luego `workflow_entity`, luego `workflow_history`). El DELETE inverso
   chocaba con la FK de n8n tras recrear el canary con versión activa.
