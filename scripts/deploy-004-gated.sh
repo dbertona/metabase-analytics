@@ -243,17 +243,35 @@ REMOTE
 
 ensure_canary_stub() {
   local canary_id="$1" donor_id="$2"
+  # Un intento anterior deja la fila sin activeVersionId (ON CONFLICT DO NOTHING).
+  # El remap lee workflow_history por esa versión; si no hay fila, psql devuelve vacío.
   n8n_testing_psql "
+DELETE FROM webhook_entity WHERE \"workflowId\" = '${canary_id}';
+DELETE FROM shared_workflow WHERE \"workflowId\" = '${canary_id}';
+DELETE FROM workflow_history WHERE \"workflowId\" = '${canary_id}';
+DELETE FROM workflow_entity WHERE id = '${canary_id}';
 INSERT INTO workflow_entity (
   id, name, active, nodes, connections, \"createdAt\", \"updatedAt\",
   settings, \"staticData\", \"pinData\", \"versionId\", \"triggerCount\",
   meta, \"isArchived\", \"versionCounter\", \"nodeGroups\"
 )
 SELECT '${canary_id}', name || ' CANARY', false, nodes, connections, NOW(), NOW(),
-  settings, NULL, NULL, \"versionId\", 0,
+  settings, NULL, NULL, gen_random_uuid()::text, 0,
   meta, false, 1, \"nodeGroups\"
-FROM workflow_entity WHERE id = '${donor_id}'
-ON CONFLICT (id) DO NOTHING;
+FROM workflow_entity WHERE id = '${donor_id}';
+INSERT INTO workflow_history (
+  \"versionId\", \"workflowId\", authors, \"createdAt\", \"updatedAt\",
+  nodes, connections, name, autosaved, description, \"nodeGroups\"
+)
+SELECT e.\"versionId\", '${canary_id}', 'deploy-004-gated.sh', NOW(), NOW(),
+  h.nodes, h.connections, 'Version canary', false, NULL, COALESCE(h.\"nodeGroups\", '[]'::json)
+FROM workflow_entity e
+JOIN workflow_entity d ON d.id = '${donor_id}'
+JOIN workflow_history h ON h.\"versionId\" = d.\"activeVersionId\"
+WHERE e.id = '${canary_id}';
+UPDATE workflow_entity c
+SET \"activeVersionId\" = c.\"versionId\"
+WHERE c.id = '${canary_id}';
 INSERT INTO shared_workflow (\"workflowId\", \"projectId\", role, \"createdAt\", \"updatedAt\")
 SELECT '${canary_id}', \"projectId\", role, NOW(), NOW()
 FROM shared_workflow WHERE \"workflowId\" = '${donor_id}'

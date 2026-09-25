@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- El gate de Analytics recrea el canario 021 con versión activa. Un
+  intento a medias dejaba la fila sin `activeVersionId` y el remap de
+  credenciales fallaba con JSON vacío.
+
 ### Changed
 
 - El seguimiento económico de movimientos suma cada apunte
