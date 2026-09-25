@@ -6,9 +6,13 @@
 
 - El seguimiento económico de movimientos suma cada apunte
   (`v_se_lineas_movimientos` → `v_se_lineas_movimientos_desde_linea`).
-  El mes cerrado ya no se reescribe. La certificación abierta sigue
-  en `bc_job_ledger_entry_month`. El anti-join de ingresos cerrados
-  del expediente lee la tabla de líneas.
+  El mes cerrado ya no se reescribe. La certificación abierta la
+  reescribe el backend; el IF `job_ledger_entry_month` del 004 queda
+  en `false`. El cierre del mes también lo escribe el backend: el IF
+  `meses_cerrados` del 004 queda en `false`. La relectura de equipo de
+  las 06:30 queda apagada; el aviso usa el código de empresa (`psi` /
+  `pslab`), no el nombre. El anti-join de ingresos cerrados del
+  expediente lee la tabla de líneas.
 - **004 resumen de ejecución:** cada entidad guarda filas leídas/escritas,
   marcas de agua antes/después y el motivo si se omite (`skipReason`).
 

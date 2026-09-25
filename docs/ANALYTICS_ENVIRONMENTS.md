@@ -49,7 +49,7 @@ Desde un host sin `psql` local, el mismo DSN vía `docker exec` en el contenedor
 | Entorno | `ANALYTICS_DB_HOST` | Puerto | Password | `.env` en servidor | Estado 2026-08-14 |
 | --- | --- | --- | --- | --- | --- |
 | **Testing** | `192.168.36.103` | `5435` | `analytics_testing_2025` | `/opt/langchain-agent-v2/.env` | **Apunta a Analytics local** |
-| **DEV** | `192.168.36.100` | `5433` | prod | `/opt/langchain-agent-v2/.env` | Sigue leyendo **prod** |
+| **DEV** | `192.168.36.102` | `5435` | `analytics_dev_2025` | `/opt/langchain-agent-v2/.env` | Analytics DEV local |
 | **Prod** | `192.168.36.100` | `5433` | prod | (VM 101) | Prod |
 
 Tras cambiar el `.env` hay que **recrear** el contenedor (`docker compose up -d --force-recreate --no-deps app-backend`). Un `restart` no recarga env.
@@ -82,7 +82,7 @@ Canal BC → Analytics: solo 004 (salvo bypass explícito).
 fórmulas en prod sin el gate. **021 a n8n-prod** lo publica el mismo Action
 tras el gate (`deploy-n8n-workflow-021.sh`).
 
-**021 / 004 permanentes en testing:** leen `$env.BC_ENVIRONMENT` (Pruebas_PS) y el Analytics de `:5435`. El 021 de testing **no tiene cron** (solo webhook). El gate pinnea Production **solo durante el canary** post-clon y **restaura `$env` al terminar**. Cron L–V solo en n8n **prod** (BC Production vs Analytics prod).
+**021 / 004 permanentes en testing:** leen `$env.BC_ENVIRONMENT` (Pruebas_PS) y el Analytics de `:5435`. El 021 de testing **no tiene cron** (solo webhook). El gate compara contra Production en una **copia temporal** (otro webhook) y la borra al terminar. No reescribe el 004/021 de la cola. Cron L–V solo en n8n **prod**.
 
 ---
 
