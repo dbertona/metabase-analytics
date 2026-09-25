@@ -34,21 +34,6 @@ on:
           - sql
           - 021
           - 004+sql
-      confirm_production:
-        description: 'Obligatorio si environment es production o ambos'
-        required: false
-        default: false
-        type: boolean
-      skip_copy:
-        description: 'Prod: no clonar Analytics prod→testing (clon ya fresco)'
-        required: false
-        default: false
-        type: boolean
-      allow_figure_change:
-        description: 'Prod: permitir que v_se P/R se muevan vs el clon'
-        required: false
-        default: false
-        type: boolean
 
 env:
   CI: 'true'
@@ -121,21 +106,6 @@ jobs:
           else
             echo "❌ No se pueden instalar herramientas" >&2
             exit 1
-          fi
-
-      - name: 🔒 Confirm production
-        run: |
-          set -euo pipefail
-          ENV="${{ github.event.inputs.environment || 'testing' }}"
-          CONFIRM="${{ github.event.inputs.confirm_production }}"
-          if [[ "$ENV" == "production" || "$ENV" == "ambos" ]]; then
-            if [[ "$CONFIRM" != "true" && "$CONFIRM" != "True" ]]; then
-              echo "❌ Production/ambos exige confirm_production = true" >&2
-              exit 1
-            fi
-            echo "✅ confirm_production OK para $ENV"
-          else
-            echo "🟡 Solo testing — no hace falta confirm_production"
           fi
 
       - name: 🧾 Validate workflow JSON
@@ -339,16 +309,8 @@ jobs:
           chmod +x scripts/deploy-analytics.sh scripts/apply-analytics-artifacts.sh \
             scripts/deploy-004-gated.sh \
             scripts/deploy-n8n-workflow-021.sh scripts/apply-bi-views.sh
-          extra=()
-          if [[ "${{ github.event.inputs.skip_copy }}" == "true" ]]; then
-            extra+=(--skip-copy)
-          fi
-          if [[ "${{ github.event.inputs.allow_figure_change }}" == "true" ]]; then
-            extra+=(--allow-figure-change)
-          fi
           ./scripts/deploy-analytics.sh \
             --env production \
             --yes \
             --scope "${{ github.event.inputs.scope || 'all' }}" \
-            --year "${YEAR}" \
-            "${extra[@]+"${extra[@]}"}"
+            --year "${YEAR}"
