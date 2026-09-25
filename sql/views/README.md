@@ -12,29 +12,31 @@ Snapshot de las vistas `v_se_*` y helpers `se_*` alineado con la **BD analytics 
 | **Documentación funcional** | `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md` |
 
 **No apliques cambios SQL en prod a ciegas:** las vistas `v_se_*` alimentan KPIs
-de Apps. Canal: `./scripts/deploy-004-gated.sh --yes --sql-only`.
+de Apps. Canal: `./scripts/deploy-analytics.sh --env production --scope sql --yes`.
 
 ## Aplicar cambios reales
 
 ```bash
-# Gate (testing → prod). También cubre bi_mv_* / bi_v_*.
-./scripts/deploy-004-gated.sh --yes --sql-only
+# Deploy Analytics (testing o prod). También cubre bi_mv_* / bi_v_*.
+./scripts/deploy-analytics.sh --env production --scope sql --yes
+./scripts/deploy-analytics.sh --env testing --scope sql --yes
 
-# Solo testing, sin tocar prod
+# Solo testing, sin tocar prod (manual)
 ANALYTICS_DSN='postgresql://postgres:analytics_testing_2025@192.168.36.103:5435/postgres' \
   ./scripts/apply-bi-views.sh --with-se
 ```
 
-`apply-bi-views.sh` (sin `--refresh`) está bloqueado contra Analytics prod.
+`apply-bi-views.sh` (sin `--refresh`) está bloqueado contra Analytics prod
+salvo `ANALYTICS_DEPLOY_OK=1`.
 
 ## Actualizar fuente canónica
 
-Cuando cambie la lógica de negocio PBI/Superset:
+Cuando cambie la lógica de negocio PBI/Apps:
 
 1. Editar `sql/views/seguimiento_economico_views.sql`.
-2. Gate en testing: `./scripts/deploy-004-gated.sh --yes --sql-only --no-prod`.
-3. Si el cambio debe mover cifras: `--allow-figure-change` y validar vs PBI/BC.
-4. Publicar: `./scripts/deploy-004-gated.sh --yes --sql-only --skip-copy`.
+2. Probar en testing: `./scripts/deploy-analytics.sh --env testing --scope sql --yes`.
+3. Validar vs PBI/BC si el cambio mueve cifras.
+4. Publicar: `./scripts/deploy-analytics.sh --env production --scope sql --yes`.
 5. Actualizar `CHANGELOG.md` y documentación relacionada.
 
 ## Contenido vigente (resumen)

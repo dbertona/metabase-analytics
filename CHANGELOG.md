@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Retirado el gate de cifras Analytics** (clon prod→testing, canary 004/021,
+  waits, comparación de cifras). `Deploy Analytics` aplica 004/SQL/021 directo
+  desde el repo vía `scripts/apply-analytics-artifacts.sh`.
+  `deploy-004-gated.sh` queda como stub deprecado que redirige a
+  `deploy-analytics.sh`. Guards aceptan `ANALYTICS_DEPLOY_OK=1` (compat
+  `FIGURES_GATE_OK=1`). Sigue prohibido PUT/API/`apply-bi-views`/`psql` ad-hoc
+  a prod.
+
 ### Fixed
 
 - Canary del gate: stub con `active=true`, re-activación tras apply, libera

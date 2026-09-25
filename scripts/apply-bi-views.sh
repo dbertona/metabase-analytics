@@ -12,7 +12,7 @@
 #   o docker exec supabase-db (en VM 100)
 #   o fallback remoto 192.168.36.100:5433 vía contenedor postgres:15
 #
-# Publicar fórmulas a prod: ./scripts/deploy-004-gated.sh --yes
+# Publicar fórmulas a prod: ./scripts/deploy-analytics.sh --env production --yes
 # Bypass emergencia: ALLOW_DIRECT_SQL_PROD=1
 set -euo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:${PATH}"
@@ -79,15 +79,16 @@ guard_prod_formula() {
   if [[ "$REFRESH_ONLY" -eq 1 ]]; then
     return 0
   fi
-  if [[ "${FIGURES_GATE_OK:-}" == "1" || "${ALLOW_DIRECT_SQL_PROD:-}" == "1" ]]; then
+  if [[ "${ANALYTICS_DEPLOY_OK:-}" == "1" || "${FIGURES_GATE_OK:-}" == "1" \
+     || "${ALLOW_DIRECT_SQL_PROD:-}" == "1" ]]; then
     return 0
   fi
   if analytics_target_is_prod; then
     echo "⛔ Aplicar vistas/MVs a Analytics prod está bloqueado." >&2
-    echo "   Publicar cifras: $ROOT_DIR/scripts/deploy-004-gated.sh --yes" >&2
-    echo "   Solo SQL:        $ROOT_DIR/scripts/deploy-004-gated.sh --yes --sql-only" >&2
-    echo "   Testing:         ANALYTICS_DSN='postgresql://postgres:analytics_testing_2025@192.168.36.103:5435/postgres' $0 --with-se" >&2
-    echo "   Emergencia:      ALLOW_DIRECT_SQL_PROD=1 $0" >&2
+    echo "   Canal:    $ROOT_DIR/scripts/deploy-analytics.sh --env production --yes" >&2
+    echo "   Solo SQL: $ROOT_DIR/scripts/deploy-analytics.sh --env production --scope sql --yes" >&2
+    echo "   Testing:  ANALYTICS_DSN='postgresql://postgres:analytics_testing_2025@192.168.36.103:5435/postgres' $0 --with-se" >&2
+    echo "   Emergencia: ALLOW_DIRECT_SQL_PROD=1 $0" >&2
     exit 1
   fi
 }

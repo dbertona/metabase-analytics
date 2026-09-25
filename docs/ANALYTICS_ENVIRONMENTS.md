@@ -76,13 +76,12 @@ Canal BC → Analytics: solo 004 (salvo bypass explícito).
 `Deploy Analytics Multi-Environment` (mismo modelo que Timesheet: manual,
 `testing` / `production` / `ambos`). CLI: `./scripts/deploy-analytics.sh --env … --yes`.
 
-**Prod 004 / vistas/MVs:** el Action llama a `./scripts/deploy-004-gated.sh`
-(copia prod→testing, valida 021 + cifras, luego JSON y/o SQL a prod).
-`--sql-only` / `--004-only` si el scope lo pide. `apply-bi-views.sh` no escribe
-fórmulas en prod sin el gate. **021 a n8n-prod** lo publica el mismo Action
-tras el gate (`deploy-n8n-workflow-021.sh`).
+**Prod 004 / vistas/MVs:** apply directo desde el repo (`apply-analytics-artifacts.sh`).
+Sin clon, canary ni comparación de cifras. `apply-bi-views.sh` no escribe
+fórmulas en prod sin `ANALYTICS_DEPLOY_OK=1`. **021 a n8n-prod** lo publica el
+mismo Action (`deploy-n8n-workflow-021.sh`).
 
-**021 / 004 permanentes en testing:** leen `$env.BC_ENVIRONMENT` (Pruebas_PS) y el Analytics de `:5435`. El 021 de testing **no tiene cron** (solo webhook). El gate compara contra Production en una **copia temporal** (otro webhook) y la borra al terminar. No reescribe el 004/021 de la cola. Cron L–V solo en n8n **prod**.
+**021 / 004 permanentes en testing:** leen `$env.BC_ENVIRONMENT` (Pruebas_PS) y el Analytics de `:5435`. El 021 de testing **no tiene cron** (solo webhook). Cron L–V solo en n8n **prod**.
 
 ---
 
@@ -109,7 +108,7 @@ Sin alinear el PK, el `COPY` falla por duplicados.
 
 ### Limitaciones del script canónico
 
-`copy-analytics-production-to-env.sh` (dump `--data-only`). El gate usa el modo **pipe** (no `--file` / `--direct`).
+`copy-analytics-production-to-env.sh` (dump `--data-only`). Útil para refrescar testing a mano; **ya no forma parte del deploy**.
 
 1. ~~`analytics_align_target_schema_from_source` trata vistas como tablas~~ — corregido: solo `BASE TABLE`. Crea tablas faltantes y alinea PKs tras truncate.
 2. `--file` + `pg_restore --disable-triggers` falla en la imagen Supabase (`RI_ConstraintTrigger` system).

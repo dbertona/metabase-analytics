@@ -67,8 +67,8 @@ Excepción rara: `KEEP_BRANCH=1 ./scripts/merge-safe.sh` (solo si el usuario lo 
 
 Si la rama tocó `src/workflows/004_*.json`, `021_*.json` o `sql/views/` (`v_se_*` / `bi_*`):
 **no** aplicar en testing/prod desde el merge. Canal operativo: Gitea Action
-**Deploy Analytics** (`./scripts/deploy-analytics.sh`). Prod 004/SQL = el Action
-llama a `./scripts/deploy-004-gated.sh` (`analytics-figures-gate.mdc`).
+**Deploy Analytics** (`./scripts/deploy-analytics.sh`). Prod 004/SQL = apply
+directo (`analytics-figures-gate.mdc`).
 
 ### 6. Reportar
 

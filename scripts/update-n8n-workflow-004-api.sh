@@ -1,9 +1,9 @@
 #!/bin/bash
 # OBSOLETO como PUT directo a prod.
-# Publicar 004 / vistas a prod pasa por el gate de cifras (testing).
+# Publicar 004 / vistas a prod: Deploy Analytics.
 #
 # Uso: ./scripts/update-n8n-workflow-004-api.sh
-#      → exec ./scripts/deploy-004-gated.sh --yes
+#      → exec ./scripts/deploy-analytics.sh --env production --yes
 #
 # Bypass (solo emergencia + OK explícito): ALLOW_DIRECT_004_PROD=1
 
@@ -12,15 +12,15 @@ set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 if [[ "${ALLOW_DIRECT_004_PROD:-}" != "1" ]]; then
     echo "⛔ PUT directo a n8n prod está bloqueado."
-    echo "   Publicar cifras: $ROOT/scripts/deploy-004-gated.sh --yes"
-    echo "   Solo SQL:        $ROOT/scripts/deploy-004-gated.sh --yes --sql-only"
-    echo "   Solo 004:        $ROOT/scripts/deploy-004-gated.sh --yes --004-only"
-    echo "   Solo testing:    $ROOT/scripts/deploy-004-gated.sh --yes --no-prod"
-    echo "   Emergencia (sin gate): ALLOW_DIRECT_004_PROD=1 $0"
-    exit 1
+    echo "   Publicar:     $ROOT/scripts/deploy-analytics.sh --env production --yes"
+    echo "   Solo SQL:     $ROOT/scripts/deploy-analytics.sh --env production --scope sql --yes"
+    echo "   Solo 004:     $ROOT/scripts/deploy-analytics.sh --env production --scope 004 --yes"
+    echo "   Solo testing: $ROOT/scripts/deploy-analytics.sh --env testing --yes"
+    echo "   Emergencia:   ALLOW_DIRECT_004_PROD=1 $0"
+    exec "$ROOT/scripts/deploy-analytics.sh" --env production --yes
 fi
 
-echo "⚠️  ALLOW_DIRECT_004_PROD=1 — PUT a prod sin gate"
+echo "⚠️  ALLOW_DIRECT_004_PROD=1 — PUT a prod sin Deploy Analytics"
 
 WORKFLOW_FILE="src/workflows/004_sync_bc_to_ps_analytics.json"
 WORKFLOW_NAME="004_sync_bc_to_ps_analytics"
