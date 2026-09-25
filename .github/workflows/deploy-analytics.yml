@@ -144,7 +144,8 @@ jobs:
           python3 -m json.tool src/workflows/004_sync_bc_to_ps_analytics.json >/dev/null
           python3 -m json.tool src/workflows/021_health_check_analytics_bc.json >/dev/null
           echo "✅ JSON 004 y 021 válidos"
-          chmod +x scripts/deploy-analytics.sh scripts/deploy-004-gated.sh scripts/deploy-n8n-workflow-021.sh scripts/apply-bi-views.sh
+          chmod +x scripts/deploy-analytics.sh scripts/apply-analytics-artifacts.sh \
+            scripts/deploy-004-gated.sh scripts/deploy-n8n-workflow-021.sh scripts/apply-bi-views.sh
 
   deploy-testing:
     name: 🚀 Deploy to testing
@@ -231,7 +232,8 @@ jobs:
           SSH_PASS: ${{ secrets.DEPLOY_SSH_PASSWORD }}
         run: |
           set -euo pipefail
-          chmod +x scripts/deploy-analytics.sh scripts/deploy-004-gated.sh scripts/apply-bi-views.sh
+          chmod +x scripts/deploy-analytics.sh scripts/apply-analytics-artifacts.sh \
+            scripts/deploy-004-gated.sh scripts/apply-bi-views.sh
           ./scripts/deploy-analytics.sh \
             --env testing \
             --yes \
@@ -328,13 +330,14 @@ jobs:
             apt-get update -qq && apt-get install -y -qq sshpass openssh-client python3 curl
           }
 
-      - name: 🔴 Apply Analytics → production (gate)
+      - name: 🔴 Apply Analytics → production
         env:
           DEPLOY_SSH_PASSWORD: ${{ secrets.DEPLOY_SSH_PASSWORD }}
           SSH_PASS: ${{ secrets.DEPLOY_SSH_PASSWORD }}
         run: |
           set -euo pipefail
-          chmod +x scripts/deploy-analytics.sh scripts/deploy-004-gated.sh \
+          chmod +x scripts/deploy-analytics.sh scripts/apply-analytics-artifacts.sh \
+            scripts/deploy-004-gated.sh \
             scripts/deploy-n8n-workflow-021.sh scripts/apply-bi-views.sh
           extra=()
           if [[ "${{ github.event.inputs.skip_copy }}" == "true" ]]; then

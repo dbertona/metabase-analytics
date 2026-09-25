@@ -35,7 +35,7 @@ La vista de recursos usa campos de perfil desde la API de recursos. Verificar qu
 
 1. Migración SQL tabla(s) nueva(s) — cabecera `ANALYTICS DB ONLY`
 2. Actualizar 004 en este repo (`src/workflows/004_sync_bc_to_ps_analytics.json`)
-3. Publicar 004 + SQL a prod **solo** con `./scripts/deploy-004-gated.sh --yes` (no API PUT ni `apply-bi-views` directo)
+3. Publicar 004 + SQL a prod **solo** con `./scripts/deploy-analytics.sh --env production --yes` (no API PUT ni `apply-bi-views` directo)
 4. El gate aplica el JSON del repo en n8n prod (VM 101) y el SQL canónico en Analytics prod (VM 100) si las cifras cierran
 5. Sync: `POST https://apps.powersolution.es/n8n/webhook/sync-bc-to-analytics?company=psi`
 6. Validar `v_se_kpi_cards` en Analytics

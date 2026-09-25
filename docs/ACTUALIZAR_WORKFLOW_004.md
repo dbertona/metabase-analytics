@@ -34,8 +34,8 @@ curl -sS -m 900 -X POST \
 
 **Repaso de equipo (lun–vie 06:30, hora de n8n):** el propio 004 relee solo
 `job_team` (`reconcileTeam`) y purga lo que `ProyectosEquipos` ya no devuelve.
-No reinicia proyectos ni recursos. Publicar este JSON a producción sigue siendo
-el gate; el gate no lanza el 004.
+No reinicia proyectos ni recursos. Publicar este JSON a producción = Deploy Analytics;
+el deploy **no** lanza el 004.
 
 ---
 
@@ -45,8 +45,9 @@ el gate; el gate no lanza el 004.
 en `admin/superset-analytics` — solo `workflow_dispatch` (testing / production / ambos).
 No se lanza en push a `main`.
 
-Por debajo, **004 y SQL a prod** siguen yendo solo por `./scripts/deploy-004-gated.sh`
-(el job de production lo llama; no hay atajo PUT/API/`apply-bi-views` a VM 101/100).
+Por debajo, **004 y SQL** se aplican con `./scripts/deploy-analytics.sh` →
+`apply-analytics-artifacts.sh` (apply directo desde el repo). Sin clon, canary ni
+comparación de cifras. No hay atajo PUT/API/`apply-bi-views` a VM 101/100.
 
 ```text
 Gitea → Actions → Deploy Analytics Multi-Environment
@@ -62,52 +63,48 @@ Leftover `job_team` (no publica JSON): el 004 de n8n debe ser el de
 `Build sync_state map` prefiere `bc_*` frente a alias leftover;
 `Transform Equipo Proyectos` lee `BC API - Equipo Proyectos`. En full
 sync purga filas de `bc_job_team` fuera de ese keep-set. Canal testing:
-`./scripts/deploy-analytics.sh --env testing --scope 004 --yes` (`--apply-only`,
-sin clon ni canary). Prod 004: solo el gate.
+`./scripts/deploy-analytics.sh --env testing --scope 004 --yes`.
 
 ---
 
-## Publicar 004 o vistas que mueven cifras (gate)
+## Publicar 004 o vistas que mueven cifras
 
-**Motor de prod:** `./scripts/deploy-004-gated.sh` (lo invoca el deploy de Gitea).
+**Motor:** `./scripts/deploy-analytics.sh` (lo invoca el Action de Gitea).
 
 Cubre el JSON 004 **y** SQL que alimenta Apps (`v_se_*`, `bi_v_*`, `bi_mv_*`).  
-No aplicar JSON a n8n prod ni `CREATE OR REPLACE` en Analytics prod sin pasar el gate.
+No aplicar JSON a n8n prod ni `CREATE OR REPLACE` en Analytics prod fuera de este canal.
 
-El gate:
+Flujo:
 
 1. Seatbelt estático 004 (Transform PlanificacionMes = SUM, sin `pbiKey` / Distinct), si el alcance incluye 004.
-2. Copia Analytics **prod → testing** (escribe solo en VM 103).
-3. Si hay SQL: snapshot de `v_se_facturacion` (empresa + depto `1-02`) → aplica `v_se_*` + `bi_*` **solo en testing** → compara vs snapshot (tol 0,50 €). Un cambio que deba mover cifras exige `--allow-figure-change`.
-4. Si hay 004: JSON del repo a n8n **testing** (004 + 021) con `$env.BC_ENVIRONMENT`. El canary es una **copia temporal** (otro id y otro webhook) pinchada a Production. El 004/021 de la cola no se reescriben. El 021 de testing **no lleva cron**.
-5. Reset de watermarks + canary 004 (`planificacion_mes`, `movimientos_proyectos`, `expediente_mes`, `meses_cerrados`, `mayor_analitico`) en psi y pslab (solo alcance 004). La tabla `bc_job_ledger_entry_line` no la crea el gate (vistas); aplicar `sql/tables/bc_job_ledger_entry_line.sql` antes.
-6. 021 en testing **bajo demanda** (gate / webhook): `tipo_p_planif_sum`, `tipo_r_sum`, `tipo_p_expediente_sum` (tol 0,50 €). El cron L–V del 021 vive solo en n8n **prod**. El mail del 021 también falla por mes cerrado ausente/incompleto y por error de entidad en el último 004; el gate **no** espera esos checks (solo las 6 cifras €).
-7. Cifras publicadas: `bi_mv_planificacion_kpi` == `v_se_facturacion`; `v_se` tipo R == 021 `tipo_r_sum` BC. Si falla → **no se toca prod**.
-8. **Borra** las copias canary y reinicia n8n testing. 004 y 021 de pruebas siguen en `$env.BC_ENVIRONMENT`. El 021 sigue sin cron.
-9. Si cierran: mismo JSON a n8n prod y/o mismo SQL a Analytics prod. **No lanza 004 en prod.**
+2. **Testing:** aplica SQL a `:5435` y/o JSON 004/021 a n8n VM 103 (021 sin cron).
+3. **Production:** aplica el mismo SQL a Analytics `:5433` y/o JSON 004 a n8n-prod; 021 a prod con cron L–V 07:00 si el scope lo incluye.
+4. **No lanza sync 004** en ningún entorno.
+
+`deploy-004-gated.sh` es un stub deprecado que redirige aquí (flags `--004-only` /
+`--sql-only` / `--no-prod` se mapean a `--scope` / `--env testing`).
 
 **Seguimiento Económico (Tipo R / mes cerrado):** el SQL canónico hace que
 `v_se_lineas_movimientos` lea `v_se_lineas_movimientos_desde_linea`
 (suma de `bc_job_ledger_entry_line` con `COALESCE(-line_price, 0)`). Detalle:
 `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md` y
-`ANALYTICS_FACTURACION_PBI_ALIGNMENT.md`. Tras `--sql-only` / Deploy Analytics,
-verificar Iberia+Lab delta 0 vs la vista de prueba si hubo cambio de fórmula.
+`ANALYTICS_FACTURACION_PBI_ALIGNMENT.md`.
 
 ```bash
 cd superset-analytics
-./scripts/deploy-004-gated.sh --yes                 # 004 + SQL
-./scripts/deploy-004-gated.sh --yes --sql-only      # solo vistas/MVs
-./scripts/deploy-004-gated.sh --yes --004-only      # solo JSON 004
-./scripts/deploy-004-gated.sh --yes --no-prod       # solo veredicto testing
-./scripts/deploy-004-gated.sh --yes --skip-copy     # clon testing ya fresco
+./scripts/deploy-analytics.sh --env production --yes
+./scripts/deploy-analytics.sh --env production --scope sql --yes
+./scripts/deploy-analytics.sh --env production --scope 004 --yes
+./scripts/deploy-analytics.sh --env testing --yes
 ```
 
-`apply-bi-views.sh` (sin `--refresh`) está bloqueado contra prod.  
-⛔ No exportar 004 de prod y parchear un nodo (reintroduce Distinct).  
+`apply-bi-views.sh` (sin `--refresh`) está bloqueado contra prod salvo
+`ANALYTICS_DEPLOY_OK=1`.  
+⛔ No exportar 004 de prod y parchear un nodo.  
 n8n DEV: credencial `Postgres PS_Analytics` → Analytics DEV (`192.168.36.102:5435`), no prod. Un syncAll en DEV no escribe en VM 100. `$env.BC_ENVIRONMENT` en DEV puede ser `Pruebas_PS` (cifras ≠ Excel Production).  
 `update-n8n-workflow-004-api.sh` ya no hace PUT a prod: redirige aquí.
 
-### Emergencia (solo con OK explícito, sin gate)
+### Emergencia (solo con OK explícito, sin Deploy Analytics)
 
 ```bash
 # 1) Copiar script y JSON al servidor 101
@@ -135,7 +132,7 @@ quedan atrás p. ej. `bi_mv_mano_obra_recursos_*` (Recursos/Perfiles).
 Los datasets Apps/`bi_v_*` son wrappers. Publicar SQL a prod:
 
 ```bash
-./scripts/deploy-004-gated.sh --yes --sql-only
+./scripts/deploy-analytics.sh --env production --scope sql --yes
 ```
 
 `--refresh` (no cambia fórmulas) sigue permitido a mano:

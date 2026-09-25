@@ -5,7 +5,7 @@
 #   https://apps.powersolution.es/n8n/workflow/d1f7647e114a486e
 #
 # Para actualizar el JSON / vistas en prod desde este repo:
-#   ./scripts/deploy-004-gated.sh --yes
+#   ./scripts/deploy-analytics.sh --env production --yes
 #
 # Ver: docs/ACTUALIZAR_WORKFLOW_004.md
 
@@ -18,7 +18,7 @@ echo "   UI:  https://apps.powersolution.es/n8n/workflow/d1f7647e114a486e"
 echo "   Sync: POST https://apps.powersolution.es/n8n/webhook/sync-bc-to-analytics?company=psi"
 echo ""
 echo "✅ Actualizar JSON / vistas:"
-echo "   ./scripts/deploy-004-gated.sh --yes"
+echo "   ./scripts/deploy-analytics.sh --env production --yes"
 echo ""
 echo "📖 docs/ACTUALIZAR_WORKFLOW_004.md"
 exit 1

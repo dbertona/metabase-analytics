@@ -48,7 +48,7 @@ Solo **manual** en Gitea (`workflow_dispatch`). No despliega al hacer push a `ma
 4. `scope`: `all` (004 + SQL + 021) o un subconjunto.
 5. Si `production` o `ambos`: marcar **confirm_production**.
 
-Prod 004/SQL pasa por el figures gate. Testing aplica el repo a n8n 103 y Analytics `:5435` (021 sin cron).
+Prod 004/SQL = apply directo desde el repo (sin clon/canary). Testing aplica el repo a n8n 103 y Analytics `:5435` (021 sin cron).
 
 CLI: `./scripts/deploy-analytics.sh --env testing|production --yes`
 
