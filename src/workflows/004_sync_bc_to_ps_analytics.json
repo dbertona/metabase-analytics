@@ -4653,6 +4653,7 @@
         "name": "Schedule Equipo 06:30 Lun-Vie",
         "type": "n8n-nodes-base.scheduleTrigger",
         "typeVersion": 1.2,
+        "disabled": true,
         "position": [
           4920,
           4200
@@ -4675,13 +4676,13 @@
         },
         "parameters": {
           "operation": "executeQuery",
-          "query": "SELECT DISTINCT company_name\nFROM public.sync_state\nWHERE entity = 'bc_job_team'\n  AND btrim(COALESCE(company_name, '')) <> ''\nORDER BY 1;"
+          "query": "SELECT DISTINCT CASE btrim(company_name)\n  WHEN 'Power Solution Iberia SL' THEN 'psi'\n  WHEN 'PS LAB CONSULTING SL' THEN 'pslab'\nEND AS company_slug\nFROM public.sync_state\nWHERE entity = 'bc_job_team'\n  AND CASE btrim(company_name)\n    WHEN 'Power Solution Iberia SL' THEN 'psi'\n    WHEN 'PS LAB CONSULTING SL' THEN 'pslab'\n  END IS NOT NULL\nORDER BY 1;"
         }
       },
       {
         "parameters": {
           "method": "POST",
-          "url": "={{ (String($env.N8N_SELF_BASE_URL || 'http://localhost:5678').trim().replace(/\\/+$/, '')) + '/webhook/sync-bc-to-analytics?company=' + encodeURIComponent($json.company_name) }}",
+          "url": "={{ (String($env.N8N_SELF_BASE_URL || 'http://localhost:5678').trim().replace(/\\/+$/, '')) + '/webhook/sync-bc-to-analytics?company=' + encodeURIComponent($json.company_slug) }}",
           "sendBody": true,
           "specifyBody": "json",
           "jsonBody": "={{ JSON.stringify({ entities: ['job_team'], reconcileTeam: true }) }}",
