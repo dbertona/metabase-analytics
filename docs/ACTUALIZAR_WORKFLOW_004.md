@@ -53,7 +53,6 @@ comparación de cifras. No hay atajo PUT/API/`apply-bi-views` a VM 101/100.
 Gitea → Actions → Deploy Analytics Multi-Environment
   environment: testing | production | ambos
   scope: all | 004 | sql | 021 | 004+sql
-  confirm_production: true si production o ambos
 ```
 
 CLI equivalente: `./scripts/deploy-analytics.sh --env testing|production --yes`.

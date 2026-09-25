@@ -11,6 +11,8 @@
   `deploy-analytics.sh`. Guards aceptan `ANALYTICS_DEPLOY_OK=1` (compat
   `FIGURES_GATE_OK=1`). Sigue prohibido PUT/API/`apply-bi-views`/`psql` ad-hoc
   a prod.
+- **Deploy Analytics** ya no pide `confirm_production` ni los inputs muertos
+  del gate (`skip_copy`, `allow_figure_change`). Basta `environment` + `scope`.
 
 ### Fixed
 
