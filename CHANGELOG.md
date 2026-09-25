@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- El gate borra el canary en orden seguro (`activeVersionId` → NULL,
+  luego `workflow_entity`, luego `workflow_history`). El DELETE inverso
+  chocaba con la FK de n8n tras recrear el canary con versión activa.
 - El gate de Analytics recrea el canario 021 con versión activa. Un
   intento a medias dejaba la fila sin `activeVersionId` y el remap de
   credenciales fallaba con JSON vacío.

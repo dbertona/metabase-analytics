@@ -245,11 +245,13 @@ ensure_canary_stub() {
   local canary_id="$1" donor_id="$2"
   # Un intento anterior deja la fila sin activeVersionId (ON CONFLICT DO NOTHING).
   # El remap lee workflow_history por esa versión; si no hay fila, psql devuelve vacío.
+  # activeVersionId → workflow_history: anular/borrar entity ANTES del history.
   n8n_testing_psql "
 DELETE FROM webhook_entity WHERE \"workflowId\" = '${canary_id}';
 DELETE FROM shared_workflow WHERE \"workflowId\" = '${canary_id}';
-DELETE FROM workflow_history WHERE \"workflowId\" = '${canary_id}';
+UPDATE workflow_entity SET \"activeVersionId\" = NULL WHERE id = '${canary_id}';
 DELETE FROM workflow_entity WHERE id = '${canary_id}';
+DELETE FROM workflow_history WHERE \"workflowId\" = '${canary_id}';
 INSERT INTO workflow_entity (
   id, name, active, nodes, connections, \"createdAt\", \"updatedAt\",
   settings, \"staticData\", \"pinData\", \"versionId\", \"triggerCount\",
@@ -283,8 +285,10 @@ delete_canary_workflows() {
   n8n_testing_psql "
 DELETE FROM webhook_entity WHERE \"workflowId\" IN ('${CANARY_004_ID}','${CANARY_021_ID}');
 DELETE FROM shared_workflow WHERE \"workflowId\" IN ('${CANARY_004_ID}','${CANARY_021_ID}');
-DELETE FROM workflow_history WHERE \"workflowId\" IN ('${CANARY_004_ID}','${CANARY_021_ID}');
+UPDATE workflow_entity SET \"activeVersionId\" = NULL
+  WHERE id IN ('${CANARY_004_ID}','${CANARY_021_ID}');
 DELETE FROM workflow_entity WHERE id IN ('${CANARY_004_ID}','${CANARY_021_ID}');
+DELETE FROM workflow_history WHERE \"workflowId\" IN ('${CANARY_004_ID}','${CANARY_021_ID}');
 " || true
 }
 
