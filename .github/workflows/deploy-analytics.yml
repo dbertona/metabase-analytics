@@ -1,14 +1,14 @@
 name: 📊 Deploy Analytics Multi-Environment
 
 run-name: >-
-  ${{ (github.event.inputs.environment || 'testing') == 'ambos'
-    && format('🟡+🔴 TESTING+PRODUCCIÓN → {0} | {1} | by {2}', github.ref_name, github.sha, github.actor)
-    || (github.event.inputs.environment || 'testing') == 'production'
-    && format('🔴 PRODUCCIÓN → {0} | {1} | by {2}', github.ref_name, github.sha, github.actor)
-    || format('🟡 TESTING → {0} | {1} | by {2}', github.ref_name, github.sha, github.actor) }}
+  ${{ format('Analytics [{0}] → {1} | {2} | by {3}',
+    inputs.environment || github.event.inputs.environment || 'testing',
+    github.ref_name,
+    github.sha,
+    github.actor) }}
 
 concurrency:
-  group: analytics-${{ github.ref }}-${{ github.event.inputs.environment || 'testing' }}
+  group: analytics-${{ github.ref }}-${{ inputs.environment || github.event.inputs.environment || 'testing' }}
   cancel-in-progress: false
 
 on:

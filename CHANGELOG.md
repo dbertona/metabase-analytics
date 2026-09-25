@@ -13,6 +13,9 @@
   a prod.
 - **Deploy Analytics** ya no pide `confirm_production` ni los inputs muertos
   del gate (`skip_copy`, `allow_figure_change`). Basta `environment` + `scope`.
+- **run-name** del Action muestra el entorno real
+  (`Analytics [production|testing|ambos] → …`), sin cadena `&&`/`||` que
+  en Gitea caía siempre a TESTING.
 
 ### Fixed
 
