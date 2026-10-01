@@ -4,6 +4,12 @@
 
 ### Changed
 
+- **004 FACT_DEFAULT:** `dias_imputacion` ya no va en el lote de hechos
+  por defecto. Canal canónico: 1=1 master sync
+  (`calendar_period_days` → `bc_dias_imputacion`). El branch 004 queda
+  para `entities[]` / `fullResync`.
+- **021 health:** cobertura pipeline 004 / v_se / maestros informativos;
+  `dias_imputacion` como `soft_abs`.
 - **Retirado el gate de cifras Analytics** (clon prod→testing, canary 004/021,
   waits, comparación de cifras). `Deploy Analytics` aplica 004/SQL/021 directo
   desde el repo vía `scripts/apply-analytics-artifacts.sh`.
