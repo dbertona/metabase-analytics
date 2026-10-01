@@ -4,6 +4,12 @@
 
 ### Changed
 
+- **021 coste tipo R:** compara el coste de las líneas del mayor en meses
+  cerrados (`bc_job_ledger_entry_line` + `bc_meses_cerrados`) con el API
+  de mes cerrado. La tabla mensual ya no se reescribe.
+- **021 días de imputación:** cuenta días distintos con calendario, igual
+  que `bc_dias_imputacion`. El `$count` bruto incluía calendario vacío y
+  periodos solapados.
 - **004 FACT_DEFAULT:** `objectives_by_department` ya no va en el lote
   por defecto. Lo escribe el backend (`POST /api/sync/master`). La rama
   del 004 queda para `entities[]` / `fullResync`.
