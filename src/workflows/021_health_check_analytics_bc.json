@@ -77,7 +77,7 @@
           520
         ],
         "parameters": {
-          "jsCode": "const year = Number($json.year);\nconst companyName = $json.companyName;\nconst companyId = $json.companyId;\nconst env = (($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || 'Production');\nconst base = 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/'\n  + env + '/api/Power_Solution/PS_API/v2.0/companies(' + companyId + ')';\n\n// Tipo R cerrado: movimientosProyectosMes Ingresos (year texto)\nconst movUrl = base + \"/movimientosProyectosMes\"\n  + \"?$select=invoice,year,descripcionCA,job\"\n  + \"&$filter=year%20eq%20'\" + year + \"'%20and%20descripcionCA%20eq%20'Ingresos'\";\n\n// Tipo R abierto (cert): movimientosProyectos Ingresos + tieneCertificacion (igual path 004)\nconst certUrl = base + \"/movimientosProyectos\"\n  + \"?$select=jobNo,year,month,totalPrice,descripcion,tieneCertificacion,documentNo,no\"\n  + \"&$filter=year%20eq%20'\" + year + \"'%20and%20descripcion%20eq%20'Ingresos'%20and%20tieneCertificacion%20eq%20true\";\n\n// Tipo P sync: planificacionMes bruto (year entero). SUM sin Distinct (2026-08-07).\nconst planifUrl = base + \"/planificacionMes\"\n  + \"?$select=job,year,month,invoice,cost,nr,estado,budgetDateYear,budgetDateMonth,descripcionCA\"\n  + \"&$filter=year%20eq%20\" + year;\n\n// Tipo P sync: expedienteMes bruto (year entero). Alineado Transform ExpedienteMes 004.\nconst expedienteUrl = base + \"/expedienteMes\"\n  + \"?$select=job,year,month,invoice,jobUnitNo,departamento,descripcion,estado,tipoProyecto,probability,doNotConsolidate,budgetDateYear,budgetDateMonth,status1\"\n  + \"&$filter=year%20eq%20\" + year;\n\nconst cerradosUrl = base + \"/mesesCerrados\"\n  + \"?$select=job,fecha\";\n\nreturn [{ json: {\n  year, companyName, companyId, slug: $json.slug,\n  movUrl, certUrl, planifUrl, expedienteUrl, cerradosUrl,\n  emailTo: $json.emailTo || 'dbertona@powersolution.es',\n}}];\n"
+          "jsCode": "const year = Number($json.year);\nconst companyName = $json.companyName;\nconst companyId = $json.companyId;\nconst env = (($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || 'Production');\nconst base = 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/'\n  + env + '/api/Power_Solution/PS_API/v2.0/companies(' + companyId + ')';\n\nconst movUrl = base + \"/movimientosProyectosMes\"\n  + \"?$select=invoice,cost,year,descripcionCA,job\"\n  + \"&$filter=year%20eq%20'\" + year + \"'%20and%20descripcionCA%20eq%20'Ingresos'\";\n\nconst movCostUrl = base + \"/movimientosProyectosMes\"\n  + \"?$select=job,cost,year,descripcionCA\"\n  + \"&$filter=year%20eq%20'\" + year + \"'\";\n\nconst certUrl = base + \"/movimientosProyectos\"\n  + \"?$select=jobNo,year,month,totalPrice,descripcion,tieneCertificacion,documentNo,no\"\n  + \"&$filter=year%20eq%20'\" + year + \"'%20and%20descripcion%20eq%20'Ingresos'%20and%20tieneCertificacion%20eq%20true\";\n\nconst planifUrl = base + \"/planificacionMes\"\n  + \"?$select=job,year,month,invoice,cost,nr,estado,budgetDateYear,budgetDateMonth,descripcionCA\"\n  + \"&$filter=year%20eq%20\" + year;\n\nconst expedienteUrl = base + \"/expedienteMes\"\n  + \"?$select=job,year,month,invoice,jobUnitNo,departamento,descripcion,estado,tipoProyecto,probability,doNotConsolidate,budgetDateYear,budgetDateMonth,status1\"\n  + \"&$filter=year%20eq%20\" + year;\n\nconst cerradosUrl = base + \"/mesesCerrados\"\n  + \"?$select=job,fecha\";\n\nconst historicoUrl = base + \"/HistoricoPlanificacionMes\"\n  + \"?$select=job,year,month,invoice,cost\"\n  + \"&$filter=year%20eq%20\" + year;\n\nconst diasCountUrl = base + \"/diasdeImputacion/$count\";\nconst proyectosCountUrl = base + \"/proyectos/$count\";\nconst recursosCountUrl = base + \"/Recursos/$count\";\nconst lineCountUrl = base + \"/movimientosProyectos/$count\"\n  + \"?$filter=year%20eq%20'\" + year + \"'\";\n\nreturn [{ json: {\n  year, companyName, companyId, slug: $json.slug,\n  movUrl, movCostUrl, certUrl, planifUrl, expedienteUrl, cerradosUrl,\n  historicoUrl, diasCountUrl, proyectosCountUrl, recursosCountUrl, lineCountUrl,\n  emailTo: $json.emailTo || 'dbertona@powersolution.es',\n  mode: $json.mode || 'full',\n}}];\n"
         },
         "typeVersion": 2
       },
@@ -122,7 +122,7 @@
           400
         ],
         "parameters": {
-          "jsCode": "const input = $input.all();\nconst meta = $('Build BC URLs').first().json;\nlet sum = 0;\nlet count = 0;\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  if (raw.error || raw.statusCode >= 400) continue;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const inv = Number(r.invoice ?? 0);\n    if (!Number.isFinite(inv)) continue;\n    sum += inv;\n    count += 1;\n  }\n}\nreturn [{ json: {\n  ...meta,\n  bc_r_sum: Math.abs(sum),\n  bc_r_count: count,\n}}];\n"
+          "jsCode": "const input = $input.all();\nconst meta = $('Build BC URLs').first().json;\nlet sum = 0;\nlet count = 0;\nconst byJob = {};\nconst add = (job, inv) => {\n  const j = String(job || '').trim();\n  if (!j || j.startsWith('PP') || j.startsWith('PY')) return;\n  byJob[j] = Number(((byJob[j] || 0) + Math.abs(inv)).toFixed(2));\n};\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  if (raw.error || raw.statusCode >= 400) continue;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const inv = Number(r.invoice ?? 0);\n    if (!Number.isFinite(inv)) continue;\n    sum += inv;\n    count += 1;\n    add(r.job, inv);\n  }\n}\nreturn [{ json: {\n  ...meta,\n  bc_r_mov_sum: Math.abs(sum),\n  bc_r_sum: Math.abs(sum),\n  bc_r_count: count,\n  bc_r_mov_by_job: byJob,\n}}];\n"
         },
         "typeVersion": 2
       },
@@ -167,7 +167,7 @@
           400
         ],
         "parameters": {
-          "jsCode": "const input = $input.all();\nconst meta = $('Sum Movimientos BC').first().json;\nconst allowed = new Set(['Planning', 'Quote', 'Open', 'Completed', 'Lost']);\nconst toNum = (v) => {\n  const n = Number(v);\n  return Number.isFinite(n) ? n : 0;\n};\nlet sum = 0;\nlet count = 0;\nlet bcOk = false;\nconst bcPlanifKeys = [];\nconst keySeen = new Set();\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  if (raw.error || raw.statusCode >= 400) continue;\n  bcOk = true;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const job = String(r.job ?? '').trim();\n    if (!job || job.startsWith('PP') || job.startsWith('PY')) continue;\n    const status = String(r.estado ?? r.status ?? '').trim();\n    if (!allowed.has(status)) continue;\n    const year = Number(r.year ?? 0) || 0;\n    const month = Number(r.month ?? 0) || 0;\n    if (!year || !month) continue;\n    const budgetYear = toNum(r.budgetDateYear);\n    const budgetMonth = toNum(r.budgetDateMonth);\n    if (budgetYear !== 0 && (year !== budgetYear || month < budgetMonth)) continue;\n    const inv = toNum(r.invoice);\n    sum += inv;\n    count += 1;\n    const nr = String(r.nr ?? r.lineNo ?? r.line_no ?? '').trim();\n    if (!nr) continue;\n    const key = job + '|' + nr + '|' + year + '|' + month;\n    if (keySeen.has(key)) continue;\n    keySeen.add(key);\n    bcPlanifKeys.push(key);\n  }\n}\nreturn [{ json: {\n  ...meta,\n  bc_p_planif_sum: Number(sum.toFixed(2)),\n  bc_p_planif_count: count,\n  bc_planif_ok: bcOk,\n  bcPlanifKeys,\n}}];\n"
+          "jsCode": "const input = $input.all();\nconst meta = $('Sum Movimientos BC').first().json;\nconst allowed = new Set(['Planning', 'Quote', 'Open', 'Completed', 'Lost']);\nconst toNum = (v) => {\n  const n = Number(v);\n  return Number.isFinite(n) ? n : 0;\n};\nlet sum = 0;\nlet costSum = 0;\nlet count = 0;\nlet bcOk = false;\nconst bcPlanifKeys = [];\nconst keySeen = new Set();\nconst byJob = {};\nconst costByJob = {};\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  if (raw.error || raw.statusCode >= 400) continue;\n  bcOk = true;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const job = String(r.job ?? '').trim();\n    if (!job || job.startsWith('PP') || job.startsWith('PY')) continue;\n    const status = String(r.estado ?? r.status ?? '').trim();\n    if (!allowed.has(status)) continue;\n    const year = Number(r.year ?? 0) || 0;\n    const month = Number(r.month ?? 0) || 0;\n    if (!year || !month) continue;\n    const budgetYear = toNum(r.budgetDateYear);\n    const budgetMonth = toNum(r.budgetDateMonth);\n    if (budgetYear !== 0 && (year !== budgetYear || month < budgetMonth)) continue;\n    const inv = toNum(r.invoice);\n    const cost = toNum(r.cost);\n    sum += inv;\n    costSum += cost;\n    count += 1;\n    byJob[job] = Number(((byJob[job] || 0) + inv).toFixed(2));\n    costByJob[job] = Number(((costByJob[job] || 0) + cost).toFixed(2));\n    const nr = String(r.nr ?? r.lineNo ?? r.line_no ?? '').trim();\n    if (!nr) continue;\n    const key = job + '|' + nr + '|' + year + '|' + month;\n    if (keySeen.has(key)) continue;\n    keySeen.add(key);\n    bcPlanifKeys.push(key);\n  }\n}\nreturn [{ json: {\n  ...meta,\n  bc_p_planif_sum: Number(sum.toFixed(2)),\n  bc_p_planif_count: count,\n  bc_p_cost_sum: Number(costSum.toFixed(2)),\n  bc_planif_ok: bcOk,\n  bcPlanifKeys,\n  bc_p_planif_by_job: byJob,\n  bc_p_cost_by_job: costByJob,\n}}];\n"
         },
         "typeVersion": 2
       },
@@ -205,7 +205,7 @@
       },
       {
         "parameters": {
-          "jsCode": "const input = $input.all();\nconst meta = $('Sum Planificacion BC').first().json;\nconst toNum = (v) => {\n  const n = Number(v);\n  return Number.isFinite(n) ? n : 0;\n};\nlet sum = 0;\nlet count = 0;\nlet bcOk = false;\nconst bcExpedienteKeys = [];\nconst keySeen = new Set();\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  if (raw.error || raw.statusCode >= 400) continue;\n  bcOk = true;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const job = String(r.job ?? '').trim();\n    if (!job || job.startsWith('PP') || job.startsWith('PY')) continue;\n    // Transform 004 ExpedienteMes: excluye status1 Completed/Lost (no whitelist de estado Job)\n    const status1 = String(r.status1 ?? r.monthClosingStatus ?? '').trim();\n    if (status1 === 'Completed' || status1 === 'Lost') continue;\n    const year = Number(r.year ?? 0) || 0;\n    const month = Number(r.month ?? 0) || 0;\n    if (!year || !month) continue;\n    sum += toNum(r.invoice);\n    count += 1;\n    const unit = String(r.jobUnitNo ?? r.job_unit_no ?? '').trim();\n    const key = job + '|' + unit + '|' + year + '|' + month;\n    if (keySeen.has(key)) continue;\n    keySeen.add(key);\n    bcExpedienteKeys.push(key);\n  }\n}\nreturn [{ json: {\n  ...meta,\n  bc_p_expediente_sum: Number(sum.toFixed(2)),\n  bc_p_expediente_count: count,\n  bc_expediente_ok: bcOk,\n  bcExpedienteKeys,\n}}];\n"
+          "jsCode": "const input = $input.all();\nconst meta = $('Sum Planificacion BC').first().json;\nconst toNum = (v) => {\n  const n = Number(v);\n  return Number.isFinite(n) ? n : 0;\n};\nlet sum = 0;\nlet count = 0;\nlet bcOk = false;\nconst bcExpedienteKeys = [];\nconst keySeen = new Set();\nconst byJob = {};\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  if (raw.error || raw.statusCode >= 400) continue;\n  bcOk = true;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const job = String(r.job ?? '').trim();\n    if (!job || job.startsWith('PP') || job.startsWith('PY')) continue;\n    const status1 = String(r.status1 ?? r.monthClosingStatus ?? '').trim();\n    if (status1 === 'Completed' || status1 === 'Lost') continue;\n    const year = Number(r.year ?? 0) || 0;\n    const month = Number(r.month ?? 0) || 0;\n    if (!year || !month) continue;\n    const inv = toNum(r.invoice);\n    sum += inv;\n    count += 1;\n    byJob[job] = Number(((byJob[job] || 0) + inv).toFixed(2));\n    const unit = String(r.jobUnitNo ?? r.job_unit_no ?? '').trim();\n    const key = job + '|' + unit + '|' + year + '|' + month;\n    if (keySeen.has(key)) continue;\n    keySeen.add(key);\n    bcExpedienteKeys.push(key);\n  }\n}\nreturn [{ json: {\n  ...meta,\n  bc_p_expediente_sum: Number(sum.toFixed(2)),\n  bc_p_expediente_count: count,\n  bc_expediente_ok: bcOk,\n  bcExpedienteKeys,\n  bc_p_expediente_by_job: byJob,\n}}];\n"
         },
         "id": "sum-exp-021",
         "name": "Sum Expediente BC",
@@ -302,7 +302,7 @@
           400
         ],
         "parameters": {
-          "jsCode": "const input = $input.all();\nconst meta = $('Sum MesesCerrados BC').first().json;\nconst year = Number(meta.year) || 0;\nconst toNum = (v) => {\n  const n = Number(v);\n  return Number.isFinite(n) ? n : 0;\n};\n\n// Meses cerrados BC → set job|year|month (misma exclusión que Upsert Cert Open 004)\nconst closed = new Set();\ntry {\n  for (const it of ($items('BC MesesCerrados') || [])) {\n    const raw = it?.json ?? {};\n    if (raw.error || raw.statusCode >= 400) continue;\n    const src = raw?.body ?? raw;\n    const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n    for (const r of chunk) {\n      const job = String(r.job ?? '').trim();\n      const fecha = String(r.fecha ?? '').trim();\n      if (!job || !fecha || fecha.startsWith('0001')) continue;\n      if (job.startsWith('PP') || job.startsWith('PY')) continue;\n      const d = new Date(fecha.includes('T') ? fecha : fecha + 'T00:00:00Z');\n      if (Number.isNaN(d.getTime())) continue;\n      const y = d.getUTCFullYear();\n      const m = d.getUTCMonth() + 1;\n      if (y === year) closed.add(job + '|' + y + '|' + m);\n    }\n  }\n} catch (e) {}\n\n// Certificaciones en meses ABIERTOS (provisional R). totalPrice negativo → ABS.\nlet certSum = 0;\nlet certCount = 0;\nlet certSkippedClosed = 0;\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  if (raw.error || raw.statusCode >= 400) continue;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const job = String(r.jobNo ?? r.JobNo ?? r.job ?? '').trim();\n    if (!job || job.startsWith('PP') || job.startsWith('PY')) continue;\n    const y = Number(r.year ?? 0) || 0;\n    const m = Number(r.month ?? 0) || 0;\n    if (y !== year || !m) continue;\n    const concepto = String(r.descripcion ?? r.Descripcion ?? '').trim();\n    if (concepto && concepto !== 'Ingresos') continue;\n    const key = job + '|' + y + '|' + m;\n    if (closed.has(key)) { certSkippedClosed += 1; continue; }\n    // Mismo signo que Transform Cert Open: totalPrice * -1\n    const inv = toNum(r.totalPrice ?? r.TotalPrice) * -1;\n    certSum += inv;\n    certCount += 1;\n  }\n}\n\nconst movSum = toNum(meta.bc_r_sum); // ya ABS desde Sum Movimientos\nconst bc_r_total = Number((movSum + Math.abs(certSum)).toFixed(2));\n\nreturn [{ json: {\n  ...meta,\n  bc_r_mov_sum: movSum,\n  bc_r_cert_open_sum: Number(Math.abs(certSum).toFixed(2)),\n  bc_r_cert_open_count: certCount,\n  bc_r_cert_skipped_closed: certSkippedClosed,\n  bc_r_sum: bc_r_total, // total alineado con Analytics ledger Ingresos\n}}];\n"
+          "jsCode": "const input = $input.all();\nconst meta = $('Sum MesesCerrados BC').first().json;\nconst year = Number(meta.year) || 0;\nconst toNum = (v) => {\n  const n = Number(v);\n  return Number.isFinite(n) ? n : 0;\n};\n\nconst closed = new Set();\ntry {\n  for (const it of ($items('BC MesesCerrados') || [])) {\n    const raw = it?.json ?? {};\n    if (raw.error || raw.statusCode >= 400) continue;\n    const src = raw?.body ?? raw;\n    const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n    for (const r of chunk) {\n      const job = String(r.job ?? '').trim();\n      const fecha = String(r.fecha ?? '').trim();\n      if (!job || !fecha || fecha.startsWith('0001')) continue;\n      if (job.startsWith('PP') || job.startsWith('PY')) continue;\n      const d = new Date(fecha.includes('T') ? fecha : fecha + 'T00:00:00Z');\n      if (Number.isNaN(d.getTime())) continue;\n      const y = d.getUTCFullYear();\n      const m = d.getUTCMonth() + 1;\n      if (y === year) closed.add(job + '|' + y + '|' + m);\n    }\n  }\n} catch (e) {}\n\nlet certSum = 0;\nlet certCount = 0;\nlet certSkippedClosed = 0;\nconst certByJob = {};\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  if (raw.error || raw.statusCode >= 400) continue;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const job = String(r.jobNo ?? r.JobNo ?? r.job ?? '').trim();\n    if (!job || job.startsWith('PP') || job.startsWith('PY')) continue;\n    const y = Number(r.year ?? 0) || 0;\n    const m = Number(r.month ?? 0) || 0;\n    if (y !== year || !m) continue;\n    const concepto = String(r.descripcion ?? r.Descripcion ?? '').trim();\n    if (concepto && concepto !== 'Ingresos') continue;\n    const key = job + '|' + y + '|' + m;\n    if (closed.has(key)) { certSkippedClosed += 1; continue; }\n    const inv = toNum(r.totalPrice ?? r.TotalPrice) * -1;\n    certSum += inv;\n    certCount += 1;\n    certByJob[job] = Number(((certByJob[job] || 0) + Math.abs(inv)).toFixed(2));\n  }\n}\n\nconst movSum = toNum(meta.bc_r_mov_sum ?? meta.bc_r_sum);\nconst bc_r_total = Number((movSum + Math.abs(certSum)).toFixed(2));\n\nconst rByJob = { ...(meta.bc_r_mov_by_job || {}) };\nfor (const [job, v] of Object.entries(certByJob)) {\n  rByJob[job] = Number(((rByJob[job] || 0) + Number(v)).toFixed(2));\n}\n\nreturn [{ json: {\n  ...meta,\n  bc_r_mov_sum: movSum,\n  bc_r_cert_open_sum: Number(Math.abs(certSum).toFixed(2)),\n  bc_r_cert_open_count: certCount,\n  bc_r_cert_skipped_closed: certSkippedClosed,\n  bc_r_sum: bc_r_total,\n  bc_r_by_job: rByJob,\n}}];\n"
         },
         "typeVersion": 2
       },
@@ -311,12 +311,12 @@
         "name": "Query Analytics",
         "type": "n8n-nodes-base.postgres",
         "position": [
-          3120,
+          6000,
           400
         ],
         "parameters": {
           "operation": "executeQuery",
-          "query": "SELECT\n  COALESCE((SELECT SUM(invoice) FROM bc_job_ledger_entry_month\n    WHERE company_name = $1 AND year = $2::int\n      AND concepto_analitico_descripcion = 'Ingresos'), 0) AS r_sum,\n  COALESCE((SELECT SUM(invoice) FROM bc_job_planning_line\n    WHERE company_name = $1 AND year = $2::int\n      AND status IN ('Planning','Quote','Open','Completed','Lost')\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'\n      AND (\n        COALESCE(budget_date_year, 0) = 0\n        OR (budget_date_year = year AND month >= budget_date_month)\n      )), 0) AS p_planif_sum,\n  COALESCE((SELECT SUM(invoice) FROM bc_expediente_mes\n    WHERE company_name = $1 AND year = $2::int\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'\n      AND COALESCE(month_closing_status, '') NOT IN ('Completed', 'Lost')\n  ), 0) AS p_expediente_sum,\n  COALESCE((SELECT COUNT(*) FROM bc_meses_cerrados\n    WHERE company_name = $1\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'), 0) AS cerrados_count,\n  COALESCE((SELECT COUNT(*) FROM bc_job_planning_line\n    WHERE company_name = $1 AND year = $2::int\n      AND budget_date_year = 0 AND COALESCE(invoice,0) <> 0\n      AND status IN ('Open','Planning')\n      AND make_date(year, month, 1) < date_trunc('month', CURRENT_DATE)), 0) AS budget0_past_count,\n  COALESCE((SELECT SUM(facturado) FROM v_se_facturacion\n    WHERE empresa = $1 AND year = $2::int AND tipo IN ('P','R')), 0) AS planificacion_actual,\n  COALESCE((SELECT json_agg(k) FROM (\n    SELECT DISTINCT job_no || '|' || line_no || '|' || year::text || '|' || month::text AS k\n    FROM bc_job_planning_line\n    WHERE company_name = $1 AND year = $2::int\n      AND status IN ('Planning','Quote','Open','Completed','Lost')\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'\n      AND (\n        COALESCE(budget_date_year, 0) = 0\n        OR (budget_date_year = year AND month >= budget_date_month)\n      )\n  ) t), '[]'::json) AS planif_keys,\n  COALESCE((SELECT json_agg(k) FROM (\n    SELECT DISTINCT job_no || '|' || COALESCE(job_unit_no, '') || '|' || year::text || '|' || month::text AS k\n    FROM bc_expediente_mes\n    WHERE company_name = $1 AND year = $2::int\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'\n      AND COALESCE(month_closing_status, '') NOT IN ('Completed', 'Lost')\n  ) t), '[]'::json) AS expediente_keys,\n  COALESCE((SELECT jsonb_object_agg(ym, n) FROM (\n    SELECT year::text || '-' || LPAD(month::text, 2, '0') AS ym,\n           COUNT(*)::int AS n\n    FROM bc_meses_cerrados\n    WHERE company_name = $1 AND year = $2::int\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'\n    GROUP BY year, month\n  ) m), '{}'::jsonb) AS cerrados_by_month,\n  COALESCE((SELECT json_agg(x) FROM (\n    SELECT e.id, e.status, e.finished_at,\n           COALESCE(e.details->'sync_details', '{}'::jsonb) AS sync_details\n    FROM sync_executions e\n    WHERE e.company_name = $1\n      AND e.status IS DISTINCT FROM 'running'\n      AND (\n        COALESCE(e.details->>'workflow','') = '004'\n        OR e.details ? 'sync_details'\n      )\n    ORDER BY e.id DESC\n    LIMIT 1\n  ) x), '[]'::json) AS last_004,\n  COALESCE((\n    SELECT ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(started_at)))/3600.0, 2)\n    FROM sync_executions\n    WHERE company_name = $1\n      AND status = 'ok'\n      AND (\n        COALESCE(details->>'workflow','') = '004'\n        OR details ? 'sync_details'\n      )\n  ), 9999) AS hours_since_last_ok,\n  COALESCE((\n    SELECT COUNT(*)::int FROM sync_executions\n    WHERE company_name = $1\n      AND status = 'running'\n      AND started_at < NOW() - INTERVAL '30 minutes'\n  ), 0) AS mutex_stuck_count,\n  COALESCE((\n    SELECT ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(started_at)))/60.0, 1)\n    FROM sync_executions\n    WHERE company_name = $1 AND status = 'running'\n  ), 0) AS mutex_running_minutes,\n  COALESCE((\n    SELECT COUNT(*)::int FROM sync_executions\n    WHERE company_name = $1\n      AND status IN ('error', 'partial_error')\n      AND started_at >= NOW() - INTERVAL '24 hours'\n      AND (\n        COALESCE(details->>'workflow','') = '004'\n        OR details ? 'sync_details'\n      )\n  ), 0) AS sync_exec_errors_24h,\n  COALESCE((\n    SELECT ROUND(EXTRACT(EPOCH FROM (NOW() - last_sync_at))/3600.0, 2)\n    FROM sync_state\n    WHERE company_name = $1 AND entity = 'bc_dias_imputacion'\n  ), 9999) AS age_h_dias_imputacion,\n  COALESCE((\n    SELECT ROUND(EXTRACT(EPOCH FROM (NOW() - last_sync_at))/3600.0, 2)\n    FROM sync_state\n    WHERE company_name = $1 AND entity = 'bc_historico_planificacion_mes'\n  ), 9999) AS age_h_historico_planif\n",
+          "query": "SELECT\n  COALESCE((SELECT SUM(invoice) FROM bc_job_ledger_entry_month\n    WHERE company_name = $1 AND year = $2::int\n      AND concepto_analitico_descripcion = 'Ingresos'), 0) AS r_sum,\n  COALESCE((SELECT SUM(invoice) FROM bc_job_planning_line\n    WHERE company_name = $1 AND year = $2::int\n      AND status IN ('Planning','Quote','Open','Completed','Lost')\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'\n      AND (\n        COALESCE(budget_date_year, 0) = 0\n        OR (budget_date_year = year AND month >= budget_date_month)\n      )), 0) AS p_planif_sum,\n  COALESCE((SELECT SUM(cost) FROM bc_job_planning_line\n    WHERE company_name = $1 AND year = $2::int\n      AND status IN ('Planning','Quote','Open','Completed','Lost')\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'\n      AND (\n        COALESCE(budget_date_year, 0) = 0\n        OR (budget_date_year = year AND month >= budget_date_month)\n      )), 0) AS p_cost_sum,\n  COALESCE((SELECT SUM(cost) FROM bc_job_ledger_entry_month\n    WHERE company_name = $1 AND year = $2::int), 0) AS r_cost_sum,\n  COALESCE((SELECT SUM(invoice) FROM bc_expediente_mes\n    WHERE company_name = $1 AND year = $2::int\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'\n      AND COALESCE(month_closing_status, '') NOT IN ('Completed', 'Lost')\n  ), 0) AS p_expediente_sum,\n  COALESCE((SELECT COUNT(*) FROM bc_meses_cerrados\n    WHERE company_name = $1\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'), 0) AS cerrados_count,\n  COALESCE((SELECT COUNT(*) FROM bc_job_planning_line\n    WHERE company_name = $1 AND year = $2::int\n      AND budget_date_year = 0 AND COALESCE(invoice,0) <> 0\n      AND status IN ('Open','Planning')\n      AND make_date(year, month, 1) < date_trunc('month', CURRENT_DATE)), 0) AS budget0_past_count,\n  COALESCE((SELECT SUM(facturado) FROM v_se_facturacion\n    WHERE empresa = $1 AND year = $2::int AND tipo IN ('P','R')), 0) AS planificacion_actual,\n  COALESCE((SELECT SUM(facturado) FROM v_se_facturacion\n    WHERE empresa = $1 AND year = $2::int AND tipo = 'R'), 0) AS v_se_facturacion_r,\n  COALESCE((SELECT SUM(facturado) FROM v_se_facturacion\n    WHERE empresa = $1 AND year = $2::int AND tipo = 'P'), 0) AS v_se_facturacion_p,\n  COALESCE((SELECT jsonb_object_agg(job, s) FROM (\n    SELECT job, ROUND(SUM(facturado)::numeric, 2) AS s\n    FROM v_se_facturacion\n    WHERE empresa = $1 AND year = $2::int AND tipo = 'R'\n      AND job NOT LIKE 'PP%' AND job NOT LIKE 'PY%'\n    GROUP BY job\n  ) t), '{}'::jsonb) AS v_se_facturacion_r_by_job,\n  COALESCE((SELECT jsonb_object_agg(job, s) FROM (\n    SELECT job, ROUND(SUM(facturado)::numeric, 2) AS s\n    FROM v_se_facturacion\n    WHERE empresa = $1 AND year = $2::int AND tipo = 'P'\n      AND job NOT LIKE 'PP%' AND job NOT LIKE 'PY%'\n    GROUP BY job\n  ) t), '{}'::jsonb) AS v_se_facturacion_p_by_job,\n  COALESCE((SELECT jsonb_object_agg(job, s) FROM (\n    SELECT job, ROUND(SUM(coste)::numeric, 2) AS s\n    FROM v_se_coste\n    WHERE empresa = $1 AND year = $2::int AND tipo = 'R'\n      AND job NOT LIKE 'PP%' AND job NOT LIKE 'PY%'\n    GROUP BY job\n  ) t), '{}'::jsonb) AS v_se_coste_r_by_job,\n  COALESCE((SELECT jsonb_object_agg(job, s) FROM (\n    SELECT job, ROUND(SUM(coste)::numeric, 2) AS s\n    FROM v_se_coste\n    WHERE empresa = $1 AND year = $2::int AND tipo = 'P'\n      AND job NOT LIKE 'PP%' AND job NOT LIKE 'PY%'\n    GROUP BY job\n  ) t), '{}'::jsonb) AS v_se_coste_p_by_job,\n  COALESCE((SELECT SUM(coste) FROM v_se_coste\n    WHERE empresa = $1 AND year = $2::int AND tipo = 'R'), 0) AS v_se_coste_r,\n  COALESCE((SELECT SUM(coste) FROM v_se_coste\n    WHERE empresa = $1 AND year = $2::int AND tipo = 'P'), 0) AS v_se_coste_p,\n  COALESCE((SELECT json_agg(k) FROM (\n    SELECT DISTINCT job_no || '|' || line_no || '|' || year::text || '|' || month::text AS k\n    FROM bc_job_planning_line\n    WHERE company_name = $1 AND year = $2::int\n      AND status IN ('Planning','Quote','Open','Completed','Lost')\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'\n      AND (\n        COALESCE(budget_date_year, 0) = 0\n        OR (budget_date_year = year AND month >= budget_date_month)\n      )\n  ) t), '[]'::json) AS planif_keys,\n  COALESCE((SELECT json_agg(k) FROM (\n    SELECT DISTINCT job_no || '|' || COALESCE(job_unit_no, '') || '|' || year::text || '|' || month::text AS k\n    FROM bc_expediente_mes\n    WHERE company_name = $1 AND year = $2::int\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'\n      AND COALESCE(month_closing_status, '') NOT IN ('Completed', 'Lost')\n  ) t), '[]'::json) AS expediente_keys,\n  COALESCE((SELECT jsonb_object_agg(ym, n) FROM (\n    SELECT year::text || '-' || LPAD(month::text, 2, '0') AS ym,\n           COUNT(*)::int AS n\n    FROM bc_meses_cerrados\n    WHERE company_name = $1 AND year = $2::int\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'\n    GROUP BY year, month\n  ) m), '{}'::jsonb) AS cerrados_by_month,\n  COALESCE((SELECT jsonb_object_agg(job_no, s) FROM (\n    SELECT job_no, ROUND(SUM(ABS(invoice))::numeric, 2) AS s\n    FROM bc_job_ledger_entry_month\n    WHERE company_name = $1 AND year = $2::int\n      AND concepto_analitico_descripcion = 'Ingresos'\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'\n    GROUP BY job_no\n  ) t), '{}'::jsonb) AS r_by_job,\n  COALESCE((SELECT jsonb_object_agg(job_no, s) FROM (\n    SELECT job_no, ROUND(SUM(invoice)::numeric, 2) AS s\n    FROM bc_job_planning_line\n    WHERE company_name = $1 AND year = $2::int\n      AND status IN ('Planning','Quote','Open','Completed','Lost')\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'\n      AND (\n        COALESCE(budget_date_year, 0) = 0\n        OR (budget_date_year = year AND month >= budget_date_month)\n      )\n    GROUP BY job_no\n  ) t), '{}'::jsonb) AS p_planif_by_job,\n  COALESCE((SELECT jsonb_object_agg(job_no, s) FROM (\n    SELECT job_no, ROUND(SUM(invoice)::numeric, 2) AS s\n    FROM bc_expediente_mes\n    WHERE company_name = $1 AND year = $2::int\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'\n      AND COALESCE(month_closing_status, '') NOT IN ('Completed', 'Lost')\n    GROUP BY job_no\n  ) t), '{}'::jsonb) AS p_expediente_by_job,\n  COALESCE((SELECT jsonb_object_agg(job_no, s) FROM (\n    SELECT job_no, ROUND(SUM(cost)::numeric, 2) AS s\n    FROM bc_job_planning_line\n    WHERE company_name = $1 AND year = $2::int\n      AND status IN ('Planning','Quote','Open','Completed','Lost')\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'\n      AND (\n        COALESCE(budget_date_year, 0) = 0\n        OR (budget_date_year = year AND month >= budget_date_month)\n      )\n    GROUP BY job_no\n  ) t), '{}'::jsonb) AS p_cost_by_job,\n  COALESCE((SELECT jsonb_object_agg(job_no, s) FROM (\n    SELECT job_no, ROUND(SUM(cost)::numeric, 2) AS s\n    FROM bc_job_ledger_entry_month\n    WHERE company_name = $1 AND year = $2::int\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'\n    GROUP BY job_no\n  ) t), '{}'::jsonb) AS r_cost_by_job,\n  COALESCE((SELECT jsonb_object_agg(job_no, s) FROM (\n    SELECT job_no, ROUND(SUM(invoice)::numeric, 2) AS s\n    FROM bc_historico_planificacion_mes\n    WHERE company_name = $1 AND year = $2::int\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'\n    GROUP BY job_no\n  ) t), '{}'::jsonb) AS historico_by_job,\n  COALESCE((SELECT SUM(invoice) FROM bc_historico_planificacion_mes\n    WHERE company_name = $1 AND year = $2::int\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'), 0) AS historico_sum,\n  COALESCE((SELECT COUNT(*) FROM bc_historico_planificacion_mes\n    WHERE company_name = $1 AND year = $2::int\n      AND job_no NOT LIKE 'PP%' AND job_no NOT LIKE 'PY%'), 0) AS historico_count,\n  COALESCE((SELECT COUNT(*) FROM bc_dias_imputacion WHERE company_name = $1), 0) AS dias_count,\n  COALESCE((SELECT COUNT(*) FROM bc_job WHERE company_name = $1), 0) AS job_count,\n  COALESCE((SELECT COUNT(*) FROM bc_resource WHERE company_name = $1), 0) AS resource_count,\n  COALESCE((SELECT COUNT(*) FROM bc_job_ledger_entry_line\n    WHERE company_name = $1 AND year = $2::int), 0) AS line_count,\n  COALESCE((SELECT SUM(ABS(total_price)) FROM bc_job_ledger_entry_line\n    WHERE company_name = $1 AND year = $2::int\n      AND concepto_analitico_descripcion = 'Ingresos'), 0) AS line_r_sum,\n  COALESCE((SELECT json_agg(x) FROM (\n    SELECT e.id, e.status, e.finished_at,\n           COALESCE(e.details->'sync_details', '{}'::jsonb) AS sync_details\n    FROM sync_executions e\n    WHERE e.company_name = $1\n      AND e.status IS DISTINCT FROM 'running'\n      AND (\n        COALESCE(e.details->>'workflow','') = '004'\n        OR e.details ? 'sync_details'\n      )\n    ORDER BY e.id DESC\n    LIMIT 1\n  ) x), '[]'::json) AS last_004,\n  COALESCE((\n    SELECT ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(started_at)))/3600.0, 2)\n    FROM sync_executions\n    WHERE company_name = $1\n      AND status = 'ok'\n      AND (\n        COALESCE(details->>'workflow','') = '004'\n        OR details ? 'sync_details'\n      )\n  ), 9999) AS hours_since_last_ok,\n  COALESCE((\n    SELECT COUNT(*)::int FROM sync_executions\n    WHERE company_name = $1\n      AND status = 'running'\n      AND started_at < NOW() - INTERVAL '30 minutes'\n  ), 0) AS mutex_stuck_count,\n  COALESCE((\n    SELECT ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(started_at)))/60.0, 1)\n    FROM sync_executions\n    WHERE company_name = $1 AND status = 'running'\n  ), 0) AS mutex_running_minutes,\n  COALESCE((\n    SELECT COUNT(*)::int FROM sync_executions\n    WHERE company_name = $1\n      AND status IN ('error', 'partial_error')\n      AND started_at >= NOW() - INTERVAL '24 hours'\n      AND (\n        COALESCE(details->>'workflow','') = '004'\n        OR details ? 'sync_details'\n      )\n  ), 0) AS sync_exec_errors_24h,\n  COALESCE((\n    SELECT ROUND(EXTRACT(EPOCH FROM (NOW() - last_sync_at))/3600.0, 2)\n    FROM sync_state\n    WHERE company_name = $1 AND entity = 'bc_dias_imputacion'\n  ), 9999) AS age_h_dias_imputacion,\n  COALESCE((\n    SELECT ROUND(EXTRACT(EPOCH FROM (NOW() - last_sync_at))/3600.0, 2)\n    FROM sync_state\n    WHERE company_name = $1 AND entity = 'bc_historico_planificacion_mes'\n  ), 9999) AS age_h_historico_planif\n",
           "options": {
             "queryReplacement": "={{ $json.companyName }}\n={{ $json.year }}"
           }
@@ -334,11 +334,11 @@
         "name": "Compare",
         "type": "n8n-nodes-base.code",
         "position": [
-          3360,
+          6240,
           400
         ],
         "parameters": {
-          "jsCode": "const meta = $('Sum Cert Open BC').first().json;\nconst rows = $input.all().map(i => i.json);\nconst a = rows[0] || {};\n\nconst num = (v) => {\n  const n = Number(v);\n  return Number.isFinite(n) ? n : 0;\n};\n\nconst an_r = Math.abs(num(a.r_sum));\nconst an_p_planif = num(a.p_planif_sum);\nconst an_p_expediente = num(a.p_expediente_sum);\nconst an_cerrados = num(a.cerrados_count);\nconst an_budget0 = num(a.budget0_past_count);\nconst planif_actual = Math.abs(num(a.planificacion_actual));\n\nconst checks = [];\nconst push = (check_name, bc, an, tol, kind='abs', detailsExtra={}) => {\n  const delta = Number((bc - an).toFixed(2));\n  let status = 'ok';\n  if (kind === 'count' && Math.abs(delta) > tol) status = 'fail';\n  if (kind === 'abs' && Math.abs(delta) > tol) status = 'fail';\n  if (kind === 'signal' && an > tol) status = 'fail';\n  if (kind === 'max_age' && an > tol) status = 'fail';\n  if (kind === 'cerrados') {\n    const base = Math.max(Math.abs(bc), Math.abs(an), 1);\n    const pct = Math.abs(delta) / base;\n    if (pct > 0.05) status = 'fail';\n    else if (Math.abs(delta) > tol) status = 'warn';\n  }\n  if (kind === 'cerrados_month') {\n    if (Math.abs(an) === 0 && Math.abs(bc) >= 20) status = 'fail';\n    else if (Math.abs(delta) > tol) status = 'fail';\n    else if (Math.abs(delta) > 10) status = 'warn';\n  }\n  if (kind === 'info') status = 'ok';\n  checks.push({\n    company_name: meta.companyName,\n    year: meta.year,\n    check_name,\n    bc_value: bc,\n    analytics_value: an,\n    delta,\n    status,\n    details: { slug: meta.slug, kind, ...detailsExtra },\n  });\n};\n\n// Tipo R = MovimientosMes (cerrados) + Cert Open (abiertos). Misma composición que Analytics ledger.\npush(\n  'tipo_r_sum',\n  Number(num(meta.bc_r_sum).toFixed(2)),\n  Number(an_r.toFixed(2)),\n  0.5,\n  'abs',\n  {\n    bc_r_mov_sum: meta.bc_r_mov_sum,\n    bc_r_cert_open_sum: meta.bc_r_cert_open_sum,\n  }\n);\n\npush(\n  'tipo_p_planif_sum',\n  Number(num(meta.bc_p_planif_sum).toFixed(2)),\n  Number(an_p_planif.toFixed(2)),\n  0.5,\n  'abs'\n);\n\npush(\n  'tipo_p_expediente_sum',\n  Number(num(meta.bc_p_expediente_sum).toFixed(2)),\n  Number(an_p_expediente.toFixed(2)),\n  0.5,\n  'abs',\n  { bc_p_expediente_count: meta.bc_p_expediente_count }\n);\n\npush('meses_cerrados_count', meta.bc_cerrados_count, an_cerrados, 50, 'cerrados');\n\nlet anByMonth = a.cerrados_by_month;\nif (typeof anByMonth === 'string') {\n  try { anByMonth = JSON.parse(anByMonth); } catch (_) { anByMonth = {}; }\n}\nif (!anByMonth || typeof anByMonth !== 'object' || Array.isArray(anByMonth)) anByMonth = {};\nconst bcByMonth = meta.bc_cerrados_by_month || {};\nconst months = new Set([...Object.keys(bcByMonth), ...Object.keys(anByMonth)]);\nfor (const ym of [...months].sort()) {\n  const bcM = num(bcByMonth[ym]);\n  const anM = num(anByMonth[ym]);\n  if (!bcM && !anM) continue;\n  push('meses_cerrados_' + ym.replace('-', '_'), bcM, anM, 50, 'cerrados_month', { year_month: ym });\n}\n\nfunction collect004EntityErrors(raw) {\n  let list = raw;\n  if (typeof list === 'string') {\n    try { list = JSON.parse(list); } catch (_) { list = []; }\n  }\n  if (list && !Array.isArray(list) && typeof list === 'object') list = [list];\n  if (!Array.isArray(list)) list = [];\n  const errors = [];\n  for (const row of list) {\n    if (!row) continue;\n    let sync = row.sync_details;\n    if (typeof sync === 'string') {\n      try { sync = JSON.parse(sync); } catch (_) { sync = {}; }\n    }\n    const before = errors.length;\n    if (sync && typeof sync === 'object') {\n      for (const [key, v] of Object.entries(sync)) {\n        if (!v || typeof v !== 'object') continue;\n        const st = String(v.status || '');\n        const msg = String(v.message || '');\n        if ((st && st !== 'ok' && st !== 'skipped') || /invalid syntax/i.test(msg)) {\n          errors.push({ entity: key, status: st || 'error', message: msg || st, exec: row.id });\n        }\n      }\n    }\n    if (errors.length === before && (row.status === 'error' || row.status === 'partial_error')) {\n      errors.push({ entity: '*', status: row.status, message: '004 status ' + row.status, exec: row.id });\n    }\n  }\n  return errors;\n}\nconst entityErrors = collect004EntityErrors(a.last_004);\npush('sync_004_entity_errors', 0, entityErrors.length, 0, 'signal', {\n  sample: entityErrors.slice(0, 8),\n});\n\npush('budget0_past_with_invoice', 0, an_budget0, 0, 'signal');\n\nconst bcKeys = new Set(Array.isArray(meta.bcPlanifKeys) ? meta.bcPlanifKeys : []);\nlet anKeys = a.planif_keys;\nif (typeof anKeys === 'string') {\n  try { anKeys = JSON.parse(anKeys); } catch (_) { anKeys = []; }\n}\nif (!Array.isArray(anKeys)) anKeys = [];\nconst orphans = anKeys.filter((k) => k && !bcKeys.has(String(k)));\nif (meta.bc_planif_ok) {\n  push('planif_orphan_grain', 0, orphans.length, 0, 'signal', {\n    sample: orphans.slice(0, 10),\n    bc_keys: bcKeys.size,\n    an_keys: anKeys.length,\n  });\n} else {\n  push('planif_orphan_grain', 0, 0, 0, 'info', {\n    note: 'BC PlanificacionMes HTTP failed; skip orphan check',\n  });\n}\n\nconst bcExpKeys = new Set(Array.isArray(meta.bcExpedienteKeys) ? meta.bcExpedienteKeys : []);\nlet anExpKeys = a.expediente_keys;\nif (typeof anExpKeys === 'string') {\n  try { anExpKeys = JSON.parse(anExpKeys); } catch (_) { anExpKeys = []; }\n}\nif (!Array.isArray(anExpKeys)) anExpKeys = [];\nconst expOrphans = anExpKeys.filter((k) => k && !bcExpKeys.has(String(k)));\nif (meta.bc_expediente_ok) {\n  push('expediente_orphan_grain', 0, expOrphans.length, 0, 'signal', {\n    sample: expOrphans.slice(0, 10),\n    bc_keys: bcExpKeys.size,\n    an_keys: anExpKeys.length,\n  });\n} else {\n  push('expediente_orphan_grain', 0, 0, 0, 'info', {\n    note: 'BC ExpedienteMes HTTP failed; skip orphan check',\n  });\n}\n\npush('planificacion_actual_p_plus_r', planif_actual, planif_actual, 0, 'info');\n\nconst madridDay = new Intl.DateTimeFormat('en-US', {\n  timeZone: 'Europe/Madrid',\n  weekday: 'short',\n}).format(new Date());\nconst isWeekend = madridDay === 'Sat' || madridDay === 'Sun';\nconst maxHoursPipe = isWeekend ? 72 : 26;\npush('sync_004_last_ok_age_h', maxHoursPipe, num(a.hours_since_last_ok), maxHoursPipe, 'max_age', {\n  threshold_h: maxHoursPipe,\n  isWeekend,\n});\npush('sync_004_mutex_stuck', 0, num(a.mutex_stuck_count), 0, 'signal', {\n  mutex_running_minutes: num(a.mutex_running_minutes),\n});\npush('sync_004_exec_errors_24h', 0, num(a.sync_exec_errors_24h), 0, 'signal');\npush('sync_state_dias_imputacion_age_h', maxHoursPipe, num(a.age_h_dias_imputacion), maxHoursPipe, 'max_age', {\n  entity: 'bc_dias_imputacion',\n  threshold_h: maxHoursPipe,\n});\npush('sync_state_historico_planif_age_h', maxHoursPipe, num(a.age_h_historico_planif), maxHoursPipe, 'max_age', {\n  entity: 'bc_historico_planificacion_mes',\n  threshold_h: maxHoursPipe,\n});\n\n\nconst hasFail = checks.some(c => c.status === 'fail');\nconst hasWarn = checks.some(c => c.status === 'warn');\nconst overall = hasFail ? 'fail' : (hasWarn ? 'warn' : 'ok');\n\nreturn [{ json: {\n  companyName: meta.companyName,\n  year: meta.year,\n  emailTo: meta.emailTo,\n  overall,\n  checks,\n  hasDiff: hasFail || hasWarn,\n}}];\n"
+          "jsCode": "const meta = $('Sum Line Count BC').first().json;\nconst rows = $input.all().map(i => i.json);\nconst a = rows[0] || {};\n\nconst num = (v) => {\n  const n = Number(v);\n  return Number.isFinite(n) ? n : 0;\n};\n\nconst an_r = Math.abs(num(a.r_sum));\nconst an_p_planif = num(a.p_planif_sum);\nconst an_p_expediente = num(a.p_expediente_sum);\nconst an_cerrados = num(a.cerrados_count);\nconst an_budget0 = num(a.budget0_past_count);\nconst planif_actual = Math.abs(num(a.planificacion_actual));\n\nconst checks = [];\nconst push = (check_name, bc, an, tol, kind='abs', detailsExtra={}) => {\n  const delta = Number((bc - an).toFixed(2));\n  let status = 'ok';\n  if (kind === 'count' && Math.abs(delta) > tol) status = 'fail';\n  if (kind === 'abs' && Math.abs(delta) > tol) status = 'fail';\n  if (kind === 'signal' && an > tol) status = 'fail';\n  if (kind === 'max_age' && an > tol) status = 'fail';\n  if (kind === 'cerrados') {\n    const base = Math.max(Math.abs(bc), Math.abs(an), 1);\n    const pct = Math.abs(delta) / base;\n    if (pct > 0.05) status = 'fail';\n    else if (Math.abs(delta) > tol) status = 'warn';\n  }\n  if (kind === 'cerrados_month') {\n    if (Math.abs(an) === 0 && Math.abs(bc) >= 20) status = 'fail';\n    else if (Math.abs(delta) > tol) status = 'fail';\n    else if (Math.abs(delta) > 10) status = 'warn';\n  }\n  if (kind === 'info') status = 'ok';\n  checks.push({\n    company_name: meta.companyName,\n    year: meta.year,\n    check_name,\n    bc_value: bc,\n    analytics_value: an,\n    delta,\n    status,\n    details: { slug: meta.slug, kind, ...detailsExtra },\n  });\n};\n\n// Tipo R = MovimientosMes (cerrados) + Cert Open (abiertos). Misma composición que Analytics ledger.\npush(\n  'tipo_r_sum',\n  Number(num(meta.bc_r_sum).toFixed(2)),\n  Number(an_r.toFixed(2)),\n  0.5,\n  'abs',\n  {\n    bc_r_mov_sum: meta.bc_r_mov_sum,\n    bc_r_cert_open_sum: meta.bc_r_cert_open_sum,\n  }\n);\n\npush(\n  'tipo_p_planif_sum',\n  Number(num(meta.bc_p_planif_sum).toFixed(2)),\n  Number(an_p_planif.toFixed(2)),\n  0.5,\n  'abs'\n);\n\npush(\n  'tipo_p_expediente_sum',\n  Number(num(meta.bc_p_expediente_sum).toFixed(2)),\n  Number(an_p_expediente.toFixed(2)),\n  0.5,\n  'abs',\n  { bc_p_expediente_count: meta.bc_p_expediente_count }\n);\n\npush('meses_cerrados_count', meta.bc_cerrados_count, an_cerrados, 50, 'cerrados');\n\nlet anByMonth = a.cerrados_by_month;\nif (typeof anByMonth === 'string') {\n  try { anByMonth = JSON.parse(anByMonth); } catch (_) { anByMonth = {}; }\n}\nif (!anByMonth || typeof anByMonth !== 'object' || Array.isArray(anByMonth)) anByMonth = {};\nconst bcByMonth = meta.bc_cerrados_by_month || {};\nconst months = new Set([...Object.keys(bcByMonth), ...Object.keys(anByMonth)]);\nfor (const ym of [...months].sort()) {\n  const bcM = num(bcByMonth[ym]);\n  const anM = num(anByMonth[ym]);\n  if (!bcM && !anM) continue;\n  push('meses_cerrados_' + ym.replace('-', '_'), bcM, anM, 50, 'cerrados_month', { year_month: ym });\n}\n\nfunction collect004EntityErrors(raw) {\n  let list = raw;\n  if (typeof list === 'string') {\n    try { list = JSON.parse(list); } catch (_) { list = []; }\n  }\n  if (list && !Array.isArray(list) && typeof list === 'object') list = [list];\n  if (!Array.isArray(list)) list = [];\n  const errors = [];\n  for (const row of list) {\n    if (!row) continue;\n    let sync = row.sync_details;\n    if (typeof sync === 'string') {\n      try { sync = JSON.parse(sync); } catch (_) { sync = {}; }\n    }\n    const before = errors.length;\n    if (sync && typeof sync === 'object') {\n      for (const [key, v] of Object.entries(sync)) {\n        if (!v || typeof v !== 'object') continue;\n        const st = String(v.status || '');\n        const msg = String(v.message || '');\n        if ((st && st !== 'ok' && st !== 'skipped') || /invalid syntax/i.test(msg)) {\n          errors.push({ entity: key, status: st || 'error', message: msg || st, exec: row.id });\n        }\n      }\n    }\n    if (errors.length === before && (row.status === 'error' || row.status === 'partial_error')) {\n      errors.push({ entity: '*', status: row.status, message: '004 status ' + row.status, exec: row.id });\n    }\n  }\n  return errors;\n}\nconst entityErrors = collect004EntityErrors(a.last_004);\npush('sync_004_entity_errors', 0, entityErrors.length, 0, 'signal', {\n  sample: entityErrors.slice(0, 8),\n});\n\npush('budget0_past_with_invoice', 0, an_budget0, 0, 'signal');\n\nconst bcKeys = new Set(Array.isArray(meta.bcPlanifKeys) ? meta.bcPlanifKeys : []);\nlet anKeys = a.planif_keys;\nif (typeof anKeys === 'string') {\n  try { anKeys = JSON.parse(anKeys); } catch (_) { anKeys = []; }\n}\nif (!Array.isArray(anKeys)) anKeys = [];\nconst orphans = anKeys.filter((k) => k && !bcKeys.has(String(k)));\nif (meta.bc_planif_ok) {\n  push('planif_orphan_grain', 0, orphans.length, 0, 'signal', {\n    sample: orphans.slice(0, 10),\n    bc_keys: bcKeys.size,\n    an_keys: anKeys.length,\n  });\n} else {\n  push('planif_orphan_grain', 0, 0, 0, 'info', {\n    note: 'BC PlanificacionMes HTTP failed; skip orphan check',\n  });\n}\n\nconst bcExpKeys = new Set(Array.isArray(meta.bcExpedienteKeys) ? meta.bcExpedienteKeys : []);\nlet anExpKeys = a.expediente_keys;\nif (typeof anExpKeys === 'string') {\n  try { anExpKeys = JSON.parse(anExpKeys); } catch (_) { anExpKeys = []; }\n}\nif (!Array.isArray(anExpKeys)) anExpKeys = [];\nconst expOrphans = anExpKeys.filter((k) => k && !bcExpKeys.has(String(k)));\nif (meta.bc_expediente_ok) {\n  push('expediente_orphan_grain', 0, expOrphans.length, 0, 'signal', {\n    sample: expOrphans.slice(0, 10),\n    bc_keys: bcExpKeys.size,\n    an_keys: anExpKeys.length,\n  });\n} else {\n  push('expediente_orphan_grain', 0, 0, 0, 'info', {\n    note: 'BC ExpedienteMes HTTP failed; skip orphan check',\n  });\n}\n\n\nfunction parseMap(raw) {\n  let m = raw;\n  if (typeof m === 'string') {\n    try { m = JSON.parse(m); } catch (_) { m = {}; }\n  }\n  if (!m || typeof m !== 'object' || Array.isArray(m)) m = {};\n  const out = {};\n  for (const [k, v] of Object.entries(m)) {\n    const key = String(k || '').trim();\n    if (!key || key.startsWith('PP') || key.startsWith('PY')) continue;\n    const n = Number(v);\n    out[key] = Number.isFinite(n) ? n : 0;\n  }\n  return out;\n}\n\nfunction pushJobDiff(checkName, bcMap, anMap, tolFail = 1) {\n  const keys = new Set([...Object.keys(bcMap), ...Object.keys(anMap)]);\n  const mismatches = [];\n  for (const job of keys) {\n    const bc = num(bcMap[job]);\n    const an = num(anMap[job]);\n    const delta = Number((bc - an).toFixed(2));\n    if (Math.abs(delta) <= 0.009) continue;\n    const st = Math.abs(delta) > tolFail ? 'fail' : 'warn';\n    mismatches.push({ job, bc, an, delta, status: st });\n  }\n  mismatches.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));\n  const failCount = mismatches.filter((x) => x.status === 'fail').length;\n  const warnCount = mismatches.filter((x) => x.status === 'warn').length;\n  push(checkName, 0, failCount, 0, 'signal', {\n    warn_count: warnCount,\n    mismatch_count: mismatches.length,\n    sample: mismatches.slice(0, 50),\n    bc_jobs: Object.keys(bcMap).length,\n    an_jobs: Object.keys(anMap).length,\n  });\n}\n\nconst bcRByJob = parseMap(meta.bc_r_by_job);\nconst anRByJob = parseMap(a.r_by_job);\npushJobDiff('tipo_r_by_job', bcRByJob, anRByJob, 1);\n\nconst bcPPlanByJob = parseMap(meta.bc_p_planif_by_job);\nconst anPPlanByJob = parseMap(a.p_planif_by_job);\npushJobDiff('tipo_p_planif_by_job', bcPPlanByJob, anPPlanByJob, 1);\n\nconst bcPExpByJob = parseMap(meta.bc_p_expediente_by_job);\nconst anPExpByJob = parseMap(a.p_expediente_by_job);\npushJobDiff('tipo_p_expediente_by_job', bcPExpByJob, anPExpByJob, 1);\n\npush(\n  'tipo_p_cost_sum',\n  Number(num(meta.bc_p_cost_sum).toFixed(2)),\n  Number(num(a.p_cost_sum).toFixed(2)),\n  0.5,\n  'abs'\n);\npushJobDiff('tipo_p_cost_by_job', parseMap(meta.bc_p_cost_by_job), parseMap(a.p_cost_by_job), 1);\n\nif (meta.bc_r_cost_ok) {\n  push(\n    'tipo_r_cost_sum',\n    Number(num(meta.bc_r_cost_sum).toFixed(2)),\n    Number(num(a.r_cost_sum).toFixed(2)),\n    0.5,\n    'abs'\n  );\n  pushJobDiff('tipo_r_cost_by_job', parseMap(meta.bc_r_cost_by_job), parseMap(a.r_cost_by_job), 1);\n} else {\n  push('tipo_r_cost_sum', 0, 0, 0, 'info', { note: 'BC Mov Cost HTTP failed; skipped' });\n}\n\npush('v_se_coste_r', Number(num(a.r_cost_sum).toFixed(2)), Number(num(a.v_se_coste_r).toFixed(2)), 0.5, 'abs');\npush('v_se_coste_p', Number(num(a.p_cost_sum).toFixed(2)), Number(num(a.v_se_coste_p).toFixed(2)), 0.5, 'abs');\n\nif (meta.bc_historico_ok) {\n  push(\n    'historico_planif_sum',\n    Number(num(meta.bc_historico_sum).toFixed(2)),\n    Number(num(a.historico_sum).toFixed(2)),\n    0.5,\n    'abs',\n    { bc_count: meta.bc_historico_count, an_count: a.historico_count }\n  );\n  pushJobDiff('historico_planif_by_job', parseMap(meta.bc_historico_by_job), parseMap(a.historico_by_job), 1);\n} else {\n  push('historico_planif_sum', 0, 0, 0, 'info', { note: 'BC Historico HTTP failed; skipped' });\n}\n\nif (meta.bc_dias_ok) {\n  push('dias_imputacion_count', num(meta.bc_dias_count), num(a.dias_count), 0, 'count');\n} else {\n  push('dias_imputacion_count', 0, 0, 0, 'info', { note: 'BC Dias $count failed; skipped' });\n}\n\nif (meta.bc_job_ok) {\n  push('master_job_count', num(meta.bc_job_count), num(a.job_count), 0, 'count');\n} else {\n  push('master_job_count', 0, 0, 0, 'info', { note: 'BC proyectos/$count failed; skipped' });\n}\n\nif (meta.bc_resource_ok) {\n  push('master_resource_count', num(meta.bc_resource_count), num(a.resource_count), 0, 'count');\n} else {\n  push('master_resource_count', 0, 0, 0, 'info', { note: 'BC Recursos/$count failed; skipped' });\n}\n\nif (meta.bc_line_ok) {\n  push('ledger_line_count', num(meta.bc_line_count), num(a.line_count), 0, 'count');\n} else {\n  push('ledger_line_count', 0, 0, 0, 'info', { note: 'BC line/$count failed; skipped' });\n}\n\n// Month (Analytics R) vs line Ingresos ABS — known structural gap (cert/open composition).\n// Only warn if relative gap > 25% to catch gross errors; never fail.\n{\n  const monthR = Math.abs(num(a.r_sum));\n  const lineR = Math.abs(num(a.line_r_sum));\n  const delta = Number((monthR - lineR).toFixed(2));\n  const base = Math.max(monthR, lineR, 1);\n  const pct = Math.abs(delta) / base;\n  let status = 'ok';\n  if (pct > 0.25) status = 'warn';\n  checks.push({\n    company_name: meta.companyName,\n    year: meta.year,\n    check_name: 'month_vs_line_r_gap',\n    bc_value: monthR,\n    analytics_value: lineR,\n    delta,\n    status,\n    details: { slug: meta.slug, kind: 'gap', pct: Number(pct.toFixed(4)), note: 'Expected composition gap; warn if >25%' },\n  });\n}\n\n\n\n// --- PR3: cifras que ve el usuario (v_se_*) vs BC / vs tablas ---\nconst seFactR = Math.abs(num(a.v_se_facturacion_r));\nconst seFactP = num(a.v_se_facturacion_p);\npush(\n  'v_se_facturacion_r',\n  Number(num(meta.bc_r_sum).toFixed(2)),\n  Number(seFactR.toFixed(2)),\n  0.5,\n  'abs',\n  { note: 'Apps SE Tipo R' }\n);\npush(\n  'v_se_facturacion_p',\n  Number(num(meta.bc_p_planif_sum).toFixed(2)),\n  Number(seFactP.toFixed(2)),\n  0.5,\n  'abs',\n  { note: 'Apps SE Tipo P (planificacion)' }\n);\npush(\n  'v_se_facturacion_total',\n  Number((num(meta.bc_r_sum) + num(meta.bc_p_planif_sum)).toFixed(2)),\n  Number(planif_actual.toFixed(2)),\n  0.5,\n  'abs',\n  { note: 'Apps SE P+R' }\n);\npushJobDiff(\n  'v_se_facturacion_r_by_job',\n  parseMap(meta.bc_r_by_job),\n  parseMap(a.v_se_facturacion_r_by_job),\n  1\n);\npushJobDiff(\n  'v_se_facturacion_p_by_job',\n  parseMap(meta.bc_p_planif_by_job),\n  parseMap(a.v_se_facturacion_p_by_job),\n  1\n);\n\n// Coste vista vs BC (además del check vista vs tabla bc_* ya existente)\nif (meta.bc_r_cost_ok) {\n  push(\n    'v_se_coste_r_vs_bc',\n    Number(num(meta.bc_r_cost_sum).toFixed(2)),\n    Number(num(a.v_se_coste_r).toFixed(2)),\n    0.5,\n    'abs',\n    { note: 'Apps SE coste Tipo R' }\n  );\n  pushJobDiff(\n    'v_se_coste_r_by_job',\n    parseMap(meta.bc_r_cost_by_job),\n    parseMap(a.v_se_coste_r_by_job),\n    1\n  );\n}\npush(\n  'v_se_coste_p_vs_bc',\n  Number(num(meta.bc_p_cost_sum).toFixed(2)),\n  Number(num(a.v_se_coste_p).toFixed(2)),\n  0.5,\n  'abs',\n  { note: 'Apps SE coste Tipo P' }\n);\npushJobDiff(\n  'v_se_coste_p_by_job',\n  parseMap(meta.bc_p_cost_by_job),\n  parseMap(a.v_se_coste_p_by_job),\n  1\n);\n\npush('planificacion_actual_p_plus_r', planif_actual, planif_actual, 0, 'info');\n\n\nconst madridDay = new Intl.DateTimeFormat('en-US', {\n  timeZone: 'Europe/Madrid',\n  weekday: 'short',\n}).format(new Date());\nconst isWeekend = madridDay === 'Sat' || madridDay === 'Sun';\nconst maxHoursPipe = isWeekend ? 72 : 26;\npush('sync_004_last_ok_age_h', maxHoursPipe, num(a.hours_since_last_ok), maxHoursPipe, 'max_age', {\n  threshold_h: maxHoursPipe,\n  isWeekend,\n});\npush('sync_004_mutex_stuck', 0, num(a.mutex_stuck_count), 0, 'signal', {\n  mutex_running_minutes: num(a.mutex_running_minutes),\n});\npush('sync_004_exec_errors_24h', 0, num(a.sync_exec_errors_24h), 0, 'signal');\npush('sync_state_dias_imputacion_age_h', maxHoursPipe, num(a.age_h_dias_imputacion), maxHoursPipe, 'max_age', {\n  entity: 'bc_dias_imputacion',\n  threshold_h: maxHoursPipe,\n});\npush('sync_state_historico_planif_age_h', maxHoursPipe, num(a.age_h_historico_planif), maxHoursPipe, 'max_age', {\n  entity: 'bc_historico_planificacion_mes',\n  threshold_h: maxHoursPipe,\n});\n\n\nconst hasFail = checks.some(c => c.status === 'fail');\nconst hasWarn = checks.some(c => c.status === 'warn');\nconst overall = hasFail ? 'fail' : (hasWarn ? 'warn' : 'ok');\n\nreturn [{ json: {\n  companyName: meta.companyName,\n  year: meta.year,\n  emailTo: meta.emailTo,\n  overall,\n  checks,\n  hasDiff: hasFail || hasWarn,\n}}];\n"
         },
         "typeVersion": 2
       },
@@ -347,7 +347,7 @@
         "name": "Expand checks for insert",
         "type": "n8n-nodes-base.code",
         "position": [
-          3600,
+          6480,
           400
         ],
         "parameters": {
@@ -360,7 +360,7 @@
         "name": "Insert health log",
         "type": "n8n-nodes-base.postgres",
         "position": [
-          3840,
+          6720,
           400
         ],
         "parameters": {
@@ -384,7 +384,7 @@
         "name": "Restore company result",
         "type": "n8n-nodes-base.code",
         "position": [
-          4080,
+          6960,
           400
         ],
         "parameters": {
@@ -414,7 +414,7 @@
           80
         ],
         "parameters": {
-          "jsCode": "const rows = $input.all().map(i => i.json).filter(r => r && r.check_name);\nif (!rows.length) return [];\n\nconst esc = (s) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\nconst fmt = (n) => {\n  if (n === null || n === undefined || n === '') return '';\n  const x = Number(n);\n  return Number.isFinite(x) ? x.toLocaleString('es-ES', { maximumFractionDigits: 2 }) : String(n);\n};\n\nlet body = '';\nfor (const c of rows) {\n  body += `<tr>\n    <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.company_name)}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.check_name)}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.bc_value))}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.analytics_value))}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.delta))}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.status)}</td>\n  </tr>`;\n}\n\nconst when = new Date().toISOString().slice(0,10);\nconst html = `<!DOCTYPE html><html><body style=\"font-family:Segoe UI,sans-serif;color:#333;\">\n<p style=\"margin:0 0 16px;font-size:13px;color:#c0392b;font-weight:600;\">Alerta Health Check Analytics vs BC (workflow 021)</p>\n<p>Se detectaron discrepancias CRÍTICAS el <strong>${esc(when)}</strong> (${rows.length} checks).</p>\n<table style=\"border-collapse:collapse;width:100%;max-width:900px;\">\n<thead><tr style=\"background:#f0f0f0;\">\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Empresa</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Check</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">BC</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">Analytics</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">Delta</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Status</th>\n</tr></thead>\n<tbody>${body}</tbody></table>\n<p style=\"font-size:12px;color:#888;margin-top:16px;\">\nSolo se alerta por fallos críticos (descuadre Tipo R / Tipo P, grano huérfano, mes cerrado ausente o incompleto, error de entidad en el 004, plan sin versionar, 004 sin éxito reciente, mutex atascado, sync_state stale de leftover). El recuento total de meses cerrados (todos los años) solo falla si el desvío supera el 5%. Diferencias menores (warn) quedan solo en <code>analytics_health_log</code>. Acciones típicas: webhook 004, revisar meses cerrados / budget_date_year.\n</p>\n</body></html>`;\n\nreturn [{ json: {\n  to: 'dbertona@powersolution.es',\n  subject: `[Analytics 021] Discrepancia BC vs Analytics — ${when}`,\n  html,\n}}];\n"
+          "jsCode": "const rows = $input.all().map(i => i.json).filter(r => r && r.check_name);\nif (!rows.length) return [];\n\nconst esc = (s) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\nconst fmt = (n) => {\n  if (n === null || n === undefined || n === '') return '';\n  const x = Number(n);\n  return Number.isFinite(x) ? x.toLocaleString('es-ES', { maximumFractionDigits: 2 }) : String(n);\n};\n\nlet body = '';\nfor (const c of rows) {\n  body += `<tr>\n    <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.company_name)}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.check_name)}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.bc_value))}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.analytics_value))}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;text-align:right;\">${esc(fmt(c.delta))}</td>\n    <td style=\"padding:6px;border:1px solid #ddd;\">${esc(c.status)}</td>\n  </tr>`;\n}\n\nconst when = new Date().toISOString().slice(0,10);\nconst html = `<!DOCTYPE html><html><body style=\"font-family:Segoe UI,sans-serif;color:#333;\">\n<p style=\"margin:0 0 16px;font-size:13px;color:#c0392b;font-weight:600;\">Alerta Health Check Analytics vs BC (workflow 021)</p>\n<p>Se detectaron discrepancias CRÍTICAS el <strong>${esc(when)}</strong> (${rows.length} checks).</p>\n<table style=\"border-collapse:collapse;width:100%;max-width:900px;\">\n<thead><tr style=\"background:#f0f0f0;\">\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Empresa</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Check</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">BC</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">Analytics</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:right;\">Delta</th>\n<th style=\"padding:6px;border:1px solid #ddd;text-align:left;\">Status</th>\n</tr></thead>\n<tbody>${body}</tbody></table>\n<p style=\"font-size:12px;color:#888;margin-top:16px;\">\nSolo se alerta por fallos críticos: descuadre Tipo R/P (total o por proyecto), coste, v_se_facturacion/v_se_coste, histórico, maestros, grano huérfano, meses cerrados, salud del 004 (antigüedad/mutex/stale). Diferencias &lt;1€ por proyecto = warn (sin mail). El recuento total de meses cerrados (todos los años) solo falla si el desvío supera el 5%. Diferencias menores (warn) quedan solo en <code>analytics_health_log</code>. Acciones típicas: webhook 004, revisar meses cerrados / budget_date_year.\n</p>\n</body></html>`;\n\nreturn [{ json: {\n  to: 'dbertona@powersolution.es',\n  subject: `[Analytics 021] Discrepancia BC vs Analytics — ${when}`,\n  html,\n}}];\n"
         },
         "typeVersion": 2
       },
@@ -552,6 +552,240 @@
         "position": [
           1080,
           280
+        ]
+      },
+      {
+        "parameters": {
+          "url": "={{ $json.movCostUrl }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "options": {
+            "pagination": {
+              "pagination": {
+                "nextURL": "={{ $response.body['@odata.nextLink'] }}",
+                "paginationMode": "responseContainsNextURL",
+                "completeExpression": "={{ !$response.body['@odata.nextLink'] }}",
+                "paginationCompleteWhen": "other"
+              }
+            }
+          }
+        },
+        "id": "http-movcost-021",
+        "name": "BC Mov Cost",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          3120,
+          520
+        ],
+        "credentials": {
+          "oAuth2Api": {
+            "id": "5caHilW1m87Snw87",
+            "name": "Business Central"
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "parameters": {
+          "jsCode": "const input = $input.all();\nconst meta = $('Sum Cert Open BC').first().json;\nconst toNum = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };\nlet sum = 0;\nlet count = 0;\nlet bcOk = false;\nconst byJob = {};\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  if (raw.error || raw.statusCode >= 400) continue;\n  bcOk = true;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const job = String(r.job ?? '').trim();\n    if (!job || job.startsWith('PP') || job.startsWith('PY')) continue;\n    const cost = toNum(r.cost);\n    sum += cost;\n    count += 1;\n    byJob[job] = Number(((byJob[job] || 0) + cost).toFixed(2));\n  }\n}\nreturn [{ json: {\n  ...meta,\n  bc_r_cost_sum: Number(sum.toFixed(2)),\n  bc_r_cost_count: count,\n  bc_r_cost_ok: bcOk,\n  bc_r_cost_by_job: byJob,\n}}];\n"
+        },
+        "id": "sum-movcost-021",
+        "name": "Sum Mov Cost BC",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          3360,
+          520
+        ]
+      },
+      {
+        "parameters": {
+          "url": "={{ $json.historicoUrl }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "options": {
+            "pagination": {
+              "pagination": {
+                "nextURL": "={{ $response.body['@odata.nextLink'] }}",
+                "paginationMode": "responseContainsNextURL",
+                "completeExpression": "={{ !$response.body['@odata.nextLink'] }}",
+                "paginationCompleteWhen": "other"
+              }
+            }
+          }
+        },
+        "id": "http-hist-021",
+        "name": "BC Historico",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          3600,
+          520
+        ],
+        "credentials": {
+          "oAuth2Api": {
+            "id": "5caHilW1m87Snw87",
+            "name": "Business Central"
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "parameters": {
+          "jsCode": "const input = $input.all();\nconst meta = $('Sum Mov Cost BC').first().json;\nconst toNum = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };\nlet invSum = 0;\nlet costSum = 0;\nlet count = 0;\nlet bcOk = false;\nconst byJob = {};\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  if (raw.error || raw.statusCode >= 400) continue;\n  bcOk = true;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const job = String(r.job ?? '').trim();\n    if (!job || job.startsWith('PP') || job.startsWith('PY')) continue;\n    const inv = toNum(r.invoice);\n    invSum += inv;\n    costSum += toNum(r.cost);\n    count += 1;\n    byJob[job] = Number(((byJob[job] || 0) + inv).toFixed(2));\n  }\n}\nreturn [{ json: {\n  ...meta,\n  bc_historico_sum: Number(invSum.toFixed(2)),\n  bc_historico_cost_sum: Number(costSum.toFixed(2)),\n  bc_historico_count: count,\n  bc_historico_ok: bcOk,\n  bc_historico_by_job: byJob,\n}}];\n"
+        },
+        "id": "sum-hist-021",
+        "name": "Sum Historico BC",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          3840,
+          520
+        ]
+      },
+      {
+        "parameters": {
+          "url": "={{ $json.diasCountUrl }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "options": {}
+        },
+        "id": "http-dias-021",
+        "name": "BC Dias Count",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          4080,
+          520
+        ],
+        "credentials": {
+          "oAuth2Api": {
+            "id": "5caHilW1m87Snw87",
+            "name": "Business Central"
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "parameters": {
+          "jsCode": "function readCount(items) {\n  let ok = false;\n  let n = 0;\n  for (const it of items) {\n    const raw = it?.json ?? {};\n    if (raw.error || raw.statusCode >= 400) continue;\n    ok = true;\n    const src = raw?.body ?? raw?.data ?? raw;\n    if (typeof src === 'number') { n = src; break; }\n    if (typeof src === 'string' && src.trim() !== '' && !Number.isNaN(Number(src))) { n = Number(src); break; }\n    if (src && typeof src === 'object') {\n      if (typeof src['@odata.count'] === 'number') { n = src['@odata.count']; break; }\n      if (typeof src.value === 'number') { n = src.value; break; }\n      if (typeof src === 'object' && raw.statusCode) {\n        // some gateways put body as raw string already parsed\n      }\n    }\n  }\n  return { ok, n: Number(n) || 0 };\n}\n\nconst meta = $('Sum Historico BC').first().json;\nconst { ok, n } = readCount($input.all());\nreturn [{ json: { ...meta, bc_dias_count: n, bc_dias_ok: ok } }];\n"
+        },
+        "id": "sum-dias-021",
+        "name": "Sum Dias Count BC",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          4320,
+          520
+        ]
+      },
+      {
+        "parameters": {
+          "url": "={{ $json.proyectosCountUrl }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "options": {}
+        },
+        "id": "http-jobcnt-021",
+        "name": "BC Proyectos Count",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          4560,
+          520
+        ],
+        "credentials": {
+          "oAuth2Api": {
+            "id": "5caHilW1m87Snw87",
+            "name": "Business Central"
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "parameters": {
+          "jsCode": "function readCount(items) {\n  let ok = false;\n  let n = 0;\n  for (const it of items) {\n    const raw = it?.json ?? {};\n    if (raw.error || raw.statusCode >= 400) continue;\n    ok = true;\n    const src = raw?.body ?? raw?.data ?? raw;\n    if (typeof src === 'number') { n = src; break; }\n    if (typeof src === 'string' && src.trim() !== '' && !Number.isNaN(Number(src))) { n = Number(src); break; }\n    if (src && typeof src === 'object') {\n      if (typeof src['@odata.count'] === 'number') { n = src['@odata.count']; break; }\n      if (typeof src.value === 'number') { n = src.value; break; }\n      if (typeof src === 'object' && raw.statusCode) {\n        // some gateways put body as raw string already parsed\n      }\n    }\n  }\n  return { ok, n: Number(n) || 0 };\n}\n\nconst meta = $('Sum Dias Count BC').first().json;\nconst { ok, n } = readCount($input.all());\nreturn [{ json: { ...meta, bc_job_count: n, bc_job_ok: ok } }];\n"
+        },
+        "id": "sum-jobcnt-021",
+        "name": "Sum Proyectos Count BC",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          4800,
+          520
+        ]
+      },
+      {
+        "parameters": {
+          "url": "={{ $json.recursosCountUrl }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "options": {}
+        },
+        "id": "http-rescnt-021",
+        "name": "BC Recursos Count",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          5040,
+          520
+        ],
+        "credentials": {
+          "oAuth2Api": {
+            "id": "5caHilW1m87Snw87",
+            "name": "Business Central"
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "parameters": {
+          "jsCode": "function readCount(items) {\n  let ok = false;\n  let n = 0;\n  for (const it of items) {\n    const raw = it?.json ?? {};\n    if (raw.error || raw.statusCode >= 400) continue;\n    ok = true;\n    const src = raw?.body ?? raw?.data ?? raw;\n    if (typeof src === 'number') { n = src; break; }\n    if (typeof src === 'string' && src.trim() !== '' && !Number.isNaN(Number(src))) { n = Number(src); break; }\n    if (src && typeof src === 'object') {\n      if (typeof src['@odata.count'] === 'number') { n = src['@odata.count']; break; }\n      if (typeof src.value === 'number') { n = src.value; break; }\n      if (typeof src === 'object' && raw.statusCode) {\n        // some gateways put body as raw string already parsed\n      }\n    }\n  }\n  return { ok, n: Number(n) || 0 };\n}\n\nconst meta = $('Sum Proyectos Count BC').first().json;\nconst { ok, n } = readCount($input.all());\nreturn [{ json: { ...meta, bc_resource_count: n, bc_resource_ok: ok } }];\n"
+        },
+        "id": "sum-rescnt-021",
+        "name": "Sum Recursos Count BC",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          5280,
+          520
+        ]
+      },
+      {
+        "parameters": {
+          "url": "={{ $json.lineCountUrl }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "options": {}
+        },
+        "id": "http-linecnt-021",
+        "name": "BC Line Count",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          5520,
+          520
+        ],
+        "credentials": {
+          "oAuth2Api": {
+            "id": "5caHilW1m87Snw87",
+            "name": "Business Central"
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "parameters": {
+          "jsCode": "function readCount(items) {\n  let ok = false;\n  let n = 0;\n  for (const it of items) {\n    const raw = it?.json ?? {};\n    if (raw.error || raw.statusCode >= 400) continue;\n    ok = true;\n    const src = raw?.body ?? raw?.data ?? raw;\n    if (typeof src === 'number') { n = src; break; }\n    if (typeof src === 'string' && src.trim() !== '' && !Number.isNaN(Number(src))) { n = Number(src); break; }\n    if (src && typeof src === 'object') {\n      if (typeof src['@odata.count'] === 'number') { n = src['@odata.count']; break; }\n      if (typeof src.value === 'number') { n = src.value; break; }\n      if (typeof src === 'object' && raw.statusCode) {\n        // some gateways put body as raw string already parsed\n      }\n    }\n  }\n  return { ok, n: Number(n) || 0 };\n}\n\nconst meta = $('Sum Recursos Count BC').first().json;\nconst { ok, n } = readCount($input.all());\nreturn [{ json: { ...meta, bc_line_count: n, bc_line_ok: ok } }];\n"
+        },
+        "id": "sum-linecnt-021",
+        "name": "Sum Line Count BC",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          5760,
+          520
         ]
       }
     ],
@@ -787,7 +1021,7 @@
         "main": [
           [
             {
-              "node": "Query Analytics",
+              "node": "BC Mov Cost",
               "type": "main",
               "index": 0
             }
@@ -861,6 +1095,138 @@
           [
             {
               "node": "Expand checks for insert",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BC Mov Cost": {
+        "main": [
+          [
+            {
+              "node": "Sum Mov Cost BC",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sum Mov Cost BC": {
+        "main": [
+          [
+            {
+              "node": "BC Historico",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BC Historico": {
+        "main": [
+          [
+            {
+              "node": "Sum Historico BC",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sum Historico BC": {
+        "main": [
+          [
+            {
+              "node": "BC Dias Count",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BC Dias Count": {
+        "main": [
+          [
+            {
+              "node": "Sum Dias Count BC",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sum Dias Count BC": {
+        "main": [
+          [
+            {
+              "node": "BC Proyectos Count",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BC Proyectos Count": {
+        "main": [
+          [
+            {
+              "node": "Sum Proyectos Count BC",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sum Proyectos Count BC": {
+        "main": [
+          [
+            {
+              "node": "BC Recursos Count",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BC Recursos Count": {
+        "main": [
+          [
+            {
+              "node": "Sum Recursos Count BC",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sum Recursos Count BC": {
+        "main": [
+          [
+            {
+              "node": "BC Line Count",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BC Line Count": {
+        "main": [
+          [
+            {
+              "node": "Sum Line Count BC",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sum Line Count BC": {
+        "main": [
+          [
+            {
+              "node": "Query Analytics",
               "type": "main",
               "index": 0
             }
