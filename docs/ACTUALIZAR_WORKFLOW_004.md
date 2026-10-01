@@ -34,7 +34,7 @@ curl -sS -m 900 -X POST \
 
 **Repaso de equipo (lun–vie 06:30):** el nodo `Schedule Equipo 06:30` existe en el JSON pero está **desactivado** (`disabled`). Si se activara, el 004 releería solo `job_team` (`reconcileTeam`).
 
-**Papel del 004 hoy:** ya no recibe eventos de BC. Los maestros y los hechos (planificación, mayor, mes abierto, cierres, expediente, histórico, días imputables) los escribe el backend con `POST /api/sync/master`. El 004 se lanza a mano (`fullResync`, `entities[]`), recibe el lote `historico_planificacion_mes` tras una reconstrucción masiva en BC y es el único que rellena `bc_objectives_by_department`. Mapa completo: `Business-Central/docs/business-central/master-deleted-sync.md`.
+**Papel del 004 hoy:** ya no recibe eventos de BC. Los maestros, los hechos y los objetivos por departamento los escribe el backend con `POST /api/sync/master`. El 004 se lanza a mano (`fullResync`, `entities[]`) y recibe el lote `historico_planificacion_mes` tras una reconstrucción masiva en BC. `objectives_by_department` ya no está en `FACT_DEFAULT`. Mapa completo: `Business-Central/docs/business-central/master-deleted-sync.md`.
 
 Publicar este JSON a producción = Deploy Analytics; el deploy **no** lanza el 004.
 

@@ -4,6 +4,9 @@
 
 ### Changed
 
+- **004 FACT_DEFAULT:** `objectives_by_department` ya no va en el lote
+  por defecto. Lo escribe el backend (`POST /api/sync/master`). La rama
+  del 004 queda para `entities[]` / `fullResync`.
 - **004 FACT_DEFAULT:** `dias_imputacion` ya no va en el lote de hechos
   por defecto. Canal canónico: 1=1 master sync
   (`calendar_period_days` → `bc_dias_imputacion`). El branch 004 queda
