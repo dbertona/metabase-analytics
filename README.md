@@ -1,6 +1,6 @@
 # PS Analytics (capa datos)
 
-Réplica de datos Business Central en **PostgreSQL Analytics** (prod VM 100; testing VM 103; DEV VM 102) y sync **n8n workflow 004**.
+Réplica de datos Business Central en **PostgreSQL Analytics** (prod VM 100; testing VM 103) y sync **n8n workflow 004**.
 
 > Nombre histórico del repo: `superset-analytics`. La UI Apache Superset está **retirada**. Este repo mantiene SQL canónico (`v_se_*`, `bi_v_*`), scripts de apply y la definición del workflow 004.
 
@@ -29,7 +29,7 @@ Réplica de datos Business Central en **PostgreSQL Analytics** (prod VM 100; tes
 
 ## Conexión DB Analytics
 
-Matriz DEV / testing / prod y backend Apps: [`docs/ANALYTICS_ENVIRONMENTS.md`](docs/ANALYTICS_ENVIRONMENTS.md)
+Matriz testing / prod y backend Apps: [`docs/ANALYTICS_ENVIRONMENTS.md`](docs/ANALYTICS_ENVIRONMENTS.md)
 
 ```bash
 # Prod
