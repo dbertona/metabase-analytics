@@ -78,7 +78,7 @@ Flujo:
 
 1. Seatbelt estático 004 (Transform PlanificacionMes = SUM, sin `pbiKey` / Distinct), si el alcance incluye 004.
 2. **Testing:** aplica SQL a `:5435` y/o JSON 004/021 a n8n VM 103 (021 sin cron).
-3. **Production:** aplica el mismo SQL a Analytics `:5433` y/o JSON 004 a n8n-prod; 021 a prod con cron L–V 07:00 (full) + cada 2 h laborables (solo salud pipeline) si el scope lo incluye. Detalle de checks: `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md` §14.
+3. **Production:** aplica el mismo SQL a Analytics `:5433` y/o JSON 004 a n8n-prod; 021 a prod con cron L–V 07:00 (full) + cada 2 h laborables (salud del pipeline y foto del Seguimiento: `bi_mv_resumen_fact` / `bi_mv_resumen_coste`) si el scope lo incluye. Detalle de checks: `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md` §14.
 4. **No lanza sync 004** en ningún entorno.
 
 `deploy-004-gated.sh` es un stub deprecado que redirige aquí (flags `--004-only` /
