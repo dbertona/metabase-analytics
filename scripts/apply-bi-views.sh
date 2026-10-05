@@ -61,7 +61,7 @@ analytics_target_is_prod() {
   local dsn
   dsn="$(resolved_dsn)"
   case "$dsn" in
-    *192.168.36.103*|*192.168.36.102*|*analytics_testing*|*analytics_dev*)
+    *192.168.36.103*|*analytics_testing*)
       return 1
       ;;
     *192.168.36.100*|*SuperSecurePassword2025*)
