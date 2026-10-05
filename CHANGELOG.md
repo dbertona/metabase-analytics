@@ -4,6 +4,10 @@
 
 ### Changed
 
+- **021 foto del Seguimiento:** `bi_mv_resumen_fact` y `bi_mv_resumen_coste`
+  comparan la foto `bi_mv_resumen_proyectos` con `v_se_facturacion`
+  (tolerancia 0,5 €). El pase completo añade el desglose por proyecto (1 €).
+  También corre cada 2 h laborables. Un fallo envía el correo.
 - **021 coste tipo R:** compara el coste de las líneas del mayor en meses
   cerrados (`bc_job_ledger_entry_line` + `bc_meses_cerrados`) con el API
   de mes cerrado. La tabla mensual ya no se reescribe.
