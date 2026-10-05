@@ -4,6 +4,9 @@
 
 ### Changed
 
+- **VM 102 retirada (2026-10-05).** Analytics solo tiene Testing (`:5435`)
+  y Producción (`:5433`). `apply-bi-views.sh` y la doc de entornos ya no
+  ofrecen development. Cierre de rama `chore/retirar-vm-dev`.
 - **021 foto del Seguimiento:** `bi_mv_resumen_fact` y `bi_mv_resumen_coste`
   comparan la foto `bi_mv_resumen_proyectos` con `v_se_facturacion`
   (tolerancia 0,5 €). El pase completo añade el desglose por proyecto (1 €).
