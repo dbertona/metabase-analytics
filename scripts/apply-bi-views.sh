@@ -40,16 +40,24 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
+# Todas las fotos de public. Una lista fija dejó fuera Recursos/Perfiles.
 REFRESH_SQL=$(cat <<'SQL'
-REFRESH MATERIALIZED VIEW bi_mv_planificacion_kpi;
-REFRESH MATERIALIZED VIEW bi_mv_evolucion_mensual;
-REFRESH MATERIALIZED VIEW bi_mv_facturacion_probabilidad;
-REFRESH MATERIALIZED VIEW bi_mv_resumen_proyectos;
-REFRESH MATERIALIZED VIEW bi_mv_unidad;
-REFRESH MATERIALIZED VIEW bi_mv_facturacion;
-REFRESH MATERIALIZED VIEW bi_mv_gastos;
-REFRESH MATERIALIZED VIEW bi_mv_mano_obra;
-SELECT 'bi_mvs_refreshed' AS status;
+DO $$
+DECLARE
+  r record;
+BEGIN
+  FOR r IN
+    SELECT c.relname
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relkind = 'm'
+    ORDER BY c.relname
+  LOOP
+    EXECUTE format('REFRESH MATERIALIZED VIEW public.%I', r.relname);
+  END LOOP;
+END
+$$;
+SELECT count(*) AS bi_mvs_refreshed FROM pg_matviews WHERE schemaname = 'public';
 SQL
 )
 
