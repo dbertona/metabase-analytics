@@ -9,6 +9,10 @@
 
 ### Changed
 
+- **Una fuente de reglas.** Analytics enlaza la arquitectura propia y
+  el merge común. `docs/shared` en `99ccf8b`. Lo siempre activo queda
+  en 367 líneas. Rama `chore/reglas-fuente-y-lint`.
+
 - **Una sola confirmación.** Se quita `.cursorrules`. El pedido ya es la
   aprobación. Ramas `feat/`, `fix/`, `hotfix/` o `chore/`.
   `docs/shared` en `7e4c8d6`. Rama `chore/reglas-sin-contradiccion`.
