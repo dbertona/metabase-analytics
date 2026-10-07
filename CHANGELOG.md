@@ -9,6 +9,10 @@
 
 ### Changed
 
+- **`.gitmodules` sin contraseña.** La URL de `docs/shared` ya no lleva
+  usuario ni clave. `merge-safe.sh` falla si vuelve a aparecer, o si se
+  enlaza una regla siempre activa. Rama `chore/reglas-una-carga`.
+
 - **El bloque siempre activo ya no se enlaza aquí.** En el
   super-workspace entra solo desde Business Central. Hooks y reglas
   a demanda siguen. `docs/shared` en `8d19d87`.
