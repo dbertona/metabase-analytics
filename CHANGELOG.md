@@ -4,6 +4,10 @@
 
 ### Changed
 
+- **docs/shared sin la regla de Imixs.** El submódulo pasa de `acb08f7`
+  a `8a43f52`, la punta de docs. Cierre de rama
+  `chore/docs-shared-sin-imixs`.
+
 - **021 tipo R facturado:** `tipo_r_sum` y el desglose por proyecto leen
   `v_se_lineas_movimientos` (líneas de mes cerrado + certificación abierta).
   `bc_job_ledger_entry_month` no se reescribe al cerrar y el check fallaba
