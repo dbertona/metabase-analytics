@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Recursos/Perfiles:** `apply-bi-views.sh --refresh` también refresca
+  `bi_mv_mano_obra_recursos_{horas,coste,prob,perfil}`.
+
 ### Changed
 
 - **Una sola confirmación.** Se quita `.cursorrules`. El pedido ya es la
