@@ -9,6 +9,11 @@
 
 ### Changed
 
+- **Aviso de reglas en una ventana solo de Analytics.** Se enlaza
+  `00-LOAD-CORE-RULES.mdc`: si faltan las doce siempre activas, el
+  agente las lee desde `docs/shared`. `merge-safe.sh` admite solo ese aviso.
+  Rama `chore/aviso-reglas`.
+
 - **docs/shared en `7b96de1`.** Incluye la guía del runner de docs.
   Rama `chore/pin-docs-runner`.
 
