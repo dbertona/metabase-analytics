@@ -9,6 +9,10 @@
 
 ### Changed
 
+- **El hook carga las reglas en una ventana solo de Analytics.** Tras la
+  primera herramienta inyecta las doce siempre activas. Hasta entonces
+  frena ediciones y comandos que cambian estado. `docs/shared` en `f96f31a`.
+
 - **Aviso de reglas en una ventana solo de Analytics.** Se enlaza
   `00-LOAD-CORE-RULES.mdc`: si faltan las doce siempre activas, el
   agente las lee desde `docs/shared`. `merge-safe.sh` admite solo ese aviso.
