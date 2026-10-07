@@ -4,6 +4,10 @@
 
 ### Changed
 
+- **Hooks de Cursor en Analytics.** Intención, rama y shell (tarjeta si
+  se escribe en producción). Un worktree nuevo inicializa `docs/shared`.
+  Cierre de rama `chore/hooks-versionados`.
+
 - **Puerta de intención en Analytics.** Superset carga la puerta de
   intención y la regla de parches. Northline y el gate de cifras apuntan
   a `docs/shared`. Cierre de rama `chore/reglas-puerta-intencion`.
