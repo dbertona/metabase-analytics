@@ -271,6 +271,19 @@ if git status --porcelain | grep -qE '^[ ]*M[ ]+docs/shared|^M[ ]+docs/shared'; 
   fail "docs/shared (submodulo) tiene cambios. Commitea en el submodulo y actualiza la referencia en la rama."
 fi
 
+# En el super-workspace el bloque siempre activo entra solo desde Business Central.
+for rule in .cursor/rules/*.mdc; do
+  [ -e "$rule" ] || continue
+  [ "$(head -n 1 "$rule")" = "---" ] || continue
+  if sed -n '2,/^---$/p' "$rule" | grep -qE '^alwaysApply:[[:space:]]*true'; then
+    fail "$rule es siempre activa. Aqui no se enlaza: el super-workspace la cargaria dos veces."
+  fi
+done
+
+if [ -f .gitmodules ] && grep -qE 'https?://[^/@[:space:]]+:[^@[:space:]]+@' .gitmodules; then
+  fail ".gitmodules lleva usuario y contrasena en la URL. Usa la URL sin credenciales."
+fi
+
 if [ "${QUIET:-0}" = "1" ]; then
   mkdir -p "$GIT_COMMON_DIR"
   : >"$QUIET_LOG"
