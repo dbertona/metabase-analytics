@@ -9,6 +9,9 @@
 
 ### Changed
 
+- **docs/shared en `7b96de1`.** Incluye la guía del runner de docs.
+  Rama `chore/pin-docs-runner`.
+
 - **`.gitmodules` sin contraseña.** La URL de `docs/shared` ya no lleva
   usuario ni clave. `merge-safe.sh` falla si vuelve a aparecer, o si se
   enlaza una regla siempre activa. Rama `chore/reglas-una-carga`.
