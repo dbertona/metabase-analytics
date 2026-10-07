@@ -9,6 +9,9 @@
 
 ### Changed
 
+- **El hook de intención guarda el estado por chat.** Un chat no hereda
+  el modo de otro. `docs/shared` en `719131e`. Rama `chore/pin-hooks-por-chat`.
+
 - **El hook carga las reglas en una ventana solo de Analytics.** Tras la
   primera herramienta inyecta las doce siempre activas. Hasta entonces
   frena ediciones y comandos que cambian estado. `docs/shared` en `f96f31a`.
