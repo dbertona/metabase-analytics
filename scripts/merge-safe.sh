@@ -272,8 +272,10 @@ if git status --porcelain | grep -qE '^[ ]*M[ ]+docs/shared|^M[ ]+docs/shared'; 
 fi
 
 # En el super-workspace el bloque siempre activo entra solo desde Business Central.
+# Solo se admite el aviso 00-LOAD-CORE-RULES.mdc.
 for rule in .cursor/rules/*.mdc; do
   [ -e "$rule" ] || continue
+  [ "$(basename "$rule")" = "00-LOAD-CORE-RULES.mdc" ] && continue
   [ "$(head -n 1 "$rule")" = "---" ] || continue
   if sed -n '2,/^---$/p' "$rule" | grep -qE '^alwaysApply:[[:space:]]*true'; then
     fail "$rule es siempre activa. Aqui no se enlaza: el super-workspace la cargaria dos veces."
