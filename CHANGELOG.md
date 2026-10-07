@@ -9,6 +9,10 @@
 
 ### Changed
 
+- **El bloque siempre activo ya no se enlaza aquí.** En el
+  super-workspace entra solo desde Business Central. Hooks y reglas
+  a demanda siguen. Rama `chore/reglas-sin-duplicar`.
+
 - **Una fuente de reglas.** Analytics enlaza la arquitectura propia y
   el merge común. `docs/shared` en `99ccf8b`. Lo siempre activo queda
   en 367 líneas. Rama `chore/reglas-fuente-y-lint`.
