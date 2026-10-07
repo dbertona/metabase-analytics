@@ -4,6 +4,10 @@
 
 ### Changed
 
+- **Una sola confirmación.** Se quita `.cursorrules`. El pedido ya es la
+  aprobación. Ramas `feat/`, `fix/`, `hotfix/` o `chore/`.
+  `docs/shared` en `7e4c8d6`. Rama `chore/reglas-sin-contradiccion`.
+
 - **Hooks de Cursor en Analytics.** Intención, rama y shell (tarjeta si
   se escribe en producción). Un worktree nuevo inicializa `docs/shared`.
   Cierre de rama `chore/hooks-versionados`.
