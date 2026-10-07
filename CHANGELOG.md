@@ -4,6 +4,10 @@
 
 ### Changed
 
+- **021 tipo R facturado:** `tipo_r_sum` y el desglose por proyecto leen
+  `v_se_lineas_movimientos` (líneas de mes cerrado + certificación abierta).
+  `bc_job_ledger_entry_month` no se reescribe al cerrar y el check fallaba
+  en falso. `month_vs_line_r_gap` sigue mirando la tabla mensual.
 - **VM 102 retirada (2026-10-05).** Analytics solo tiene Testing (`:5435`)
   y Producción (`:5433`). `apply-bi-views.sh` y la doc de entornos ya no
   ofrecen development. Cierre de rama `chore/retirar-vm-dev`.
