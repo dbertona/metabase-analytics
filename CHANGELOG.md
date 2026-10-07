@@ -4,6 +4,10 @@
 
 ### Changed
 
+- **Puerta de intención en Analytics.** Superset carga la puerta de
+  intención y la regla de parches. Northline y el gate de cifras apuntan
+  a `docs/shared`. Cierre de rama `chore/reglas-puerta-intencion`.
+
 - **docs/shared sin la regla de Imixs.** El submódulo pasa de `acb08f7`
   a `8a43f52`, la punta de docs. Cierre de rama
   `chore/docs-shared-sin-imixs`.
