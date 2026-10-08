@@ -9,6 +9,12 @@
 
 ### Changed
 
+- **021 sin antigüedad en horas.** Se quitan `sync_004_last_ok_age_h`,
+  `sync_state_dias_imputacion_age_h` y `sync_state_historico_planif_age_h`
+  del pase completo y del de cada 2 h. El canal diario ya no es el 004 y
+  esos relojes avisaban en falso. Siguen el mutex colgado, los errores de
+  ejecución y las cifras.
+
 - **El hook de intención guarda el estado por chat.** Un chat no hereda
   el modo de otro. `docs/shared` en `719131e`. Rama `chore/pin-hooks-por-chat`.
 
