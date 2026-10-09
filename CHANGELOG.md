@@ -9,6 +9,9 @@
 
 ### Changed
 
+- **En modo consulta el hook pide Aceptar/Rechazar en vez de bloquear.**
+  `docs/shared` en `2700c80`. Rama `chore/pin-boton-aceptar`.
+
 - **021 sin antigüedad en horas.** Se quitan `sync_004_last_ok_age_h`,
   `sync_state_dias_imputacion_age_h` y `sync_state_historico_planif_age_h`
   del pase completo y del de cada 2 h. El canal diario ya no es el 004 y
