@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Vigilantes partidos en piezas, sin cambio de comportamiento.** `docs/shared` en `31e281c`. Rama `chore/pin-docs-31e281c`.
+
 - **Comando publicar-reglas; hacer y haz cuentan como orden.** `docs/shared` en `de0d3b8`. Rama `chore/pin-docs-de0d3b8`.
 
 - **Recursos/Perfiles:** `apply-bi-views.sh --refresh` también refresca
