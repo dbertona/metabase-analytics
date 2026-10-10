@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Comando publicar-reglas; hacer y haz cuentan como orden.** `docs/shared` en `de0d3b8`. Rama `chore/pin-docs-de0d3b8`.
+
 - **Recursos/Perfiles:** `apply-bi-views.sh --refresh` también refresca
   `bi_mv_mano_obra_recursos_{horas,coste,prob,perfil}`.
 
