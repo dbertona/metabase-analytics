@@ -9,6 +9,9 @@
 
 ### Changed
 
+- **Un mensaje que termina en «?» es siempre consulta.** `docs/shared` en
+  `a94dc52`. Rama `chore/pin-pregunta-consulta`.
+
 - **Permisos en lenguaje natural, también en producción.** La tarjeta muestra
   una frase sin código. `docs/shared` en `a6e15ca`. Rama `chore/pin-permiso-natural`.
 
