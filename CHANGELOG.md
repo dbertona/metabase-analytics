@@ -9,6 +9,9 @@
 
 ### Changed
 
+- **Permisos en lenguaje natural, también en producción.** La tarjeta muestra
+  una frase sin código. `docs/shared` en `a6e15ca`. Rama `chore/pin-permiso-natural`.
+
 - **En modo consulta el hook pide Aceptar/Rechazar en vez de bloquear.**
   `docs/shared` en `2700c80`. Rama `chore/pin-boton-aceptar`.
 
