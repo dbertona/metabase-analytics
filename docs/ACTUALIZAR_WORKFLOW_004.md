@@ -13,7 +13,7 @@
 | **PostgreSQL Analytics testing** | VM **103** — `192.168.36.103:5435` (`supabase-analytics-db-testing`) |
 | **n8n testing (004)** | VM 103 — ID `dlekAIp9f5FsdfJj` |
 
-Entornos y backend: [ANALYTICS_ENVIRONMENTS.md](./ANALYTICS_ENVIRONMENTS.md). Solo existen Testing (VM 103) y Producción; la VM 102 (DEV) se retiró el 2026-10-05.
+Entornos y backend: [ANALYTICS_ENVIRONMENTS.md](./ANALYTICS_ENVIRONMENTS.md). Solo existen Testing (VM 103) y Producción.
 
 > **Retirado:** n8n en VM 100 (puerto 5678). No usar.
 
