@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Mautic enlaza las seis reglas de Cursor que le valen.** `docs/shared` en `21fd80d`. Rama `chore/pin-docs-21fd80d`.
+
 - **la tarea de soporte se busca por el título antes del proyecto.** `docs/shared` en `cd7c128`. Rama `chore/pin-docs-cd7c128`.
 
 - **el índice nombra las reglas de cada workspace.** `docs/shared` en `a2cc103`. Rama `chore/pin-docs-a2cc103`.
