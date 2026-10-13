@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **el índice dice qué reglas enlaza web-ps.** `docs/shared` en `6d42648`. Rama `chore/pin-docs-6d42648`.
+
 - **la regla de soporte dice cuándo completar la tarea.** `docs/shared` en `cdb88fe`. Rama `chore/pin-docs-cdb88fe`.
 
 - **Registro de actividad en Cursor y reparto del tiempo por tarea.** `docs/shared` en `158bdad`. Rama `chore/pin-docs-158bdad`.
