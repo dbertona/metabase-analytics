@@ -1,6 +1,6 @@
 # Entornos PostgreSQL Analytics
 
-**Última verificación:** 2026-09-14 (VM 102 retirada: 2026-10-05)  
+**Última verificación:** 2026-09-14
 **Alcance:** instancias Postgres de Analytics (datos BC / SE). No es la BD Timesheet.
 
 `https://…/analytics/` en Internet es **404** (UI Superset retirada, NPM).
@@ -14,7 +14,7 @@ Compose: `power-solution-apps/ops/supabase-analytics/docker-compose.{testing,pro
 
 ## Matriz
 
-Solo hay **dos entornos**: Testing (VM 103) y Producción (Analytics en VM 100; n8n/backend en VM 101). La VM 102 (desarrollo) y su Analytics DEV se retiraron el 2026-10-05. El día a día se trabaja contra **Testing**.
+Solo hay **dos entornos**: Testing (VM 103) y Producción (Analytics en VM 100; n8n/backend en VM 101). El día a día se trabaja contra **Testing**.
 
 | Entorno | VM | Contenedor | Host:puerto | Password | Directorio |
 | --- | --- | --- | --- | --- | --- |
