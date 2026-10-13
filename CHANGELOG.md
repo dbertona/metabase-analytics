@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **004 Resolve Company acepta el nombre de la empresa y el slug.** Un recarga manual con el nombre completo ya no cae en empresa inválida. Rama `fix/004-nombre-empresa`.
+
 - **`apply-bi-views.sh --refresh` refresca todas las fotos.** Recorre las
   vistas materializadas de `public` en vez de una lista fija, igual que el
   004. Rama `fix/refresco-todas-fotos-analytics`.
