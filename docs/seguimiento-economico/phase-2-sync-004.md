@@ -1,5 +1,9 @@
 # Fase 2 — Ampliar workflow 004 (movimientos por mes)
 
+> **Histórico.** Esta fase ya está hecha. Los eventos de BC los escribe el
+> backend con `POST /api/sync/master`. El 004 queda para recarga manual.
+> Guía vigente: `docs/shared/analytics/004_SYNC_BC_ANALYTICS.md`.
+
 Archivo canónico en este repo: `src/workflows/004_sync_bc_to_ps_analytics.json`
 
 ## Prioridad 1 — Movimientos por mes (bloquea tipo R)

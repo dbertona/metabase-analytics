@@ -65,7 +65,7 @@ SE en testing: `https://testingapp.powersolution.es/my-timesheet-app/` → Segui
 
 El 004 de testing falló el 2026-08-10 en `Try Acquire Mutex 004`: `company_name` NULL al insertar en `sync_executions`. No se corrigió en este corte.
 
-Canal BC → Analytics: solo 004 (salvo bypass explícito).
+Canal BC → Analytics: `POST /api/sync/master` (backend). El 004 es recarga manual y el lote de histórico tras una reconstrucción masiva. Un script directo exige bypass explícito.
 
 **Publicar Analytics (004, 021, SQL) a testing o prod:** Gitea Action
 `Deploy Analytics Multi-Environment` (mismo modelo que Timesheet: manual,
@@ -136,5 +136,5 @@ En 103 el stack ya estaba up (db + Kong `8002` + Studio `3002`).
 
 - Apuntar el backend de testing otra vez a `192.168.36.100:5433` (rompe el aislamiento).
 - Copiar prod → testing sin `--backup`.
-- Traer BC → Analytics fuera del 004.
+- Traer BC → Analytics fuera del backend (`POST /api/sync/master`) o del 004 manual.
 - Tocar prod sin aprobación explícita en el chat.
