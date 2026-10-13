@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- **`apply-bi-views.sh --refresh` refresca todas las fotos.** Recorre las
+  vistas materializadas de `public` en vez de una lista fija, igual que el
+  004. Rama `fix/refresco-todas-fotos-analytics`.
+
 - **Reglas y hooks: RAGFlow fuente única.** `docs/shared` en `abe4665`. Rama `chore/pin-docs-abe4665`.
 
 - **Consultar datos sin permiso; diagnosticar mirando los datos.** `docs/shared` en `941262d`. Rama `chore/pin-docs-941262d`.
