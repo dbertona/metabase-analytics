@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **la tarea de soporte se busca por el título antes del proyecto.** `docs/shared` en `cd7c128`. Rama `chore/pin-docs-cd7c128`.
+
 - **el índice nombra las reglas de cada workspace.** `docs/shared` en `a2cc103`. Rama `chore/pin-docs-a2cc103`.
 
 - **el índice dice qué reglas enlaza web-ps.** `docs/shared` en `6d42648`. Rama `chore/pin-docs-6d42648`.
