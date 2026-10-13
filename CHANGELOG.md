@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Solo RAGFlow cuenta como consulta de documentación.** `docs/shared` en `3f11715`. Rama `chore/pin-docs-3f11715`.
+
 - **004 Resolve Company acepta el nombre de la empresa y el slug.** Un recarga manual con el nombre completo ya no cae en empresa inválida. Rama `fix/004-nombre-empresa`.
 
 - **`apply-bi-views.sh --refresh` refresca todas las fotos.** Recorre las
