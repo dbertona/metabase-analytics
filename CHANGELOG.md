@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **tarea de soporte en cada acción.** `docs/shared` en `9b6dd51`. Rama `chore/pin-docs-9b6dd51`.
+
 - **La regla de documentación dice cómo redactar para la búsqueda.** `docs/shared` en `dd39b87`. Rama `chore/pin-docs-dd39b87`.
 
 - **El hook anota la pregunta de cada búsqueda.** `docs/shared` en `f07c5d6`. Rama `chore/pin-docs-f07c5d6`.
