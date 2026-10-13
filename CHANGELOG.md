@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **La regla de documentación dice cómo redactar para la búsqueda.** `docs/shared` en `dd39b87`. Rama `chore/pin-docs-dd39b87`.
+
 - **El hook anota la pregunta de cada búsqueda.** `docs/shared` en `f07c5d6`. Rama `chore/pin-docs-f07c5d6`.
 
 - **El peso de la búsqueda en RAGFlow pasa a 0.7.** `docs/shared` en `03b9a65`. Rama `chore/pin-docs-03b9a65`.
