@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **El hook anota la pregunta de cada búsqueda.** `docs/shared` en `f07c5d6`. Rama `chore/pin-docs-f07c5d6`.
+
 - **El peso de la búsqueda en RAGFlow pasa a 0.7.** `docs/shared` en `03b9a65`. Rama `chore/pin-docs-03b9a65`.
 
 - **Solo RAGFlow cuenta como consulta de documentación.** `docs/shared` en `3f11715`. Rama `chore/pin-docs-3f11715`.
