@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Reglas y hooks: RAGFlow fuente única.** `docs/shared` en `abe4665`. Rama `chore/pin-docs-abe4665`.
+
 - **Consultar datos sin permiso; diagnosticar mirando los datos.** `docs/shared` en `941262d`. Rama `chore/pin-docs-941262d`.
 
 - **Vigilantes partidos en piezas, sin cambio de comportamiento.** `docs/shared` en `31e281c`. Rama `chore/pin-docs-31e281c`.
