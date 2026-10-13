@@ -4,7 +4,7 @@
 
 ## Objetivo
 
-Mantener en **PostgreSQL Analytics** (prod VM 100; testing 103; DEV 102 — [entornos](../ANALYTICS_ENVIRONMENTS.md)) las vistas y tablas que alimentan:
+Mantener en **PostgreSQL Analytics** (prod VM 100; testing 103 — [entornos](../ANALYTICS_ENVIRONMENTS.md)) las vistas y tablas que alimentan:
 
 - **Apps** (Seguimiento Económico / planificación)
 

@@ -2,8 +2,91 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`apply-bi-views.sh --refresh` refresca todas las fotos.** Recorre las
+  vistas materializadas de `public` en vez de una lista fija, igual que el
+  004. Rama `fix/refresco-todas-fotos-analytics`.
+
+- **Reglas y hooks: RAGFlow fuente única.** `docs/shared` en `abe4665`. Rama `chore/pin-docs-abe4665`.
+
+- **Consultar datos sin permiso; diagnosticar mirando los datos.** `docs/shared` en `941262d`. Rama `chore/pin-docs-941262d`.
+
+- **Vigilantes partidos en piezas, sin cambio de comportamiento.** `docs/shared` en `31e281c`. Rama `chore/pin-docs-31e281c`.
+
+- **Comando publicar-reglas; hacer y haz cuentan como orden.** `docs/shared` en `de0d3b8`. Rama `chore/pin-docs-de0d3b8`.
+
+- **Recursos/Perfiles:** `apply-bi-views.sh --refresh` también refresca
+  `bi_mv_mano_obra_recursos_{horas,coste,prob,perfil}`.
+
 ### Changed
 
+- **Un mensaje que termina en «?» es siempre consulta.** `docs/shared` en
+  `a94dc52`. Rama `chore/pin-pregunta-consulta`.
+
+- **Permisos en lenguaje natural, también en producción.** La tarjeta muestra
+  una frase sin código. `docs/shared` en `a6e15ca`. Rama `chore/pin-permiso-natural`.
+
+- **En modo consulta el hook pide Aceptar/Rechazar en vez de bloquear.**
+  `docs/shared` en `2700c80`. Rama `chore/pin-boton-aceptar`.
+
+- **021 sin antigüedad en horas.** Se quitan `sync_004_last_ok_age_h`,
+  `sync_state_dias_imputacion_age_h` y `sync_state_historico_planif_age_h`
+  del pase completo y del de cada 2 h. El canal diario ya no es el 004 y
+  esos relojes avisaban en falso. Siguen el mutex colgado, los errores de
+  ejecución y las cifras.
+
+- **El hook de intención guarda el estado por chat.** Un chat no hereda
+  el modo de otro. `docs/shared` en `719131e`. Rama `chore/pin-hooks-por-chat`.
+
+- **El hook carga las reglas en una ventana solo de Analytics.** Tras la
+  primera herramienta inyecta las doce siempre activas. Hasta entonces
+  frena ediciones y comandos que cambian estado. `docs/shared` en `f96f31a`.
+
+- **Aviso de reglas en una ventana solo de Analytics.** Se enlaza
+  `00-LOAD-CORE-RULES.mdc`: si faltan las doce siempre activas, el
+  agente las lee desde `docs/shared`. `merge-safe.sh` admite solo ese aviso.
+  Rama `chore/aviso-reglas`.
+
+- **docs/shared en `7b96de1`.** Incluye la guía del runner de docs.
+  Rama `chore/pin-docs-runner`.
+
+- **`.gitmodules` sin contraseña.** La URL de `docs/shared` ya no lleva
+  usuario ni clave. `merge-safe.sh` falla si vuelve a aparecer, o si se
+  enlaza una regla siempre activa. Rama `chore/reglas-una-carga`.
+
+- **El bloque siempre activo ya no se enlaza aquí.** En el
+  super-workspace entra solo desde Business Central. Hooks y reglas
+  a demanda siguen. `docs/shared` en `8d19d87`.
+  Rama `chore/reglas-sin-duplicar`.
+
+- **Una fuente de reglas.** Analytics enlaza la arquitectura propia y
+  el merge común. `docs/shared` en `99ccf8b`. Lo siempre activo queda
+  en 367 líneas. Rama `chore/reglas-fuente-y-lint`.
+
+- **Una sola confirmación.** Se quita `.cursorrules`. El pedido ya es la
+  aprobación. Ramas `feat/`, `fix/`, `hotfix/` o `chore/`.
+  `docs/shared` en `7e4c8d6`. Rama `chore/reglas-sin-contradiccion`.
+
+- **Hooks de Cursor en Analytics.** Intención, rama y shell (tarjeta si
+  se escribe en producción). Un worktree nuevo inicializa `docs/shared`.
+  Cierre de rama `chore/hooks-versionados`.
+
+- **Puerta de intención en Analytics.** Superset carga la puerta de
+  intención y la regla de parches. Northline y el gate de cifras apuntan
+  a `docs/shared`. Cierre de rama `chore/reglas-puerta-intencion`.
+
+- **docs/shared sin la regla de Imixs.** El submódulo pasa de `acb08f7`
+  a `8a43f52`, la punta de docs. Cierre de rama
+  `chore/docs-shared-sin-imixs`.
+
+- **021 tipo R facturado:** `tipo_r_sum` y el desglose por proyecto leen
+  `v_se_lineas_movimientos` (líneas de mes cerrado + certificación abierta).
+  `bc_job_ledger_entry_month` no se reescribe al cerrar y el check fallaba
+  en falso. `month_vs_line_r_gap` sigue mirando la tabla mensual.
+- **VM 102 retirada (2026-10-05).** Analytics solo tiene Testing (`:5435`)
+  y Producción (`:5433`). `apply-bi-views.sh` y la doc de entornos ya no
+  ofrecen development. Cierre de rama `chore/retirar-vm-dev`.
 - **021 foto del Seguimiento:** `bi_mv_resumen_fact` y `bi_mv_resumen_coste`
   comparan la foto `bi_mv_resumen_proyectos` con `v_se_facturacion`
   (tolerancia 0,5 €). El pase completo añade el desglose por proyecto (1 €).

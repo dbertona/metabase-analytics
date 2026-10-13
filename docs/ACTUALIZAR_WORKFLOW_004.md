@@ -9,12 +9,11 @@
 | **Workflow 004 (canónico en este repo)** | `src/workflows/004_sync_bc_to_ps_analytics.json` |
 | **n8n producción** | `https://apps.powersolution.es/n8n/` (VM **101**, `n8n-prod`) |
 | **ID workflow prod** | `d1f7647e114a486e` |
-| **n8n DEV** | VM 102 — workflow ID `d57165bf41a34b8eb215` |
 | **PostgreSQL Analytics prod** | VM **100** — `192.168.36.100:5433` (`supabase-db`) |
 | **PostgreSQL Analytics testing** | VM **103** — `192.168.36.103:5435` (`supabase-analytics-db-testing`) |
 | **n8n testing (004)** | VM 103 — ID `dlekAIp9f5FsdfJj` |
 
-Entornos y backend: [ANALYTICS_ENVIRONMENTS.md](./ANALYTICS_ENVIRONMENTS.md).
+Entornos y backend: [ANALYTICS_ENVIRONMENTS.md](./ANALYTICS_ENVIRONMENTS.md). Solo existen Testing (VM 103) y Producción; la VM 102 (DEV) se retiró el 2026-10-05.
 
 > **Retirado:** n8n en VM 100 (puerto 5678). No usar.
 
@@ -101,7 +100,7 @@ cd superset-analytics
 `apply-bi-views.sh` (sin `--refresh`) está bloqueado contra prod salvo
 `ANALYTICS_DEPLOY_OK=1`.  
 ⛔ No exportar 004 de prod y parchear un nodo.  
-n8n DEV: credencial `Postgres PS_Analytics` → Analytics DEV (`192.168.36.102:5435`), no prod. Un syncAll en DEV no escribe en VM 100. `$env.BC_ENVIRONMENT` en DEV puede ser `Pruebas_PS` (cifras ≠ Excel Production).  
+n8n testing: credencial `Postgres PS_Analytics` → Analytics testing (`192.168.36.103:5435`), no prod. Un syncAll en testing no escribe en VM 100. `$env.BC_ENVIRONMENT` en testing es `Pruebas_PS` (cifras ≠ Excel Production).  
 `update-n8n-workflow-004-api.sh` ya no hace PUT a prod: redirige aquí.
 
 ### Emergencia (solo con OK explícito, sin Deploy Analytics)

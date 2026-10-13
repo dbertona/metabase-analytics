@@ -1,0 +1,5 @@
+{
+  "setup-worktree-unix": [
+    "git submodule update --init docs/shared"
+  ]
+}

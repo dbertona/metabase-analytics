@@ -1,6 +1,6 @@
 # Entornos PostgreSQL Analytics
 
-**Última verificación:** 2026-09-14  
+**Última verificación:** 2026-09-14 (VM 102 retirada: 2026-10-05)  
 **Alcance:** instancias Postgres de Analytics (datos BC / SE). No es la BD Timesheet.
 
 `https://…/analytics/` en Internet es **404** (UI Superset retirada, NPM).
@@ -8,31 +8,28 @@ No es la API de Apps (`/api/analytics/…`) ni este Postgres.
 
 Sync BC → Analytics: [004_SYNC_BC_ANALYTICS.md](./shared/analytics/004_SYNC_BC_ANALYTICS.md)  
 Copia entre entornos (script): `power-solution-apps/scripts/copy-analytics-production-to-env.sh`  
-Compose: `power-solution-apps/ops/supabase-analytics/docker-compose.{dev,testing,production}.yml`
+Compose: `power-solution-apps/ops/supabase-analytics/docker-compose.{testing,production}.yml`
 
 ---
 
 ## Matriz
 
+Solo hay **dos entornos**: Testing (VM 103) y Producción (Analytics en VM 100; n8n/backend en VM 101). La VM 102 (desarrollo) y su Analytics DEV se retiraron el 2026-10-05. El día a día se trabaja contra **Testing**.
+
 | Entorno | VM | Contenedor | Host:puerto | Password | Directorio |
 | --- | --- | --- | --- | --- | --- |
-| **DEV** | 102 | `supabase-analytics-db-dev` | `192.168.36.102:5435` | `analytics_dev_2025` | `/opt/supabase-analytics/` |
 | **Testing** | 103 | `supabase-analytics-db-testing` | `192.168.36.103:5435` | `analytics_testing_2025` | `/opt/supabase-analytics/` |
 | **Producción** | 100 | `supabase-db` | `192.168.36.100:5433` | `SuperSecurePassword2025` | `/opt/supabase/` |
 
-Usuario y database: `postgres` / `postgres` en los tres.
+Usuario y database: `postgres` / `postgres` en ambos.
 
-**Puertos publicados (DEV/testing):** Kong `8002`, Studio `3002`. Timesheet usa `8000` / `5433` en la misma VM — no mezclar.
+**Puertos publicados (testing):** Kong `8002`, Studio `3002`. Timesheet usa `8000` / `5433` en la misma VM — no mezclar.
 
 **Prod no es `:5432`.** El puerto verificado desde LAN es **`5433`**.
 
 ```bash
 # Testing
 psql "postgresql://postgres:analytics_testing_2025@192.168.36.103:5435/postgres"
-
-# DEV
-psql "postgresql://postgres:analytics_dev_2025@192.168.36.102:5435/postgres"
-
 # Prod
 psql "postgresql://postgres:SuperSecurePassword2025@192.168.36.100:5433/postgres"
 ```
@@ -49,7 +46,6 @@ Desde un host sin `psql` local, el mismo DSN vía `docker exec` en el contenedor
 | Entorno | `ANALYTICS_DB_HOST` | Puerto | Password | `.env` en servidor | Estado 2026-08-14 |
 | --- | --- | --- | --- | --- | --- |
 | **Testing** | `192.168.36.103` | `5435` | `analytics_testing_2025` | `/opt/langchain-agent-v2/.env` | **Apunta a Analytics local** |
-| **DEV** | `192.168.36.102` | `5435` | `analytics_dev_2025` | `/opt/langchain-agent-v2/.env` | Analytics DEV local |
 | **Prod** | `192.168.36.100` | `5433` | prod | (VM 101) | Prod |
 
 Tras cambiar el `.env` hay que **recrear** el contenedor (`docker compose up -d --force-recreate --no-deps app-backend`). Un `restart` no recarga env.
@@ -65,7 +61,6 @@ SE en testing: `https://testingapp.powersolution.es/my-timesheet-app/` → Segui
 | Entorno | n8n | Workflow ID | Destino de escritura |
 | --- | --- | --- | --- |
 | Prod | VM 101 — `https://apps.powersolution.es/n8n/` | `d1f7647e114a486e` | VM 100 `:5433` |
-| DEV | VM 102 `:5678` | `d57165bf41a34b8eb215` | `Postgres PS_Analytics` → Analytics DEV (`192.168.36.102:5435`) |
 | Testing | VM 103 `:5678` | `dlekAIp9f5FsdfJj` (activo) | credencial `Postgres PS_Analytics` → Analytics testing |
 
 El 004 de testing falló el 2026-08-10 en `Try Acquire Mutex 004`: `company_name` NULL al insertar en `sync_executions`. No se corrigió en este corte.
@@ -130,7 +125,7 @@ cd power-solution-apps
 ```bash
 cd power-solution-apps
 export SSH_PASS='…'
-./scripts/deploy-supabase-analytics.sh testing   # o dev
+./scripts/deploy-supabase-analytics.sh testing
 ```
 
 En 103 el stack ya estaba up (db + Kong `8002` + Studio `3002`).

@@ -1,0 +1,1 @@
+../../docs/shared/cursor-hooks/guard-shell.sh
