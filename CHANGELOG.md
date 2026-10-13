@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Registro de actividad en Cursor y reparto del tiempo por tarea.** `docs/shared` en `158bdad`. Rama `chore/pin-docs-158bdad`.
+
 - **tarea de soporte en cada acción.** `docs/shared` en `9b6dd51`. Rama `chore/pin-docs-9b6dd51`.
 
 - **La regla de documentación dice cómo redactar para la búsqueda.** `docs/shared` en `dd39b87`. Rama `chore/pin-docs-dd39b87`.
