@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **El peso de la búsqueda en RAGFlow pasa a 0.7.** `docs/shared` en `03b9a65`. Rama `chore/pin-docs-03b9a65`.
+
 - **Solo RAGFlow cuenta como consulta de documentación.** `docs/shared` en `3f11715`. Rama `chore/pin-docs-3f11715`.
 
 - **004 Resolve Company acepta el nombre de la empresa y el slug.** Un recarga manual con el nombre completo ya no cae en empresa inválida. Rama `fix/004-nombre-empresa`.
