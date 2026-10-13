@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **el índice nombra las reglas de cada workspace.** `docs/shared` en `a2cc103`. Rama `chore/pin-docs-a2cc103`.
+
 - **el índice dice qué reglas enlaza web-ps.** `docs/shared` en `6d42648`. Rama `chore/pin-docs-6d42648`.
 
 - **la regla de soporte dice cuándo completar la tarea.** `docs/shared` en `cdb88fe`. Rama `chore/pin-docs-cdb88fe`.
