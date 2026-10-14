@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Una consulta a Testing o producción, de Business Central o de apps, no pide autorización.** `docs/shared` en `26d3548`. Rama `chore/pin-docs-26d3548`.
+
 - **El reparto cuenta el tiempo delante del Mac y un chat queda en su primera tarea.** `docs/shared` en `e9e236d`. Rama `chore/pin-docs-e9e236d`.
 
 - **Mautic enlaza las seis reglas de Cursor que le valen.** `docs/shared` en `21fd80d`. Rama `chore/pin-docs-21fd80d`.
