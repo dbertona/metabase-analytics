@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **El reparto cuenta el tiempo delante del Mac y un chat queda en su primera tarea.** `docs/shared` en `e9e236d`. Rama `chore/pin-docs-e9e236d`.
+
 - **Mautic enlaza las seis reglas de Cursor que le valen.** `docs/shared` en `21fd80d`. Rama `chore/pin-docs-21fd80d`.
 
 - **la tarea de soporte se busca por el título antes del proyecto.** `docs/shared` en `cd7c128`. Rama `chore/pin-docs-cd7c128`.
