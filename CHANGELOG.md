@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **exigir RAGFlow antes de leer archivos del repo.** `docs/shared` en `ce15426`. Rama `chore/pin-docs-ce15426`.
+
 - **021 auto-repara descuadres de planificación.** Si `tipo_p_planif_*` / `tipo_p_cost_*` fallan, el health check pide al backend `POST /api/sync/master` (entity `job_planning_line`, mes a mes) con tope 1 intento / 12 h por empresa. Requiere en n8n `APPS_API_BASE` y `MASTER_SYNC_API_KEY`. Rama `fix/021-heal-planificacion`.
 
 - **Una consulta a Testing o producción, de Business Central o de apps, no pide autorización.** `docs/shared` en `26d3548`. Rama `chore/pin-docs-26d3548`.
