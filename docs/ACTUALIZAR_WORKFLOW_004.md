@@ -35,6 +35,8 @@ curl -sS -m 900 -X POST \
 
 **Papel del 004 hoy:** ya no recibe eventos de BC. Los maestros, los hechos y los objetivos por departamento los escribe el backend con `POST /api/sync/master`. El 004 se lanza a mano (`fullResync`, `entities[]`) y recibe el lote `historico_planificacion_mes` tras una reconstrucción masiva en BC. `objectives_by_department` ya no está en `FACT_DEFAULT`. Mapa completo: `Business-Central/docs/business-central/master-deleted-sync.md`.
 
+**021 auto-heal planificación:** si fallan `tipo_p_planif_*` / `tipo_p_cost_*`, el health check llama al backend (`job_planning_line` + año/mes) con tope 12 h. En n8n hacen falta `APPS_API_BASE` (p. ej. `https://apps.powersolution.es/api`) y `MASTER_SYNC_API_KEY`.
+
 Publicar este JSON a producción = Deploy Analytics; el deploy **no** lanza el 004.
 
 ---
