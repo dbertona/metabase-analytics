@@ -58,7 +58,7 @@ jobs:
             echo "✅ Workspace con repo $(git rev-parse --short HEAD 2>/dev/null || echo '?')"
             exit 0
           fi
-          echo "Clonando admin/superset-analytics desde Gitea local"
+          echo "Clonando admin/ps-analytics desde Gitea local"
           python3 - <<'PY'
           import os, shutil, subprocess, tempfile, urllib.parse
           dest = os.getcwd()
@@ -71,7 +71,7 @@ jobs:
               auth = "admin:" + urllib.parse.quote(pw, safe="")
           else:
               raise SystemExit("Falta GITHUB_TOKEN y secret APPS_CLONE_PASSWORD")
-          url = "http://%s@127.0.0.1:3000/admin/superset-analytics.git" % auth
+          url = "http://%s@127.0.0.1:3000/admin/ps-analytics.git" % auth
           tmp = tempfile.mkdtemp(prefix="analytics-co-")
           repo = os.path.join(tmp, "repo")
           try:
@@ -138,7 +138,7 @@ jobs:
             echo "✅ Workspace con repo $(git rev-parse --short HEAD 2>/dev/null || echo '?')"
             exit 0
           fi
-          echo "Clonando admin/superset-analytics desde Gitea local"
+          echo "Clonando admin/ps-analytics desde Gitea local"
           python3 - <<'PY'
           import os, shutil, subprocess, tempfile, urllib.parse
           dest = os.getcwd()
@@ -151,7 +151,7 @@ jobs:
               auth = "admin:" + urllib.parse.quote(pw, safe="")
           else:
               raise SystemExit("Falta GITHUB_TOKEN y secret APPS_CLONE_PASSWORD")
-          url = "http://%s@127.0.0.1:3000/admin/superset-analytics.git" % auth
+          url = "http://%s@127.0.0.1:3000/admin/ps-analytics.git" % auth
           tmp = tempfile.mkdtemp(prefix="analytics-co-")
           repo = os.path.join(tmp, "repo")
           try:
@@ -177,7 +177,7 @@ jobs:
           set -euo pipefail
           PASS="${APPS_CLONE_PASSWORD:-}"
           if [[ -z "$PASS" ]]; then
-            echo "❌ Falta secret APPS_CLONE_PASSWORD en admin/superset-analytics" >&2
+            echo "❌ Falta secret APPS_CLONE_PASSWORD en admin/ps-analytics" >&2
             exit 1
           fi
           python3 -c "
@@ -242,7 +242,7 @@ jobs:
             echo "✅ Workspace con repo $(git rev-parse --short HEAD 2>/dev/null || echo '?')"
             exit 0
           fi
-          echo "Clonando admin/superset-analytics desde Gitea local"
+          echo "Clonando admin/ps-analytics desde Gitea local"
           python3 - <<'PY'
           import os, shutil, subprocess, tempfile, urllib.parse
           dest = os.getcwd()
@@ -255,7 +255,7 @@ jobs:
               auth = "admin:" + urllib.parse.quote(pw, safe="")
           else:
               raise SystemExit("Falta GITHUB_TOKEN y secret APPS_CLONE_PASSWORD")
-          url = "http://%s@127.0.0.1:3000/admin/superset-analytics.git" % auth
+          url = "http://%s@127.0.0.1:3000/admin/ps-analytics.git" % auth
           tmp = tempfile.mkdtemp(prefix="analytics-co-")
           repo = os.path.join(tmp, "repo")
           try:
@@ -281,7 +281,7 @@ jobs:
           set -euo pipefail
           PASS="${APPS_CLONE_PASSWORD:-}"
           if [[ -z "$PASS" ]]; then
-            echo "❌ Falta secret APPS_CLONE_PASSWORD en admin/superset-analytics" >&2
+            echo "❌ Falta secret APPS_CLONE_PASSWORD en admin/ps-analytics" >&2
             exit 1
           fi
           python3 -c "

@@ -2,14 +2,14 @@
 
 Réplica de datos Business Central en **PostgreSQL Analytics** (prod VM 100; testing VM 103) y sync **n8n workflow 004**.
 
-> Nombre histórico del repo: `superset-analytics`. La UI Apache Superset está **retirada**. Este repo mantiene SQL canónico (`v_se_*`, `bi_v_*`), scripts de apply y la definición del workflow 004.
+> Nombre anterior del repo: `superset-analytics` (renombrado a `ps-analytics` en 2026-10). La UI Apache Superset está **retirada**. Este repo mantiene SQL canónico (`v_se_*`, `bi_v_*`), scripts de apply y la definición del workflow 004.
 
 ## Gitea es el repositorio principal
 
 - ✅ `git push gitea main`
 - ❌ No push directo a GitHub (solo mirror)
 
-**Gitea:** `http://192.168.36.104:3000/admin/superset-analytics`
+**Gitea:** `http://192.168.36.104:3000/admin/ps-analytics`
 
 ## Qué hay aquí
 

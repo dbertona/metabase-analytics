@@ -1,7 +1,7 @@
 -- =============================================================================
 -- Capa semántica BI: Dashboard Planificación (Power BI / Superset)
 -- Fuente única de verdad para KPIs, evolución mensual y probabilidad.
--- Repo: superset-analytics — aplicar con scripts/apply-bi-views.sh
+-- Repo: ps-analytics — aplicar con scripts/apply-bi-views.sh
 --
 -- Rendimiento (2026-07-29): vistas pesadas = MATERIALIZED VIEW bi_mv_* +
 -- wrapper bi_v_* (mismos nombres en Superset / RLS Jinja).

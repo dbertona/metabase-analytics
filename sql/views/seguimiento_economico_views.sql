@@ -2,7 +2,7 @@
 -- ANALYTICS DB ONLY (VM 100 / 102 / 103)
 -- Vistas canónicas Seguimiento Económico (réplica PBI → Superset)
 --
--- ⚠️  FUENTE DE VERDAD: este archivo en superset-analytics.
+-- ⚠️  FUENTE DE VERDAD: este archivo en ps-analytics.
 --     Cambios deben validarse contra PBI y aplicarse de forma controlada
 --     en el entorno de Analytics antes de promoverlos.
 --

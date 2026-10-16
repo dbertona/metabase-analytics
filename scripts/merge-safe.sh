@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# merge-safe.sh — superset-analytics
+# merge-safe.sh — ps-analytics
 #
 # Via unica y auditada para cerrar una rama y publicar en `main` cuando no se
 # usan Pull Requests. Portado del esqueleto git de power-solution-apps, con

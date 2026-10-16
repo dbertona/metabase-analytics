@@ -1,6 +1,10 @@
-# Changelog — superset-analytics
+# Changelog — ps-analytics
 
 ## [Unreleased]
+
+### Changed
+
+- **El repo pasa de `superset-analytics` a `ps-analytics`.** Gitea redirige la URL antigua. Se renombran el workspace (`ps-analytics.code-workspace`) y las referencias del repo. Las rutas de servidor `/home/superset-analytics/` no cambian. Rama `chore/renombrar-ps-analytics`.
 
 ### Fixed
 

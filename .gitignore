@@ -43,5 +43,5 @@ docs/OBTENER_SUPABASE_ANON_KEY.md
 
 # Workspace IDE local (excepto el workspace del repo)
 *.code-workspace
-!superset-analytics.code-workspace
+!ps-analytics.code-workspace
 
