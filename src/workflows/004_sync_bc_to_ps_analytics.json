@@ -4131,7 +4131,7 @@
           6288
         ],
         "parameters": {
-          "jsCode": "const map = ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json) || {};\nconst syncAll = map.syncAll !== false && (!Array.isArray(map.enabledEntities) || map.enabledEntities.length === 0);\nconst enabled = map.enabledEntities || [];\nif (!syncAll && !enabled.includes('job_ledger_entry_month')) {\n  return [{ json: { skipped: true, key: 'job_ledger_cert_open' } }];\n}\nconst companyId = map.companyId;\nconst env = (($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })());\nconst base = 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/'\n  + env + '/api/Power_Solution/PS_API/v2.0/companies(' + companyId + ')/movimientosProyectos';\n// Snapshot completo: sin watermark incremental.\n// Incremental + UPSERT REPLACE pisaba documentos con un lote parcial\n// (health 021 tipo_r_sum 2026-08-13: 26700318 / 26700303).\n// Tras el upsert: no insertar si ya hay Close (mismo doc/PK);\n// borrar Open de mes cerrado o duplicada; replace de leftovers (último lote).\nconst filt = \"descripcion eq 'Ingresos' and tieneCertificacion eq true\";\nconst select = [\n  'entryNo','entryType','documentNo','jobNo','jobTaskNo','no','description',\n  'quantity','totalCost','totalPrice','globalDimension1Code','documentDate',\n  'month','year','ca','descripcion','tieneCertificacion','lastModifiedDateTime'\n].join(',');\nreturn [{\n  json: {\n    url: base + '?$filter=' + encodeURIComponent(filt) + '&$select=' + select,\n    entityKey: 'job_ledger_cert_open',\n    mode: 'full_snapshot',\n  },\n}];\n"
+          "jsCode": "const map = ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json) || {};\nconst companyId = map.companyId;\nconst env = (($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })());\nconst base = 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/'\n  + env + '/api/Power_Solution/PS_API/v2.0/companies(' + companyId + ')/movimientosProyectos';\nconst select = [\n  'entryNo','entryType','documentNo','jobNo','jobTaskNo','no','description',\n  'quantity','totalCost','totalPrice','globalDimension1Code','documentDate',\n  'month','year','ca','descripcion','tieneCertificacion','lastModifiedDateTime'\n].join(',');\n\nconst creditMemoNos = [];\nconst seenDocs = new Set();\nfor (const it of $input.all()) {\n  const raw = it?.json ?? {};\n  const statusCode = Number(raw?.statusCode ?? raw?.response?.statusCode ?? 0);\n  if (statusCode >= 400) {\n    throw new Error('postedCertifications HTTP ' + statusCode);\n  }\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value)\n    ? src.value\n    : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const doc = String(r.creditMemoNo ?? r.CreditMemoNo ?? '').trim();\n    if (!doc || seenDocs.has(doc)) continue;\n    seenDocs.add(doc);\n    creditMemoNos.push(doc);\n  }\n}\n\nconst items = [];\nconst certFilt = \"descripcion eq 'Ingresos' and tieneCertificacion eq true\";\nitems.push({\n  json: {\n    url: base + '?$filter=' + encodeURIComponent(certFilt) + '&$select=' + select,\n    entityKey: 'job_ledger_cert_open',\n    mode: 'full_snapshot',\n    creditMemoNos,\n  },\n});\nfor (let i = 0; i < creditMemoNos.length; i += 10) {\n  const part = creditMemoNos.slice(i, i + 10);\n  const or = part.map((n) => \"documentNo eq '\" + String(n).replace(/'/g, \"''\") + \"'\").join(' or ');\n  const filt = \"descripcion eq 'Ingresos' and (\" + or + \")\";\n  items.push({\n    json: {\n      url: base + '?$filter=' + encodeURIComponent(filt) + '&$select=' + select,\n      entityKey: 'job_ledger_cert_open',\n      mode: 'full_snapshot',\n      creditMemoNos,\n    },\n  });\n}\nreturn items;\n"
         }
       },
       {
@@ -4209,7 +4209,7 @@
           6208
         ],
         "parameters": {
-          "jsCode": "const toIso = (v) => {\n  if (v === null || v === undefined) return '';\n  const s = String(v).trim();\n  if (!s || s.startsWith('0001-01-01')) return '';\n  const d = new Date(s.includes('T') ? s : s.replace(' ', 'T'));\n  return Number.isNaN(d.getTime()) ? '' : d.toISOString();\n};\nconst input = $input.all();\nif (!input.length) return [];\nconst first = input[0]?.json || {};\nif (first.skipped) {\n  return [{ json: { skipped: true, key: 'job_ledger_cert_open', companyName: '', rowsJson: '[]', pruneKeysJson: '', batchSize: 0, _maxRowTimestamp: undefined } }];\n}\n\nconst companyName = $items('Build sync_state map')[0]?.json?.company || '';\nconst cleanDate = (v) => {\n  const s = String(v ?? '').trim();\n  if (!s || s === '0001-01-01' || s.startsWith('0001-01-01')) return '';\n  return s.length >= 10 ? s.slice(0, 10) : s;\n};\nconst toNum = (v) => {\n  if (v === null || v === undefined) return 0;\n  const n = Number(v);\n  return Number.isFinite(n) ? n : 0;\n};\n\nlet __GLOBAL_MAX_TS__ = '';\nconst m = new Map();\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  const statusCode = Number(raw?.statusCode ?? raw?.response?.statusCode ?? 0);\n  if (statusCode >= 400) continue;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value)\n    ? src.value\n    : (Array.isArray(src) ? src : (src && typeof src === 'object' && !src.body ? [src] : []));\n  if (!Array.isArray(chunk)) continue;\n  for (const r of chunk) {\n    const hasCert = r.tieneCertificacion === true || r.tieneCertificacion === 'true' || r.TieneCertificacion === true;\n    if (!hasCert) continue;\n    const concepto = String(r.descripcion ?? r.Descripcion ?? '').trim();\n    if (concepto !== 'Ingresos') continue;\n\n    const ts = toIso(r.lastModifiedDateTime ?? r.LastModifiedDateTime);\n    if (ts && (!__GLOBAL_MAX_TS__ || ts > __GLOBAL_MAX_TS__)) __GLOBAL_MAX_TS__ = ts;\n\n    const jobNo = String(r.jobNo ?? r.JobNo ?? '').trim();\n    const year = Number(r.year ?? r.Year ?? 0) || 0;\n    const month = Number(r.month ?? r.Month ?? 0) || 0;\n    if (!jobNo || !year || !month) continue;\n    if (jobNo.startsWith('PP') || jobNo.startsWith('PY')) continue;\n\n    const nr = String(r.no ?? r.No ?? '').trim();\n    // Alineado con filas autoritativas de MovimientosProyectosMes (Ingresos Sale)\n    const typeLine = 'G/L Account';\n    const lineType = 'Billable';\n    const documentNo = String(r.documentNo ?? r.DocumentNo ?? '').trim();\n    // totalPrice viene negativo en Sale; mismo signo que Mes (invoice neg) → * -1\n    const totalPrice = toNum(r.totalPrice ?? r.TotalPrice);\n    const invoice = totalPrice * -1;\n    const cost = toNum(r.totalCost ?? r.TotalCost);\n    const quantity = toNum(r.quantity ?? r.Quantity);\n    const key = [jobNo, year, month, nr, typeLine, lineType, concepto, documentNo].join('|');\n    if (m.has(key)) {\n      const e = m.get(key);\n      e.invoice = Number(e.invoice || 0) + invoice;\n      e.cost = Number(e.cost || 0) + cost;\n      e.quantity = Number(e.quantity || 0) + quantity;\n      continue;\n    }\n    m.set(key, {\n      job_no: jobNo,\n      year,\n      month,\n      nr,\n      type_line: typeLine,\n      line_type: lineType,\n      concepto_analitico_descripcion: concepto,\n      document_no: documentNo,\n      document_date: cleanDate(r.documentDate ?? r.DocumentDate ?? ''),\n      timesheet_date: '',\n      invoice,\n      cost,\n      quantity,\n      departamento: String(r.globalDimension1Code ?? r.GlobalDimension1Code ?? '').trim(),\n      description: String(r.description ?? r.Description ?? '').trim(),\n      status: '',\n      tipo_proyecto: '',\n      probability: 0,\n      do_not_consolidate: false,\n      budget_date_year: null,\n      budget_date_month: null,\n      month_closing_status: 'Open',\n      concepto_analitico_code: String(r.ca ?? r.Ca ?? '').trim(),\n    });\n  }\n}\n\nconst rows = [...m.values()];\nconst snapshotOk = input.some((it) => {\n  const st = Number(it?.json?.statusCode ?? it?.json?.response?.statusCode ?? 0);\n  return st < 400;\n}) && !input.some((it) => {\n  const st = Number(it?.json?.statusCode ?? it?.json?.response?.statusCode ?? 0);\n  return st >= 400;\n});\nconst pruneKeys = snapshotOk ? rows.map((r) => ({\n  job_no: r.job_no, year: r.year, month: r.month, nr: r.nr,\n  type_line: r.type_line, line_type: r.line_type,\n  concepto_analitico_descripcion: r.concepto_analitico_descripcion,\n  document_no: r.document_no,\n})) : null;\nconst chunkSize = 500;\nconst out = [];\nconst chunks = [];\nfor (let i = 0; i < rows.length; i += chunkSize) chunks.push(rows.slice(i, i + chunkSize));\nif (!chunks.length) chunks.push([]);\nfor (let ci = 0; ci < chunks.length; ci++) {\n  const chunk = chunks[ci];\n  const isLast = ci === chunks.length - 1;\n  out.push({\n    json: {\n      companyName,\n      rowsJson: JSON.stringify(chunk),\n      pruneKeysJson: (isLast && pruneKeys) ? JSON.stringify(pruneKeys) : '',\n      batchSize: chunk.length,\n      _maxRowTimestamp: __GLOBAL_MAX_TS__ || undefined,\n      key: 'job_ledger_cert_open',\n    },\n  });\n}\nreturn out;\n"
+          "jsCode": "const toIso = (v) => {\n  if (v === null || v === undefined) return '';\n  const s = String(v).trim();\n  if (!s || s.startsWith('0001-01-01')) return '';\n  const d = new Date(s.includes('T') ? s : s.replace(' ', 'T'));\n  return Number.isNaN(d.getTime()) ? '' : d.toISOString();\n};\nconst input = $input.all();\nif (!input.length) return [];\nconst first = input[0]?.json || {};\nif (first.skipped) {\n  return [{ json: { skipped: true, key: 'job_ledger_cert_open', companyName: '', rowsJson: '[]', pruneKeysJson: '', batchSize: 0, _maxRowTimestamp: undefined } }];\n}\n\nconst companyName = $items('Build sync_state map')[0]?.json?.company || '';\nconst creditDocs = new Set();\nfor (const prep of $('Prepare Cert Open Ingresos').all()) {\n  const list = prep?.json?.creditMemoNos || [];\n  for (const n of list) {\n    const s = String(n ?? '').trim();\n    if (s) creditDocs.add(s);\n  }\n}\nconst seenEntry = new Set();\nconst cleanDate = (v) => {\n  const s = String(v ?? '').trim();\n  if (!s || s === '0001-01-01' || s.startsWith('0001-01-01')) return '';\n  return s.length >= 10 ? s.slice(0, 10) : s;\n};\nconst toNum = (v) => {\n  if (v === null || v === undefined) return 0;\n  const n = Number(v);\n  return Number.isFinite(n) ? n : 0;\n};\n\nlet __GLOBAL_MAX_TS__ = '';\nconst m = new Map();\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  const statusCode = Number(raw?.statusCode ?? raw?.response?.statusCode ?? 0);\n  if (statusCode >= 400) continue;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value)\n    ? src.value\n    : (Array.isArray(src) ? src : (src && typeof src === 'object' && !src.body ? [src] : []));\n  if (!Array.isArray(chunk)) continue;\n  for (const r of chunk) {\n    const documentNoEarly = String(r.documentNo ?? r.DocumentNo ?? '').trim();\n    const hasCert = r.tieneCertificacion === true || r.tieneCertificacion === 'true' || r.TieneCertificacion === true;\n    if (!hasCert && !creditDocs.has(documentNoEarly)) continue;\n    const concepto = String(r.descripcion ?? r.Descripcion ?? '').trim();\n    if (concepto !== 'Ingresos') continue;\n\n    const ts = toIso(r.lastModifiedDateTime ?? r.LastModifiedDateTime);\n    if (ts && (!__GLOBAL_MAX_TS__ || ts > __GLOBAL_MAX_TS__)) __GLOBAL_MAX_TS__ = ts;\n\n    const jobNo = String(r.jobNo ?? r.JobNo ?? '').trim();\n    const year = Number(r.year ?? r.Year ?? 0) || 0;\n    const month = Number(r.month ?? r.Month ?? 0) || 0;\n    if (!jobNo || !year || !month) continue;\n    if (jobNo.startsWith('PP') || jobNo.startsWith('PY')) continue;\n    const entryNo = r.entryNo ?? r.EntryNo;\n    if (entryNo !== undefined && entryNo !== null && String(entryNo) !== '') {\n      const ek = String(entryNo);\n      if (seenEntry.has(ek)) continue;\n      seenEntry.add(ek);\n    }\n\n    const nr = String(r.no ?? r.No ?? '').trim();\n    // Alineado con filas autoritativas de MovimientosProyectosMes (Ingresos Sale)\n    const typeLine = 'G/L Account';\n    const lineType = 'Billable';\n    const documentNo = String(r.documentNo ?? r.DocumentNo ?? '').trim();\n    // totalPrice viene negativo en Sale; mismo signo que Mes (invoice neg) → * -1\n    const totalPrice = toNum(r.totalPrice ?? r.TotalPrice);\n    const invoice = totalPrice * -1;\n    const cost = toNum(r.totalCost ?? r.TotalCost);\n    const quantity = toNum(r.quantity ?? r.Quantity);\n    const key = [jobNo, year, month, nr, typeLine, lineType, concepto, documentNo].join('|');\n    if (m.has(key)) {\n      const e = m.get(key);\n      e.invoice = Number(e.invoice || 0) + invoice;\n      e.cost = Number(e.cost || 0) + cost;\n      e.quantity = Number(e.quantity || 0) + quantity;\n      continue;\n    }\n    m.set(key, {\n      job_no: jobNo,\n      year,\n      month,\n      nr,\n      type_line: typeLine,\n      line_type: lineType,\n      concepto_analitico_descripcion: concepto,\n      document_no: documentNo,\n      document_date: cleanDate(r.documentDate ?? r.DocumentDate ?? ''),\n      timesheet_date: '',\n      invoice,\n      cost,\n      quantity,\n      departamento: String(r.globalDimension1Code ?? r.GlobalDimension1Code ?? '').trim(),\n      description: String(r.description ?? r.Description ?? '').trim(),\n      status: '',\n      tipo_proyecto: '',\n      probability: 0,\n      do_not_consolidate: false,\n      budget_date_year: null,\n      budget_date_month: null,\n      month_closing_status: 'Open',\n      concepto_analitico_code: String(r.ca ?? r.Ca ?? '').trim(),\n    });\n  }\n}\n\nconst rows = [...m.values()];\nconst snapshotOk = input.some((it) => {\n  const st = Number(it?.json?.statusCode ?? it?.json?.response?.statusCode ?? 0);\n  return st < 400;\n}) && !input.some((it) => {\n  const st = Number(it?.json?.statusCode ?? it?.json?.response?.statusCode ?? 0);\n  return st >= 400;\n});\nconst pruneKeys = snapshotOk ? rows.map((r) => ({\n  job_no: r.job_no, year: r.year, month: r.month, nr: r.nr,\n  type_line: r.type_line, line_type: r.line_type,\n  concepto_analitico_descripcion: r.concepto_analitico_descripcion,\n  document_no: r.document_no,\n})) : null;\nconst chunkSize = 500;\nconst out = [];\nconst chunks = [];\nfor (let i = 0; i < rows.length; i += chunkSize) chunks.push(rows.slice(i, i + chunkSize));\nif (!chunks.length) chunks.push([]);\nfor (let ci = 0; ci < chunks.length; ci++) {\n  const chunk = chunks[ci];\n  const isLast = ci === chunks.length - 1;\n  out.push({\n    json: {\n      companyName,\n      rowsJson: JSON.stringify(chunk),\n      pruneKeysJson: (isLast && pruneKeys) ? JSON.stringify(pruneKeys) : '',\n      batchSize: chunk.length,\n      _maxRowTimestamp: __GLOBAL_MAX_TS__ || undefined,\n      key: 'job_ledger_cert_open',\n    },\n  });\n}\nreturn out;\n"
         }
       },
       {
@@ -4699,6 +4699,84 @@
           4200
         ],
         "continueOnFail": true
+      },
+      {
+        "id": "09ad4b78-9be9-4f02-a0b2-619070488044",
+        "name": "BC API - Cert Credit Memos",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          4570,
+          6520
+        ],
+        "parameters": {
+          "url": "={{ $json.url }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "options": {
+            "pagination": {
+              "pagination": {
+                "nextURL": "={{ $response.body['@odata.nextLink'] }}",
+                "paginationMode": "responseContainsNextURL",
+                "completeExpression": "={{ !$response.body['@odata.nextLink'] }}",
+                "paginationCompleteWhen": "other"
+              }
+            }
+          }
+        },
+        "credentials": {
+          "oAuth2Api": {
+            "id": "5caHilW1m87Snw87",
+            "name": "Business Central"
+          }
+        }
+      },
+      {
+        "id": "ec7eb4ad-e1cb-4504-bbba-895720b43a11",
+        "name": "IF Cert Credit Memos",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          4350,
+          6520
+        ],
+        "parameters": {
+          "options": {},
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "strict"
+            },
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "ef43f72e-a246-40ec-82d1-feda446f318f",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                },
+                "leftValue": "={{ !$json.skipped && !!$json.url }}",
+                "rightValue": ""
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "a830e7d8-9016-4b85-b179-e70c35c9900c",
+        "name": "Prepare Cert Credit Memo URL",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          4130,
+          6520
+        ],
+        "parameters": {
+          "jsCode": "const map = ($('Finalize Sync Context').first()?.json || $('Build sync_state map').first().json) || {};\nconst syncAll = map.syncAll !== false && (!Array.isArray(map.enabledEntities) || map.enabledEntities.length === 0);\nconst enabled = map.enabledEntities || [];\nif (!syncAll && !enabled.includes('job_ledger_entry_month')) {\n  return [{ json: { skipped: true, key: 'job_ledger_cert_open' } }];\n}\nconst companyId = map.companyId;\nconst env = (($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || (() => { throw new Error('BC_ENVIRONMENT is required'); })());\nconst base = 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/'\n  + env + '/api/Power_Solution/PS_API/v2.0/companies(' + companyId + ')/postedCertifications';\nconst filt = \"creditMemoNo ne ''\";\nconst select = 'jobNo,creditMemoNo';\nreturn [{\n  json: {\n    url: base + '?$filter=' + encodeURIComponent(filt) + '&$select=' + select,\n    key: 'job_ledger_cert_open',\n  },\n}];\n"
+        }
       }
     ],
     "connections": {
@@ -7067,7 +7145,7 @@
         "main": [
           [
             {
-              "node": "Prepare Cert Open Ingresos",
+              "node": "Prepare Cert Credit Memo URL",
               "type": "main",
               "index": 0
             }
@@ -7384,6 +7462,46 @@
           [
             {
               "node": "POST Team Reconcile",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prepare Cert Credit Memo URL": {
+        "main": [
+          [
+            {
+              "node": "IF Cert Credit Memos",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IF Cert Credit Memos": {
+        "main": [
+          [
+            {
+              "node": "BC API - Cert Credit Memos",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Skip Result Cert Open Ingresos",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BC API - Cert Credit Memos": {
+        "main": [
+          [
+            {
+              "node": "Prepare Cert Open Ingresos",
               "type": "main",
               "index": 0
             }

@@ -77,7 +77,7 @@
           520
         ],
         "parameters": {
-          "jsCode": "const year = Number($json.year);\nconst companyName = $json.companyName;\nconst companyId = $json.companyId;\nconst env = (($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || 'Production');\nconst base = 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/'\n  + env + '/api/Power_Solution/PS_API/v2.0/companies(' + companyId + ')';\n\nconst movUrl = base + \"/movimientosProyectosMes\"\n  + \"?$select=invoice,cost,year,descripcionCA,job\"\n  + \"&$filter=year%20eq%20'\" + year + \"'%20and%20descripcionCA%20eq%20'Ingresos'\";\n\nconst movCostUrl = base + \"/movimientosProyectosMes\"\n  + \"?$select=job,cost,year,descripcionCA\"\n  + \"&$filter=year%20eq%20'\" + year + \"'\";\n\nconst certUrl = base + \"/movimientosProyectos\"\n  + \"?$select=jobNo,year,month,totalPrice,descripcion,tieneCertificacion,documentNo,no\"\n  + \"&$filter=year%20eq%20'\" + year + \"'%20and%20descripcion%20eq%20'Ingresos'%20and%20tieneCertificacion%20eq%20true\";\n\nconst planifUrl = base + \"/planificacionMes\"\n  + \"?$select=job,year,month,invoice,cost,nr,estado,budgetDateYear,budgetDateMonth,descripcionCA\"\n  + \"&$filter=year%20eq%20\" + year;\n\nconst expedienteUrl = base + \"/expedienteMes\"\n  + \"?$select=job,year,month,invoice,jobUnitNo,departamento,descripcion,estado,tipoProyecto,probability,doNotConsolidate,budgetDateYear,budgetDateMonth,status1\"\n  + \"&$filter=year%20eq%20\" + year;\n\nconst cerradosUrl = base + \"/mesesCerrados\"\n  + \"?$select=job,fecha\";\n\nconst historicoUrl = base + \"/HistoricoPlanificacionMes\"\n  + \"?$select=job,year,month,invoice,cost,closingMonthCode,nr,typeLine,lineType\"\n  + \"&$filter=year%20eq%20\" + year;\n\nconst diasCountUrl = base + \"/diasdeImputacion?$select=calendario,dia&$top=20000\";\nconst proyectosCountUrl = base + \"/proyectos/$count\";\nconst recursosCountUrl = base + \"/Recursos/$count\";\nconst lineCountUrl = base + \"/movimientosProyectos/$count\"\n  + \"?$filter=year%20eq%20'\" + year + \"'\";\n\nreturn [{ json: {\n  year, companyName, companyId, slug: $json.slug,\n  movUrl, movCostUrl, certUrl, planifUrl, expedienteUrl, cerradosUrl,\n  historicoUrl, diasCountUrl, proyectosCountUrl, recursosCountUrl, lineCountUrl,\n  emailTo: $json.emailTo || 'dbertona@powersolution.es',\n  mode: $json.mode || 'full',\n}}];\n"
+          "jsCode": "const year = Number($json.year);\nconst companyName = $json.companyName;\nconst companyId = $json.companyId;\nconst env = (($env.BC_ENVIRONMENT && String($env.BC_ENVIRONMENT).trim()) || 'Production');\nconst base = 'https://api.businesscentral.dynamics.com/v2.0/a18dc497-a8b8-4740-b723-65362ab7a3fb/'\n  + env + '/api/Power_Solution/PS_API/v2.0/companies(' + companyId + ')';\n\nconst movUrl = base + \"/movimientosProyectosMes\"\n  + \"?$select=invoice,cost,year,descripcionCA,job\"\n  + \"&$filter=year%20eq%20'\" + year + \"'%20and%20descripcionCA%20eq%20'Ingresos'\";\n\nconst movCostUrl = base + \"/movimientosProyectosMes\"\n  + \"?$select=job,cost,year,descripcionCA\"\n  + \"&$filter=year%20eq%20'\" + year + \"'\";\n\nconst apiBase = base;\nconst creditMemoUrl = base + \"/postedCertifications\"\n  + \"?$select=jobNo,creditMemoNo\"\n  + \"&$filter=creditMemoNo%20ne%20''\";\n\nconst certUrl = base + \"/movimientosProyectos\"\n  + \"?$select=jobNo,year,month,totalPrice,descripcion,tieneCertificacion,documentNo,no\"\n  + \"&$filter=year%20eq%20'\" + year + \"'%20and%20descripcion%20eq%20'Ingresos'%20and%20tieneCertificacion%20eq%20true\";\n\nconst planifUrl = base + \"/planificacionMes\"\n  + \"?$select=job,year,month,invoice,cost,nr,estado,budgetDateYear,budgetDateMonth,descripcionCA\"\n  + \"&$filter=year%20eq%20\" + year;\n\nconst expedienteUrl = base + \"/expedienteMes\"\n  + \"?$select=job,year,month,invoice,jobUnitNo,departamento,descripcion,estado,tipoProyecto,probability,doNotConsolidate,budgetDateYear,budgetDateMonth,status1\"\n  + \"&$filter=year%20eq%20\" + year;\n\nconst cerradosUrl = base + \"/mesesCerrados\"\n  + \"?$select=job,fecha\";\n\nconst historicoUrl = base + \"/HistoricoPlanificacionMes\"\n  + \"?$select=job,year,month,invoice,cost,closingMonthCode,nr,typeLine,lineType\"\n  + \"&$filter=year%20eq%20\" + year;\n\nconst diasCountUrl = base + \"/diasdeImputacion?$select=calendario,dia&$top=20000\";\nconst proyectosCountUrl = base + \"/proyectos/$count\";\nconst recursosCountUrl = base + \"/Recursos/$count\";\nconst lineCountUrl = base + \"/movimientosProyectos/$count\"\n  + \"?$filter=year%20eq%20'\" + year + \"'\";\n\nreturn [{ json: {\n  year, companyName, companyId, slug: $json.slug,\n  movUrl, movCostUrl, certUrl, creditMemoUrl, apiBase, planifUrl, expedienteUrl, cerradosUrl,\n  historicoUrl, diasCountUrl, proyectosCountUrl, recursosCountUrl, lineCountUrl,\n  emailTo: $json.emailTo || 'dbertona@powersolution.es',\n  mode: $json.mode || 'full',\n}}];\n"
         },
         "typeVersion": 2
       },
@@ -302,7 +302,7 @@
           400
         ],
         "parameters": {
-          "jsCode": "const input = $input.all();\nconst meta = $('Sum MesesCerrados BC').first().json;\nconst year = Number(meta.year) || 0;\nconst toNum = (v) => {\n  const n = Number(v);\n  return Number.isFinite(n) ? n : 0;\n};\n\nconst closed = new Set();\ntry {\n  for (const it of ($items('BC MesesCerrados') || [])) {\n    const raw = it?.json ?? {};\n    if (raw.error || raw.statusCode >= 400) continue;\n    const src = raw?.body ?? raw;\n    const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n    for (const r of chunk) {\n      const job = String(r.job ?? '').trim();\n      const fecha = String(r.fecha ?? '').trim();\n      if (!job || !fecha || fecha.startsWith('0001')) continue;\n      if (job.startsWith('PP') || job.startsWith('PY')) continue;\n      const d = new Date(fecha.includes('T') ? fecha : fecha + 'T00:00:00Z');\n      if (Number.isNaN(d.getTime())) continue;\n      const y = d.getUTCFullYear();\n      const m = d.getUTCMonth() + 1;\n      if (y === year) closed.add(job + '|' + y + '|' + m);\n    }\n  }\n} catch (e) {}\n\nlet certSum = 0;\nlet certCount = 0;\nlet certSkippedClosed = 0;\nconst certByJob = {};\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  if (raw.error || raw.statusCode >= 400) continue;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const job = String(r.jobNo ?? r.JobNo ?? r.job ?? '').trim();\n    if (!job || job.startsWith('PP') || job.startsWith('PY')) continue;\n    const y = Number(r.year ?? 0) || 0;\n    const m = Number(r.month ?? 0) || 0;\n    if (y !== year || !m) continue;\n    const concepto = String(r.descripcion ?? r.Descripcion ?? '').trim();\n    if (concepto && concepto !== 'Ingresos') continue;\n    const key = job + '|' + y + '|' + m;\n    if (closed.has(key)) { certSkippedClosed += 1; continue; }\n    const inv = toNum(r.totalPrice ?? r.TotalPrice) * -1;\n    certSum += inv;\n    certCount += 1;\n    certByJob[job] = Number(((certByJob[job] || 0) + Math.abs(inv)).toFixed(2));\n  }\n}\n\nconst movSum = toNum(meta.bc_r_mov_sum ?? meta.bc_r_sum);\nconst bc_r_total = Number((movSum + Math.abs(certSum)).toFixed(2));\n\nconst rByJob = { ...(meta.bc_r_mov_by_job || {}) };\nfor (const [job, v] of Object.entries(certByJob)) {\n  rByJob[job] = Number(((rByJob[job] || 0) + Number(v)).toFixed(2));\n}\n\nreturn [{ json: {\n  ...meta,\n  bc_r_mov_sum: movSum,\n  bc_r_cert_open_sum: Number(Math.abs(certSum).toFixed(2)),\n  bc_r_cert_open_count: certCount,\n  bc_r_cert_skipped_closed: certSkippedClosed,\n  bc_r_sum: bc_r_total,\n  bc_r_by_job: rByJob,\n}}];\n"
+          "jsCode": "const certItems = $('BC Cert Open').all();\nconst abonoItems = [];\nfor (const it of $input.all()) {\n  const j = it?.json || {};\n  if (j.skipped || j.skip) continue;\n  abonoItems.push(it);\n}\nconst input = certItems.concat(abonoItems);\nconst meta = $('Sum MesesCerrados BC').first().json;\nconst year = Number(meta.year) || 0;\nconst toNum = (v) => {\n  const n = Number(v);\n  return Number.isFinite(n) ? n : 0;\n};\n\nconst closed = new Set();\ntry {\n  for (const it of ($items('BC MesesCerrados') || [])) {\n    const raw = it?.json ?? {};\n    if (raw.error || raw.statusCode >= 400) continue;\n    const src = raw?.body ?? raw;\n    const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n    for (const r of chunk) {\n      const job = String(r.job ?? '').trim();\n      const fecha = String(r.fecha ?? '').trim();\n      if (!job || !fecha || fecha.startsWith('0001')) continue;\n      if (job.startsWith('PP') || job.startsWith('PY')) continue;\n      const d = new Date(fecha.includes('T') ? fecha : fecha + 'T00:00:00Z');\n      if (Number.isNaN(d.getTime())) continue;\n      const y = d.getUTCFullYear();\n      const m = d.getUTCMonth() + 1;\n      if (y === year) closed.add(job + '|' + y + '|' + m);\n    }\n  }\n} catch (e) {}\n\nlet certSum = 0;\nlet certCount = 0;\nlet certSkippedClosed = 0;\nconst certByJob = {};\nfor (const it of input) {\n  const raw = it?.json ?? {};\n  if (raw.error || raw.statusCode >= 400) continue;\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const job = String(r.jobNo ?? r.JobNo ?? r.job ?? '').trim();\n    if (!job || job.startsWith('PP') || job.startsWith('PY')) continue;\n    const y = Number(r.year ?? 0) || 0;\n    const m = Number(r.month ?? 0) || 0;\n    if (y !== year || !m) continue;\n    const concepto = String(r.descripcion ?? r.Descripcion ?? '').trim();\n    if (concepto && concepto !== 'Ingresos') continue;\n    const key = job + '|' + y + '|' + m;\n    if (closed.has(key)) { certSkippedClosed += 1; continue; }\n    const inv = toNum(r.totalPrice ?? r.TotalPrice) * -1;\n    certSum += inv;\n    certCount += 1;\n    certByJob[job] = Number(((certByJob[job] || 0) + inv).toFixed(2));\n  }\n}\n\nconst movSum = toNum(meta.bc_r_mov_sum ?? meta.bc_r_sum);\nconst bc_r_total = Number((movSum + Math.abs(certSum)).toFixed(2));\n\nfor (const job of Object.keys(certByJob)) {\n  certByJob[job] = Number(Math.abs(certByJob[job]).toFixed(2));\n}\n\nconst rByJob = { ...(meta.bc_r_mov_by_job || {}) };\nfor (const [job, v] of Object.entries(certByJob)) {\n  rByJob[job] = Number(((rByJob[job] || 0) + Number(v)).toFixed(2));\n}\n\nreturn [{ json: {\n  ...meta,\n  bc_r_mov_sum: movSum,\n  bc_r_cert_open_sum: Number(Math.abs(certSum).toFixed(2)),\n  bc_r_cert_open_count: certCount,\n  bc_r_cert_skipped_closed: certSkippedClosed,\n  bc_r_sum: bc_r_total,\n  bc_r_by_job: rByJob,\n}}];\n"
         },
         "typeVersion": 2
       },
@@ -918,6 +918,130 @@
           }
         },
         "continueOnFail": true
+      },
+      {
+        "id": "7a2d52d0-8137-42f2-b236-2149312da738",
+        "name": "BC Posted Cert Credit Memos",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          2860,
+          560
+        ],
+        "parameters": {
+          "url": "={{ $json.url }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "options": {
+            "pagination": {
+              "pagination": {
+                "nextURL": "={{ $response.body['@odata.nextLink'] }}",
+                "paginationMode": "responseContainsNextURL",
+                "completeExpression": "={{ !$response.body['@odata.nextLink'] }}",
+                "paginationCompleteWhen": "other"
+              }
+            }
+          }
+        },
+        "typeVersion": 4.2,
+        "credentials": {
+          "oAuth2Api": {
+            "id": "5caHilW1m87Snw87",
+            "name": "Business Central"
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "id": "24dc4d8c-ec48-418d-ad16-726a755d4c49",
+        "name": "BC Cert Abono Lines",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          3300,
+          560
+        ],
+        "parameters": {
+          "url": "={{ $json.url }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "options": {
+            "pagination": {
+              "pagination": {
+                "nextURL": "={{ $response.body['@odata.nextLink'] }}",
+                "paginationMode": "responseContainsNextURL",
+                "completeExpression": "={{ !$response.body['@odata.nextLink'] }}",
+                "paginationCompleteWhen": "other"
+              }
+            }
+          }
+        },
+        "typeVersion": 4.2,
+        "credentials": {
+          "oAuth2Api": {
+            "id": "5caHilW1m87Snw87",
+            "name": "Business Central"
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "id": "860ebc34-58b3-4ff0-94b3-9ed0d1cc400f",
+        "name": "Prepare Cert Abono Request",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2640,
+          560
+        ],
+        "parameters": {
+          "jsCode": "const built = $('Build BC URLs').first().json || {};\nif (!built.creditMemoUrl) return [{ json: { skipped: true } }];\nreturn [{ json: { url: built.creditMemoUrl } }];\n"
+        }
+      },
+      {
+        "id": "1a5170a2-2ce5-4ac2-8246-efaa5795bd9c",
+        "name": "Prepare Cert Abono Lines",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          3080,
+          560
+        ],
+        "parameters": {
+          "jsCode": "const docs = [];\nconst seen = new Set();\nfor (const it of $input.all()) {\n  const raw = it?.json ?? {};\n  const statusCode = Number(raw?.statusCode ?? raw?.response?.statusCode ?? 0);\n  if (statusCode >= 400) throw new Error('postedCertifications HTTP ' + statusCode);\n  const src = raw?.body ?? raw;\n  const chunk = Array.isArray(src.value) ? src.value : (Array.isArray(src) ? src : []);\n  for (const r of chunk) {\n    const doc = String(r.creditMemoNo ?? '').trim();\n    if (!doc || seen.has(doc)) continue;\n    seen.add(doc);\n    docs.push(doc);\n  }\n}\nif (!docs.length) return [{ json: { skipped: true } }];\nconst built = $('Build BC URLs').first().json || {};\nconst apiBase = built.apiBase;\nif (!apiBase) throw new Error('apiBase is required');\nconst or = docs.map((n) => \"documentNo eq '\" + String(n).replace(/'/g, \"''\") + \"'\").join(' or ');\nconst filt = \"descripcion eq 'Ingresos' and (\" + or + \")\";\nconst select = 'jobNo,year,month,totalPrice,descripcion,tieneCertificacion,documentNo,no';\nreturn [{ json: {\n  url: apiBase + '/movimientosProyectos?$select=' + select + '&$filter=' + encodeURIComponent(filt),\n}}];\n"
+        }
+      },
+      {
+        "parameters": {
+          "options": {},
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "strict"
+            },
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "e13ca1d7-215f-4804-9517-9747ad1b3e6a",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                },
+                "leftValue": "={{ !$json.skipped && !!$json.url }}",
+                "rightValue": ""
+              }
+            ]
+          }
+        },
+        "id": "b45ea179-f66a-4571-baf5-9d46c532e9eb",
+        "name": "IF Cert Abono Lines",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          3180,
+          480
+        ]
       }
     ],
     "connections": {
@@ -1146,7 +1270,7 @@
         "main": [
           [
             {
-              "node": "Sum Cert Open BC",
+              "node": "Prepare Cert Abono Request",
               "type": "main",
               "index": 0
             }
@@ -1408,6 +1532,68 @@
           [
             {
               "node": "Log Planif Heal Attempt",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prepare Cert Abono Request": {
+        "main": [
+          [
+            {
+              "node": "BC Posted Cert Credit Memos",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BC Posted Cert Credit Memos": {
+        "main": [
+          [
+            {
+              "node": "Prepare Cert Abono Lines",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prepare Cert Abono Lines": {
+        "main": [
+          [
+            {
+              "node": "IF Cert Abono Lines",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IF Cert Abono Lines": {
+        "main": [
+          [
+            {
+              "node": "BC Cert Abono Lines",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Sum Cert Open BC",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BC Cert Abono Lines": {
+        "main": [
+          [
+            {
+              "node": "Sum Cert Open BC",
               "type": "main",
               "index": 0
             }
