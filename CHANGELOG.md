@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **la guía distingue el enlace vivo del pin de las reglas.** `docs/shared` en `d187278`. Rama `chore/pin-docs-d187278`.
+
 - **el agente propone horas solo cuando la tarea está terminada.** `docs/shared` en `1c0355c`. Rama `chore/pin-docs-1c0355c`.
 
 - **el mirror de GitHub de Analytics ya es ps-analytics.** `docs/shared` en `2ed7b88`. Rama `chore/pin-docs-2ed7b88`.
