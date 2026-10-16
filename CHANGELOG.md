@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **el agente propone horas solo cuando la tarea está terminada.** `docs/shared` en `1c0355c`. Rama `chore/pin-docs-1c0355c`.
+
 - **el mirror de GitHub de Analytics ya es ps-analytics.** `docs/shared` en `2ed7b88`. Rama `chore/pin-docs-2ed7b88`.
 
 - **La lectura en cualquier entorno no pide permiso.** `docs/shared` en `4a4e829`. Rama `chore/pin-docs-4a4e829`.
