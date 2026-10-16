@@ -14,7 +14,7 @@ La UI Apache Superset está **retirada**.
 
 | Repo | Responsabilidad |
 |------|-----------------|
-| **superset-analytics** (este) | SQL canónico (`v_se_*`, `bi_v_*`), workflow 004, docs de sync |
+| **ps-analytics** (este) | SQL canónico (`v_se_*`, `bi_v_*`), workflow 004, docs de sync |
 | **power-solution-apps** | Consumo Apps (fuera de alcance para cambios SQL/004 aquí) |
 
 ## Infraestructura

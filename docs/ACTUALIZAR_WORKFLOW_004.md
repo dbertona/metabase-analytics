@@ -44,7 +44,7 @@ Publicar este JSON a producción = Deploy Analytics; el deploy **no** lanza el 0
 ## Publicar Analytics (004, 021, SQL)
 
 **Canal operativo (como Timesheet):** Gitea Action **Deploy Analytics Multi-Environment**
-en `admin/superset-analytics` — solo `workflow_dispatch` (testing / production / ambos).
+en `admin/ps-analytics` — solo `workflow_dispatch` (testing / production / ambos).
 No se lanza en push a `main`.
 
 Por debajo, **004 y SQL** se aplican con `./scripts/deploy-analytics.sh` →
@@ -92,7 +92,7 @@ Flujo:
 `ANALYTICS_FACTURACION_PBI_ALIGNMENT.md`.
 
 ```bash
-cd superset-analytics
+cd ps-analytics
 ./scripts/deploy-analytics.sh --env production --yes
 ./scripts/deploy-analytics.sh --env production --scope sql --yes
 ./scripts/deploy-analytics.sh --env production --scope 004 --yes
@@ -282,7 +282,7 @@ ORDER BY empresa,tipo;
    export N8N_APP_CONTAINER='n8n-prod' N8N_PG_CONTAINER='supabase-db'
    /Users/marcelodanielbertona/POWER-SOLUTION-PROJECTS/power-solution-apps/scripts/update-n8n-workflow-postgres-remote.sh \
      d1f7647e114a486e \
-     /Users/marcelodanielbertona/POWER-SOLUTION-PROJECTS/superset-analytics/superset-analytics/src/workflows/004_sync_bc_to_ps_analytics.json
+     /Users/marcelodanielbertona/POWER-SOLUTION-PROJECTS/ps-analytics/src/workflows/004_sync_bc_to_ps_analytics.json
    ```
 
 5. **Purgar el año afectado en `bc_historico_planificacion_mes`**
