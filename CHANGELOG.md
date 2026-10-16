@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **La lectura en cualquier entorno no pide permiso.** `docs/shared` en `4a4e829`. Rama `chore/pin-docs-4a4e829`.
+
 - **renombrar superset-analytics a ps-analytics.** `docs/shared` en `85af2f4`. Rama `chore/pin-docs-85af2f4`.
 
 - **El repo pasa de `superset-analytics` a `ps-analytics`.** Gitea redirige la URL antigua. Se renombran el workspace (`ps-analytics.code-workspace`) y las referencias del repo. Las rutas de servidor `/home/superset-analytics/` no cambian. Rama `chore/renombrar-ps-analytics`.
