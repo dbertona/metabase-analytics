@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **el mirror de GitHub de Analytics ya es ps-analytics.** `docs/shared` en `2ed7b88`. Rama `chore/pin-docs-2ed7b88`.
+
 - **La lectura en cualquier entorno no pide permiso.** `docs/shared` en `4a4e829`. Rama `chore/pin-docs-4a4e829`.
 
 - **renombrar superset-analytics a ps-analytics.** `docs/shared` en `85af2f4`. Rama `chore/pin-docs-85af2f4`.
